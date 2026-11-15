@@ -1917,3 +1917,37 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
+# ==========================================
+# SERVICE WORKER & REAL-TIME SYNC ROUTES
+# ==========================================
+@app.get("/sw.js")
+def service_worker():
+    return FileResponse("sw.js", media_type="application/javascript")
+
+ACTIVE_PRESENCE = {}
+
+@app.post("/api/presence/{business_id}/{customer_uuid}")
+def ping_customer_presence(business_id: int, customer_uuid: str, db: Session = Depends(get_db)):
+    cust = db.query(Customer).filter(Customer.uuid == customer_uuid, Customer.business_id == business_id).first()
+    if cust:
+        ACTIVE_PRESENCE[business_id] = {
+            "name": cust.name,
+            "uuid": cust.uuid,
+            "stamps": cust.stamps or 0,
+            "ts": datetime.now().timestamp()
+        }
+    return {"ok": True}
+
+@app.get("/api/presence/{business_id}")
+def check_business_presence(business_id: int):
+    info = ACTIVE_PRESENCE.get(business_id)
+    if info and (datetime.now().timestamp() - info["ts"]) < 25:
+        return {"active": True, "customer": info}
+    return {"active": False}
+
+@app.get("/api/customer-status/{customer_uuid}")
+def get_customer_status(customer_uuid: str, db: Session = Depends(get_db)):
+    cust = db.query(Customer).filter(Customer.uuid == customer_uuid).first()
+    if not cust:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"stamps": cust.stamps or 0, "name": cust.name}
