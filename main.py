@@ -1978,3 +1978,60 @@ def get_customer_status(customer_uuid: str, db: Session = Depends(get_db)):
     if not cust:
         raise HTTPException(status_code=404, detail="Not found")
     return {"stamps": cust.stamps or 0, "name": cust.name}
+
+# ==========================================
+# BUSINESS DASHBOARD ENDPOINTS
+# ==========================================
+class BusinessSettingsUpdate(BaseModel):
+    google_review_url: Optional[str] = None
+    staff_pin: Optional[str] = None
+    reward_text: Optional[str] = None
+
+@app.get("/api/my-business")
+def get_my_business(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Neautentificat")
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token invalid")
+    
+    biz = db.query(BusinessAccount).filter(BusinessAccount.email == email).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Afacere negăsită")
+    
+    customers = db.query(Customer).filter(Customer.business_id == biz.id).order_by(Customer.id.desc()).all()
+    feedbacks = db.query(PublicReviewFeedback).filter(PublicReviewFeedback.business_id == biz.id).order_by(PublicReviewFeedback.id.desc()).all()
+    
+    return {
+        "id": biz.id,
+        "name": biz.name,
+        "email": biz.email,
+        "plan": biz.plan or "free",
+        "max_customers": biz.max_customers or 50,
+        "reward_text": biz.reward_text,
+        "card_color": biz.card_color,
+        "staff_pin": biz.staff_pin or "1234",
+        "google_review_url": biz.google_review_url or "",
+        "customers_count": len(customers),
+        "customers": [{"name": c.name, "stamps": c.stamps or 0, "last_visit": c.last_visit} for c in customers[:20]],
+        "feedbacks": [{"rating": f.rating, "message": f.message, "date": f.created_at} for f in feedbacks[:10]]
+    }
+
+@app.post("/api/my-business/settings")
+def update_my_business_settings(req: BusinessSettingsUpdate, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Neautentificat")
+    payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+    biz = db.query(BusinessAccount).filter(BusinessAccount.email == payload.get("sub")).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Afacere negăsită")
+    if req.google_review_url is not None:
+        biz.google_review_url = req.google_review_url.strip()
+    if req.staff_pin and len(req.staff_pin) == 4:
+        biz.staff_pin = req.staff_pin.strip()
+    if req.reward_text:
+        biz.reward_text = req.reward_text.strip()
+    db.commit()
+    return {"status": "updated"}
