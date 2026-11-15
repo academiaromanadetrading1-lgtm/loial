@@ -1668,7 +1668,7 @@ def health(db: Session = Depends(get_db)):
     count = db.query(func.count(Customer.id)).scalar()
     return {"status": "healthy", "db": "sqlite", "customers": count, "timestamp": datetime.now().isoformat()}
 
-@app.post("/setup-admin")
+@app.get("/setup-admin")
 def setup_admin(email: str = "ciprianpop@academiadetrading.llc", db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == email).first()
     if not user:
