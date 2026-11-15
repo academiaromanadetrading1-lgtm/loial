@@ -2263,3 +2263,39 @@ def delete_biz_staff_direct(business_id: int, staff_id: int, db: Session = Depen
         db.commit()
     return {"status": "deleted"}
 
+# ==========================================
+# INSTANT CLIENT CARD & QR PNG ENDPOINTS
+# ==========================================
+@app.get("/manifest.json")
+def get_manifest():
+    return FileResponse("manifest.json", media_type="application/manifest+json")
+
+@app.get("/api/qr-raw/{code_text}")
+def generate_raw_qr_png(code_text: str):
+    from fastapi.responses import Response
+    img = qrcode.make(code_text)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return Response(content=buf.getvalue(), media_type="image/png")
+
+class InstantEnrollRequest(BaseModel):
+    business_id: int
+    name: str
+    uuid: str
+
+@app.post("/api/enroll-sync")
+def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db)):
+    existing = db.query(Customer).filter(Customer.uuid == req.uuid).first()
+    if existing:
+        return {"status": "exists"}
+    customer = Customer(
+        uuid=req.uuid,
+        name=sanitize_input(req.name, 80),
+        stamps=0,
+        business_id=req.business_id,
+        last_visit=datetime.now().isoformat()
+    )
+    db.add(customer)
+    db.commit()
+    return {"status": "saved"}
+
