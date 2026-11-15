@@ -1889,29 +1889,39 @@ def industry_seo_page(industrie: str):
 <html lang="ro"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{data["title"]} - Loial.space</title>
 <meta name="description" content="{data["title"]}. Creează carduri digitale de fidelitate cu cod QR gratuit în 3 minute.">
-<style>body{{font-family:system-ui;background:#0a0a0f;color:#fff;padding:40px;max-width:720px;margin:auto;line-height:1.6}}
-.btn{{display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#a855f7,#06b6d4);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;margin-top:20px}}</style>
+<link href="https://googleapis.com" rel="stylesheet">
+<style>
+  body {{ font-family: 'Inter', system-ui, sans-serif; background: #f6f9f7; color: #111f18; margin: 0; line-height: 1.6; }}
+  header {{ background: #ffffff; border-bottom: 1px solid #dce6e0; padding: 16px 32px; display: flex; justify-content: space-between; align-items: center; }}
+  .logo {{ display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; color: #111f18; text-decoration: none; }}
+  .logo-icon {{ width: 32px; height: 32px; background: linear-gradient(135deg, #2d6a4f, #52b788); color: #fff; border-radius: 8px; display: flex; align-items: center; justify-content: center; }}
+  .container {{ max-width: 760px; margin: 60px auto; padding: 0 24px; }}
+  .badge {{ display: inline-block; padding: 6px 14px; background: #e8f3ed; border: 1px solid #b7d7c5; color: #2d6a4f; border-radius: 20px; font-size: 12.5px; font-weight: 700; margin-bottom: 16px; }}
+  h1 {{ font-size: 40px; line-height: 1.15; font-weight: 800; margin-bottom: 16px; color: #111f18; }}
+  p {{ color: #475d52; font-size: 17px; margin-bottom: 24px; }}
+  .offer-card {{ background: #ffffff; padding: 24px; border-radius: 18px; border: 1px solid #dce6e0; box-shadow: 0 10px 25px rgba(17, 31, 24, 0.05); margin: 28px 0; }}
+  .offer-label {{ font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #475d52; font-weight: 700; }}
+  .offer-value {{ font-size: 20px; font-weight: 800; color: #2d6a4f; margin-top: 6px; }}
+  .btn {{ display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #2d6a4f, #40916c); color: #ffffff; text-decoration: none; border-radius: 12px; font-weight: 700; font-size: 16px; box-shadow: 0 6px 18px rgba(45, 106, 79, 0.25); }}
+</style>
 </head><body>
-<p style="color:#a855f7;font-weight:600">SOLUȚII DE LOIALITATE • LOIAL.SPACE</p>
-<h1>{data["h1"]}</h1>
-<p>Renunță la cartonașele de carton care se pierd. Oferă clienților tăi un card digital pe care îl salvează în telefon printr-o simplă scanare QR.</p>
-<div style="background:#14161f;padding:20px;border-radius:14px;border:1px solid #222;margin:20px 0">
-<strong>Exemplu ofertă recomandată:</strong><br><span style="color:#38bdf8;font-size:1.1rem">{data["reward"]}</span>
+<header>
+  <a href="/" class="logo"><div class="logo-icon">L</div> LOIAL</a>
+  <a href="/" style="color:#2d6a4f;text-decoration:none;font-weight:600;font-size:14px;">← Înapoi la toate industriile</a>
+</header>
+<div class="container">
+  <span class="badge">SOLUȚII DE LOIALITATE • LOIAL.SPACE</span>
+  <h1>{data["h1"]}</h1>
+  <p>Renunță la cartonașele de carton care se pierd. Oferă clienților tăi un card digital pe care îl salvează în telefon printr-o simplă scanare QR, fără aplicații de descărcat.</p>
+  <div class="offer-card">
+    <div class="offer-label">🎁 Exemplu ofertă recomandată pentru afacerea ta</div>
+    <div class="offer-value">{data["reward"]}</div>
+  </div>
+  <a href="/register.html" class="btn">Creează-ți primul card gratuit →</a>
+  <p style="font-size:13px;margin-top:12px;">Gratuit până la primii 50 de clienți • Fără card bancar</p>
 </div>
-<a href="/register.html" class="btn">Creează-ți primul card gratuit →</a>
 </body></html>'''
     return HTMLResponse(content=html)
-
-@app.get("/sitemap.xml")
-def dynamic_sitemap():
-    base = "https://loial.space"
-    urls = [f"{base}/"] + [f"{base}/solutii/{ind}" for ind in INDUSTRIES.keys()]
-    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://sitemaps.org">\n'
-    for u in urls:
-        xml += f'  <url><loc>{u}</loc><changefreq>weekly</changefreq></url>\n'
-    xml += '</urlset>'
-    return Response(content=xml, media_type="application/xml")
-
 
 if __name__ == "__main__":
     import uvicorn
