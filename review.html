@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Review - Loial</title>
+<style>
+body { font-family: system-ui; background: #0a0a0f; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+.box { text-align: center; padding: 40px; max-width: 400px; }
+.stars { font-size: 48px; cursor: pointer; margin: 20px 0; }
+.star { color: #333; transition: 0.2s; }
+.star.active { color: #fbbf24; }
+textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #333; background: #1a1a1f; color: #fff; margin-top: 16px; box-sizing: border-box; }
+.btn { padding: 12px 24px; border: none; border-radius: 8px; background: linear-gradient(135deg, #a855f7, #06b6d4); color: #fff; cursor: pointer; margin-top: 16px; }
+.hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h2 id="bizName">Se încarcă...</h2>
+  <p>Cum a fost experiența ta astăzi?</p>
+  <div class="stars" id="stars">
+    <span class="star" data-r="1">★</span><span class="star" data-r="2">★</span><span class="star" data-r="3">★</span><span class="star" data-r="4">★</span><span class="star" data-r="5">★</span>
+  </div>
+  <div id="feedbackForm" class="hidden">
+    <textarea id="msg" placeholder="Spune-ne ce putem îmbunătăți"></textarea>
+    <button class="btn" onclick="submitFeedback()">Trimite feedback</button>
+  </div>
+  <p id="thanks" class="hidden">Mulțumim pentru feedback!</p>
+</div>
+<script>
+const bizId = location.pathname.split('/').pop();
+let rating = 0;
+let googleUrl = null;
+
+fetch('/api/business-public/' + bizId)
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('bizName').textContent = data.name || 'Afacere';
+    googleUrl = data.google_review_url;
+  });
+
+document.querySelectorAll('.star').forEach(s => {
+  s.onclick = () => {
+    rating = parseInt(s.dataset.r);
+    document.querySelectorAll('.star').forEach((st, i) => st.classList.toggle('active', i < rating));
+    if (rating >= 4) {
+      if (googleUrl) location.href = googleUrl;
+      else { document.getElementById('thanks').classList.remove('hidden'); document.getElementById('stars').style.display = 'none'; }
+    } else {
+      document.getElementById('feedbackForm').classList.remove('hidden');
+    }
+  };
+});
+
+async function submitFeedback() {
+  await fetch('/api/private-feedback', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ business_id: parseInt(bizId), rating: rating, message: document.getElementById('msg').value })
+  });
+  document.getElementById('feedbackForm').classList.add('hidden');
+  document.getElementById('thanks').classList.remove('hidden');
+}
+</script>
+</body>
+</html>
