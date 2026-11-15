@@ -176,3 +176,108 @@
         <tr><td colspan="3" style="color: var(--text-muted);">Nu ai încă niciun client înscris. Printează afișul de mai sus sau testează scanarea!</td></tr>
       </tbody>
     </table>
+  </div>
+</div>
+
+<script>
+  let bizId = localStorage.getItem('biz_id') || '1';
+
+  async function loadDashboard() {
+    const res = await fetch(`/api/biz-full/${bizId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    document.getElementById('bizTitle').textContent = data.name;
+    document.getElementById('bizEmail').textContent = data.email;
+    document.getElementById('posterBizName').textContent = data.name;
+    document.getElementById('posterReward').textContent = '🎁 ' + data.reward_text;
+    document.getElementById('rewardInput').value = data.reward_text;
+    document.getElementById('stampsInput').value = data.stamps_required;
+    document.getElementById('googleUrlInput').value = data.google_review_url;
+    document.getElementById('planBadge').textContent = `Plan ${data.plan.toUpperCase()}: ${data.customers_count} / ${data.max_customers} clienți`;
+
+    document.getElementById('qrImage').src = data.qr_base64;
+    document.getElementById('testJoinLink').href = `/join/${data.id}`;
+    document.getElementById('openScanLink').href = `/scan/${data.id}`;
+
+    const staffTbody = document.getElementById('staffTable');
+    if (data.staff && data.staff.length > 0) {
+      staffTbody.innerHTML = data.staff.map(s => `
+        <tr>
+          <td><strong>${s.name}</strong></td>
+          <td><code>${s.pin}</code></td>
+          <td>${s.scans_count} scanări</td>
+          <td><button type="button" class="btn-danger" onclick="removeStaff(${s.id})">Elimină</button></td>
+        </tr>
+      `).join('');
+    } else {
+      staffTbody.innerHTML = '<tr><td colspan="4" style="color: var(--text-muted);">Nu ai adăugat încă angajați. Poți scana și cu PIN-ul principal (1234).</td></tr>';
+    }
+
+    if (data.customers && data.customers.length > 0) {
+      document.getElementById('customersTable').innerHTML = data.customers.map(c => `
+        <tr>
+          <td><strong>${c.name}</strong></td>
+          <td>${c.stamps} / ${data.stamps_required} ★</td>
+          <td style="color: var(--text-muted);">${(c.last_visit || '').split('T')[0]}</td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  async function addStaff() {
+    const nameInput = document.getElementById('newStaffName');
+    const pinInput = document.getElementById('newStaffPin');
+    const name = nameInput.value.trim();
+    const pin = pinInput.value.trim();
+    if (!name || pin.length !== 4) {
+      alert('Introdu numele angajatului și un PIN din 4 cifre.');
+      return;
+    }
+    const res = await fetch(`/api/biz-full/${bizId}/staff`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, pin })
+    });
+    if (res.ok) {
+      nameInput.value = '';
+      pinInput.value = '';
+      nameInput.focus();
+      loadDashboard();
+    } else {
+      const err = await res.json();
+      alert(err.detail || 'Eroare la adăugarea angajatului.');
+    }
+  }
+
+  async function removeStaff(staffId) {
+    if (!confirm('Elimini acest angajat? Codul lui PIN nu va mai funcționa.')) return;
+    await fetch(`/api/biz-full/${bizId}/staff/${staffId}`, { method: 'DELETE' });
+    loadDashboard();
+  }
+
+  async function saveOfferSettings() {
+    const res = await fetch(`/api/biz-full/${bizId}/offer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reward_text: document.getElementById('rewardInput').value,
+        stamps_required: parseInt(document.getElementById('stampsInput').value) || 6,
+        google_review_url: document.getElementById('googleUrlInput').value
+      })
+    });
+    if (res.ok) {
+      alert('✓ Oferta și numărul de ștampile au fost salvate!');
+      loadDashboard();
+    }
+  }
+
+  function logout() {
+    localStorage.clear();
+    location.href = '/login.html';
+  }
+
+  loadDashboard();
+</script>
+</body>
+</html>
