@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loial – Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root { --bg:#0a0b10; --surface:#14161f; --primary:#7c5cff; --accent:#22d3ee; --text:#f8fafc; --dim:#94a3b8; --success:#10b981; --warning:#f59e0b; --danger:#ef4444; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--text); }
+.container { max-width:1200px; margin:0 auto; padding:24px; }
+header { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+h1 { font-size:1.5rem; }
+.period-select { background:var(--surface); color:var(--text); border:1px solid rgba(255,255,255,0.1); padding:8px 16px; border-radius:8px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:24px; }
+.card { background:var(--surface); border-radius:16px; padding:20px; }
+.stat-value { font-size:2rem; font-weight:700; }
+.stat-label { color:var(--dim); font-size:0.85rem; margin-top:4px; }
+.stat-value.success { color:var(--success); }
+.stat-value.warning { color:var(--warning); }
+.stat-value.accent { color:var(--accent); }
+.chart-container { height:250px; }
+table { width:100%; border-collapse:collapse; margin-top:12px; }
+th, td { text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); font-size:0.9rem; }
+th { color:var(--dim); font-weight:500; }
+.badge { padding:4px 10px; border-radius:20px; font-size:0.75rem; }
+.badge-green { background:var(--success); }
+.badge-yellow { background:var(--warning); color:#000; }
+.badge-red { background:var(--danger); }
+.tabs { display:flex; gap:8px; margin-bottom:20px; }
+.tab { padding:10px 20px; border-radius:8px; cursor:pointer; background:var(--surface); }
+.tab.active { background:var(--primary); }
+.hidden { display:none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Loial Analytics</h1>
+    <div>
+      <select class="period-select" id="period" onchange="loadData()">
+        <option value="day">Zi</option>
+        <option value="week">Săptămână</option>
+        <option value="month" selected>Lună</option>
+        <option value="quarter">Trimestru</option>
+        <option value="semester">Semestru</option>
+        <option value="year">An</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('admin')">Admin</div>
+    <div class="tab" onclick="showTab('agent')">Agent</div>
+    <div class="tab" onclick="showTab('business')">Business</div>
+  </div>
+
+  <div id="admin-tab">
+    <div class="grid">
+      <div class="card"><div class="stat-value accent" id="a-agents">0</div><div class="stat-label">Agenți</div></div>
+      <div class="card"><div class="stat-value success" id="a-active">0</div><div class="stat-label">Activi</div></div>
+      <div class="card"><div class="stat-value warning" id="a-trial">0</div><div class="stat-label">Trial</div></div>
+      <div class="card"><div class="stat-value" id="a-businesses">0</div><div class="stat-label">Afaceri</div></div>
+      <div class="card"><div class="stat-value accent" id="a-sales">0</div><div class="stat-label">Vânzări</div></div>
+      <div class="card"><div class="stat-value success" id="a-revenue">€0</div><div class="stat-label">Revenue</div></div>
+    </div>
+    <div class="card">
+      <h3>Comisioane agenți</h3>
+      <table><thead><tr><th>Agent</th><th>Status</th><th>Vânzări</th><th>Comision</th></tr></thead><tbody id="a-commissions"></tbody></table>
+    </div>
+  </div>
+
+  <div id="agent-tab" class="hidden">
+    <div class="grid">
+      <div class="card"><div class="stat-value accent" id="ag-sales">0</div><div class="stat-label">Vânzări</div></div>
+      <div class="card"><div class="stat-value success" id="ag-commission">€0</div><div class="stat-label">Comision</div></div>
+      <div class="card"><div class="stat-value warning" id="ag-status">trial</div><div class="stat-label">Status</div></div>
+      <div class="card"><div class="stat-value" id="ag-needed">5</div><div class="stat-label">Vânzări necesare</div></div>
+    </div>
+    <div class="card">
+      <h3>Afaceri aduse</h3>
+      <table><thead><tr><th>Nume</th><th>Tip</th><th>Din</th></tr></thead><tbody id="ag-businesses"></tbody></table>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <h3>Pe tip</h3>
+      <canvas id="agent-chart"></canvas>
+    </div>
+  </div>
+
+  <div id="business-tab" class="hidden">
+    <div class="grid">
+      <div class="card"><div class="stat-value accent" id="b-customers">0</div><div class="stat-label">Clienți</div></div>
+      <div class="card"><div class="stat-value success" id="b-revenue">€0</div><div class="stat-label">Revenue</div></div>
+      <div class="card"><div class="stat-value" id="b-retention">0%</div><div class="stat-label">Retenție</div></div>
+      <div class="card"><div class="stat-value warning" id="b-returning">0</div><div class="stat-label">Revin</div></div>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <h3>Top produse</h3>
+        <table><thead><tr><th>Produs</th><th>Vânzări</th><th>Revenue</th></tr></thead><tbody id="b-top"></tbody></table>
+      </div>
+      <div class="card">
+        <h3>Produse slabe</h3>
+        <table><thead><tr><th>Produs</th><th>Vânzări</th><th>Revenue</th></tr></thead><tbody id="b-bottom"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+let token = null;
+let agentChart = null;
+
+async function login() {
+  const res = await fetch(`${API}/auth/login`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:'demo@loial.app',password:'demo123'})});
+  const data = await res.json();
+  token = data.access_token;
+}
+
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('admin-tab').classList.toggle('hidden', tab !== 'admin');
+  document.getElementById('agent-tab').classList.toggle('hidden', tab !== 'agent');
+  document.getElementById('business-tab').classList.toggle('hidden', tab !== 'business');
+  loadData();
+}
+
+async function loadData() {
+  if (!token) await login();
+  const period = document.getElementById('period').value;
+  const headers = {Authorization: `Bearer ${token}`};
+
+  const adminRes = await fetch(`${API}/analytics/admin?period=${period}`, {headers});
+  if (adminRes.ok) {
+    const d = await adminRes.json();
+    document.getElementById('a-agents').textContent = d.agents.total;
+    document.getElementById('a-active').textContent = d.agents.active;
+    document.getElementById('a-trial').textContent = d.agents.trial;
+    document.getElementById('a-businesses').textContent = d.businesses.total;
+    document.getElementById('a-sales').textContent = d.sales.count;
+    document.getElementById('a-revenue').textContent = '€' + d.sales.revenue;
+    document.getElementById('a-commissions').innerHTML = d.commissions.by_agent.map(a => 
+      `<tr><td>${a.name}</td><td><span class="badge badge-${a.status==='active'?'green':a.status==='trial'?'yellow':'red'}">${a.status}</span></td><td>${a.sales}</td><td>€${a.commission}</td></tr>`
+    ).join('') || '<tr><td colspan="4">Niciun agent</td></tr>';
+  }
+
+  const agentRes = await fetch(`${API}/analytics/agent/1?period=${period}`, {headers});
+  if (agentRes.ok) {
+    const d = await agentRes.json();
+    document.getElementById('ag-sales').textContent = d.sales.count;
+    document.getElementById('ag-commission').textContent = '€' + d.commission.earned;
+    document.getElementById('ag-status').textContent = d.status;
+    document.getElementById('ag-needed').textContent = d.sales_needed;
+    document.getElementById('ag-businesses').innerHTML = d.businesses.list.map(b => 
+      `<tr><td>${b.name}</td><td>${b.type}</td><td>${b.since||'-'}</td></tr>`
+    ).join('') || '<tr><td colspan="3">Nicio afacere</td></tr>';
+    
+    const labels = Object.keys(d.by_type);
+    const values = Object.values(d.by_type);
+    if (agentChart) agentChart.destroy();
+    if (labels.length) {
+      agentChart = new Chart(document.getElementById('agent-chart'), {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data: values, backgroundColor: ['#7c5cff','#22d3ee','#10b981','#f59e0b','#ef4444'] }] },
+        options: { plugins: { legend: { labels: { color: '#f8fafc' } } } }
+      });
+    }
+  }
+
+  const bizRes = await fetch(`${API}/analytics/business/1?period=${period}`);
+  if (bizRes.ok) {
+    const d = await bizRes.json();
+    document.getElementById('b-customers').textContent = d.customers.total;
+    document.getElementById('b-revenue').textContent = '€' + d.revenue.total;
+    document.getElementById('b-retention').textContent = d.retention_rate + '%';
+    document.getElementById('b-returning').textContent = d.customers.returning;
+    document.getElementById('b-top').innerHTML = d.top_products.map(p => 
+      `<tr><td>${p.name}</td><td>${p.count}</td><td>€${p.revenue}</td></tr>`
+    ).join('') || '<tr><td colspan="3">-</td></tr>';
+    document.getElementById('b-bottom').innerHTML = d.bottom_products.map(p => 
+      `<tr><td>${p.name}</td><td>${p.count}</td><td>€${p.revenue}</td></tr>`
+    ).join('') || '<tr><td colspan="3">-</td></tr>';
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>

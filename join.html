@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loial – Înregistrare Client</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0a0b10; --surface:#14161f; --primary:#7c5cff; --text:#f8fafc; --dim:#94a3b8; --success:#10b981; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; }
+.card { background:var(--surface); border-radius:20px; padding:32px; max-width:400px; width:90%; }
+.logo { font-size:1.4rem; font-weight:700; margin-bottom:8px; }
+h1 { font-size:1.3rem; margin-bottom:4px; }
+.business { color:var(--primary); font-weight:600; }
+p { color:var(--dim); margin-bottom:20px; font-size:0.95rem; }
+input { width:100%; padding:14px; margin:6px 0; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:#1a1d28; color:white; font-size:1rem; }
+.btn { width:100%; background:linear-gradient(135deg,#7c5cff,#6366f1); color:white; border:none; padding:16px; border-radius:12px; font-weight:600; cursor:pointer; margin-top:12px; }
+.success { text-align:center; }
+.success h2 { color:var(--success); }
+.hidden { display:none; }
+.stamps { display:flex; gap:8px; justify-content:center; margin:16px 0; }
+.stamp { width:36px; height:36px; border-radius:50%; border:2px solid rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; }
+</style>
+</head>
+<body>
+<div class="card" id="form-card">
+  <div class="logo">Loial</div>
+  <h1>Alătură-te <span class="business" id="biz-name">programului</span></h1>
+  <p>Completează datele pentru a primi oferte exclusive și recompense.</p>
+  <form id="register-form">
+    <input type="text" id="name" placeholder="Numele tău" required>
+    <input type="email" id="email" placeholder="Email" required>
+    <input type="tel" id="phone" placeholder="Telefon">
+    <input type="date" id="birthday" placeholder="Ziua de naștere">
+    <button type="submit" class="btn">Înregistrează-mă</button>
+  </form>
+</div>
+
+<div class="card success hidden" id="success-card">
+  <h2>✓ Ești înregistrat!</h2>
+  <p style="margin-top:12px;">Cardul tău de fidelitate este activ.</p>
+  <div class="stamps">
+    <div class="stamp">○</div><div class="stamp">○</div><div class="stamp">○</div>
+    <div class="stamp">○</div><div class="stamp">○</div><div class="stamp">○</div>
+  </div>
+  <p>6 ștampile = recompensă</p>
+  <p style="margin-top:16px; font-size:0.85rem;">Vei primi oferte pe email și notificări de ziua ta.</p>
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+const params = new URLSearchParams(window.location.search);
+const businessId = params.get('b') || '1';
+const businessName = params.get('name') || 'Loial Partner';
+document.getElementById('biz-name').textContent = businessName;
+
+document.getElementById('register-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const data = {
+    name: document.getElementById('name').value,
+    email: document.getElementById('email').value,
+    phone: document.getElementById('phone').value,
+    birthday: document.getElementById('birthday').value,
+    business_id: businessId
+  };
+  localStorage.setItem('loial_customer', JSON.stringify(data));
+  document.getElementById('form-card').classList.add('hidden');
+  document.getElementById('success-card').classList.remove('hidden');
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loial – Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0a0b10; --surface:#14161f; --primary:#7c5cff; --text:#f8fafc; --dim:#94a3b8; --success:#10b981; --danger:#ef4444; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; }
+.container { width:100%; max-width:400px; padding:24px; }
+.logo { text-align:center; margin-bottom:32px; }
+.logo h1 { font-size:2rem; color:var(--primary); }
+.logo p { color:var(--dim); margin-top:8px; }
+.card { background:var(--surface); border-radius:16px; padding:32px; }
+.tabs { display:flex; gap:8px; margin-bottom:24px; }
+.tab { flex:1; padding:12px; border:none; border-radius:8px; background:transparent; color:var(--dim); cursor:pointer; font-size:0.95rem; }
+.tab.active { background:var(--primary); color:#fff; }
+.form-group { margin-bottom:16px; }
+label { display:block; margin-bottom:6px; font-size:0.85rem; color:var(--dim); }
+input, select { width:100%; padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:#0a0b10; color:var(--text); font-size:1rem; }
+input:focus, select:focus { outline:none; border-color:var(--primary); }
+.btn { width:100%; padding:14px; border:none; border-radius:8px; background:var(--primary); color:#fff; font-size:1rem; font-weight:600; cursor:pointer; margin-top:8px; }
+.btn:hover { opacity:0.9; }
+.error { background:rgba(239,68,68,0.1); color:var(--danger); padding:12px; border-radius:8px; margin-bottom:16px; font-size:0.9rem; display:none; }
+.success { background:rgba(16,185,129,0.1); color:var(--success); padding:12px; border-radius:8px; margin-bottom:16px; font-size:0.9rem; display:none; }
+.hidden { display:none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">
+    <h1>Loial</h1>
+    <p>Platforma de loialitate</p>
+  </div>
+  <div class="card">
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('login')">Login</button>
+      <button class="tab" onclick="showTab('register')">Creare cont</button>
+    </div>
+    <div id="error" class="error"></div>
+    <div id="success" class="success"></div>
+    
+    <form id="login-form" onsubmit="login(event)">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="login-email" required placeholder="email@example.com">
+      </div>
+      <div class="form-group">
+        <label>Parolă</label>
+        <input type="password" id="login-password" required placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn">Intră în cont</button>
+    </form>
+    
+    <form id="register-form" class="hidden" onsubmit="register(event)">
+      <div class="form-group">
+        <label>Nume</label>
+        <input type="text" id="reg-name" required placeholder="Numele tău">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="reg-email" required placeholder="email@example.com">
+      </div>
+      <div class="form-group">
+        <label>Parolă</label>
+        <input type="password" id="reg-password" required placeholder="Minim 6 caractere">
+      </div>
+      <div class="form-group">
+        <label>Tip cont</label>
+        <select id="reg-type">
+          <option value="agent">Agent / Afiliat</option>
+          <option value="business">Afacere (cafenea, restaurant)</option>
+        </select>
+      </div>
+      <button type="submit" class="btn">Creează cont</button>
+    </form>
+  </div>
+</div>
+<script>
+const API = 'http://localhost:8000';
+const DEMO_MODE = true;
+
+const demoUsers = {
+  'ciprianpop@academiadetrading.llc': {password: 'admin123', role: 'owner', name: 'Ciprian Pop'},
+  'demo@loial.app': {password: 'demo123', role: 'owner', name: 'Demo'}
+};
+
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+  hideMessages();
+}
+
+function showError(msg) {
+  const el = document.getElementById('error');
+  el.textContent = msg;
+  el.style.display = 'block';
+  document.getElementById('success').style.display = 'none';
+}
+
+function showSuccess(msg) {
+  const el = document.getElementById('success');
+  el.textContent = msg;
+  el.style.display = 'block';
+  document.getElementById('error').style.display = 'none';
+}
+
+function hideMessages() {
+  document.getElementById('error').style.display = 'none';
+  document.getElementById('success').style.display = 'none';
+}
+
+async function login(e) {
+  e.preventDefault();
+  hideMessages();
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const btn = e.target.querySelector('button');
+  btn.textContent = 'Se conectează...';
+  btn.disabled = true;
+  
+  if (DEMO_MODE && demoUsers[email] && demoUsers[email].password === password) {
+    localStorage.setItem('token', 'demo-token');
+    localStorage.setItem('user', JSON.stringify({email, ...demoUsers[email]}));
+    showSuccess('Conectat! Se redirecționează...');
+    setTimeout(() => window.location.href = 'platform.html', 500);
+    return;
+  }
+  
+  try {
+    const res = await fetch(`${API}/auth/login`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email, password})
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.detail || 'Eroare login');
+    }
+    const data = await res.json();
+    localStorage.setItem('token', data.access_token);
+    localStorage.setItem('user', JSON.stringify(data.user || {email}));
+    showSuccess('Conectat! Se redirecționează...');
+    setTimeout(() => window.location.href = 'platform.html', 500);
+  } catch (err) {
+    showError('Email sau parolă incorectă');
+  }
+  btn.textContent = 'Intră în cont';
+  btn.disabled = false;
+}
+
+async function register(e) {
+  e.preventDefault();
+  hideMessages();
+  const name = document.getElementById('reg-name').value;
+  const email = document.getElementById('reg-email').value;
+  const password = document.getElementById('reg-password').value;
+  const type = document.getElementById('reg-type').value;
+  
+  try {
+    const endpoint = type === 'agent' ? '/sales/register' : '/business/register';
+    const res = await fetch(`${API}${endpoint}?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`, {method: 'POST'});
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Eroare înregistrare');
+    
+    showSuccess('Cont creat! Așteaptă validarea sau loghează-te.');
+    setTimeout(() => showTab('login'), 2000);
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+function redirectByRole(role) {
+  window.location.href = 'platform.html';
+}
+
+if (localStorage.getItem('token')) {
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  redirectByRole(user.role || 'agent');
+}
+</script>
+</body>
+</html>

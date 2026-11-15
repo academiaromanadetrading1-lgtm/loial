@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loial – Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0a0b10; --surface:#14161f; --primary:#7c5cff; --text:#f8fafc; --dim:#94a3b8; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--text); }
+.container { max-width:800px; margin:0 auto; padding:24px; }
+header { display:flex; justify-content:space-between; align-items:center; margin-bottom:32px; }
+h1 { color:var(--primary); }
+.user-info { color:var(--dim); font-size:0.9rem; }
+.logout { background:transparent; border:1px solid var(--dim); color:var(--dim); padding:8px 16px; border-radius:8px; cursor:pointer; }
+.logout:hover { border-color:var(--primary); color:var(--primary); }
+.grid { display:grid; gap:16px; }
+.card { background:var(--surface); border-radius:16px; padding:20px; display:flex; justify-content:space-between; align-items:center; }
+.card h2 { font-size:1.1rem; margin-bottom:4px; }
+.card p { color:var(--dim); font-size:0.85rem; }
+.btn { background:var(--primary); color:#fff; padding:10px 20px; border-radius:8px; text-decoration:none; font-weight:500; }
+.btn:hover { opacity:0.9; }
+.hidden { display:none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Loial</h1>
+    <div>
+      <span class="user-info" id="user-info"></span>
+      <button class="logout" onclick="showPasswordModal()">Schimbă parola</button>
+      <button class="logout" onclick="logout()">Ieșire</button>
+    </div>
+  </header>
+  <div class="grid" id="nav-grid"></div>
+</div>
+<div id="password-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); align-items:center; justify-content:center;">
+  <div style="background:#14161f; padding:24px; border-radius:16px; width:100%; max-width:400px;">
+    <h3 style="margin-bottom:16px;">Schimbă parola</h3>
+    <input type="password" id="old-pass" placeholder="Parola veche" style="width:100%; padding:12px; margin-bottom:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:#0a0b10; color:#fff;">
+    <input type="password" id="new-pass" placeholder="Parola nouă" style="width:100%; padding:12px; margin-bottom:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:#0a0b10; color:#fff;">
+    <div id="pass-msg" style="margin-bottom:12px; font-size:0.9rem;"></div>
+    <button onclick="changePassword()" style="width:100%; padding:12px; background:#7c5cff; color:#fff; border:none; border-radius:8px; cursor:pointer;">Salvează</button>
+    <button onclick="hidePasswordModal()" style="width:100%; padding:12px; background:transparent; color:#94a3b8; border:none; margin-top:8px; cursor:pointer;">Anulează</button>
+  </div>
+</div>
+<script>
+if (!localStorage.getItem('token')) {
+  window.location.href = 'login.html';
+}
+
+const user = JSON.parse(localStorage.getItem('user') || '{}');
+document.getElementById('user-info').textContent = user.name || user.email || '';
+
+const pages = {
+  admin: [
+    {title: 'Dashboard Analytics', desc: 'Statistici complete', url: 'dashboard.html'},
+    {title: 'Agenți', desc: 'Gestionează agenții', url: 'agent-dashboard.html'},
+    {title: 'Afaceri', desc: 'Clienți business', url: 'business.html'}
+  ],
+  owner: [
+    {title: 'Dashboard Analytics', desc: 'Statistici complete', url: 'dashboard.html'},
+    {title: 'Agenți', desc: 'Gestionează agenții', url: 'agent-dashboard.html'},
+    {title: 'Afaceri', desc: 'Clienți business', url: 'business.html'}
+  ],
+  manager: [
+    {title: 'Dashboard Agent', desc: 'Vânzări și comisioane', url: 'agent-dashboard.html'},
+    {title: 'Echipa mea', desc: 'Agenții din echipă', url: 'agent-dashboard.html'}
+  ],
+  agent: [
+    {title: 'Dashboard Agent', desc: 'Vânzări și comisioane', url: 'agent-dashboard.html'},
+    {title: 'QR Onboarding', desc: 'Codul tău QR', url: 'agent.html'}
+  ],
+  business: [
+    {title: 'Dashboard Business', desc: 'Clienți și oferte', url: 'business.html'},
+    {title: 'Clienți', desc: 'Lista clienților', url: 'business.html'}
+  ],
+  pending: [
+    {title: 'Cont în așteptare', desc: 'Așteaptă validarea admin', url: 'agent-dashboard.html'}
+  ]
+};
+
+const role = user.role || 'agent';
+const userPages = pages[role] || pages.agent;
+document.getElementById('nav-grid').innerHTML = userPages.map(p => `
+  <div class="card">
+    <div>
+      <h2>${p.title}</h2>
+      <p>${p.desc}</p>
+    </div>
+    <a href="${p.url}" class="btn">Deschide</a>
+  </div>
+`).join('');
+
+function showPasswordModal() {
+  document.getElementById('password-modal').style.display = 'flex';
+}
+function hidePasswordModal() {
+  document.getElementById('password-modal').style.display = 'none';
+}
+async function changePassword() {
+  const oldPass = document.getElementById('old-pass').value;
+  const newPass = document.getElementById('new-pass').value;
+  const msg = document.getElementById('pass-msg');
+  try {
+    const res = await fetch('http://localhost:8000/auth/change-password?old_password=' + encodeURIComponent(oldPass) + '&new_password=' + encodeURIComponent(newPass), {
+      method: 'POST',
+      headers: {Authorization: 'Bearer ' + localStorage.getItem('token')}
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail);
+    msg.style.color = '#10b981';
+    msg.textContent = 'Parola schimbată!';
+    setTimeout(hidePasswordModal, 1500);
+  } catch (err) {
+    msg.style.color = '#ef4444';
+    msg.textContent = err.message;
+  }
+}
+function logout() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  window.location.href = 'login.html';
+}
+</script>
+</body>
+</html>

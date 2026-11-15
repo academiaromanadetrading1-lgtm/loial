@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loial – Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0a0b10; --surface:#14161f; --primary:#7c5cff; --accent:#22d3ee; --text:#f8fafc; --dim:#94a3b8; --success:#10b981; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--text); }
+.container { max-width:900px; margin:0 auto; padding:24px; }
+header { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+.role-badge { background:var(--primary); padding:4px 12px; border-radius:20px; font-size:0.8rem; }
+.card { background:var(--surface); border-radius:16px; padding:24px; margin-bottom:20px; }
+.stats { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+.stat { text-align:center; }
+.stat-value { font-size:1.8rem; font-weight:700; color:var(--accent); }
+.stat-label { color:var(--dim); font-size:0.85rem; }
+.qr-box { text-align:center; }
+.qr-box img { width:180px; height:180px; background:white; padding:10px; border-radius:12px; }
+.btn { background:var(--primary); color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; }
+input { padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:#1a1d28; color:white; margin-right:8px; }
+table { width:100%; border-collapse:collapse; }
+th, td { text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); }
+.hidden { display:none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <h1 id="agent-name">Agent</h1>
+      <span class="role-badge" id="role-badge">agent</span>
+    </div>
+    <button class="btn" onclick="logout()">Ieșire</button>
+  </header>
+
+  <div class="card" id="qr-section">
+    <h2 style="margin-bottom:16px;">Codul tău QR</h2>
+    <div class="qr-box">
+      <img id="qr-image" src="" alt="QR">
+      <p style="margin-top:8px; color:var(--dim); font-size:0.85rem;" id="qr-code"></p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-bottom:16px;">Comisioanele tale</h2>
+    <div class="stats">
+      <div class="stat"><div class="stat-value" id="sales">0</div><div class="stat-label">Vânzări</div></div>
+      <div class="stat"><div class="stat-value" id="commission">€0</div><div class="stat-label">Comision</div></div>
+      <div class="stat"><div class="stat-value" id="rate">€20</div><div class="stat-label">Per client</div></div>
+    </div>
+  </div>
+
+  <div class="card hidden" id="team-section">
+    <h2 style="margin-bottom:16px;">Echipa ta</h2>
+    <div id="team-members">Niciun membru</div>
+  </div>
+
+  <div class="card hidden" id="create-team-section">
+    <h2 style="margin-bottom:16px;">Creează echipă</h2>
+    <p style="color:var(--dim); margin-bottom:12px;">Necesită aprobarea adminului.</p>
+    <input type="text" id="team-name" placeholder="Numele echipei">
+    <button class="btn" onclick="requestTeam()">Trimite cerere</button>
+    <p id="team-msg" style="margin-top:8px;"></p>
+  </div>
+
+  <div class="card hidden" id="admin-section">
+    <h2 style="margin-bottom:16px;">Admin – Agenți în așteptare</h2>
+    <table><thead><tr><th>Nume</th><th>Email</th><th>Acțiune</th></tr></thead><tbody id="pending-list"></tbody></table>
+    <h2 style="margin:24px 0 16px;">Echipe în așteptare</h2>
+    <table><thead><tr><th>Echipă</th><th>Manager</th><th>Acțiune</th></tr></thead><tbody id="pending-teams"></tbody></table>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+const token = localStorage.getItem('loial_agent_token');
+const agent = JSON.parse(localStorage.getItem('loial_agent') || '{}');
+
+if (!token || !agent.id) window.location.href = 'agent-login.html';
+
+document.getElementById('agent-name').textContent = agent.name;
+document.getElementById('role-badge').textContent = agent.role;
+
+async function loadDashboard() {
+  const headers = {Authorization: `Bearer ${token}`};
+  
+  const qrRes = await fetch(`${API}/sales/agent/${agent.id}/qr`, {headers});
+  if (qrRes.ok) {
+    const qr = await qrRes.json();
+    document.getElementById('qr-image').src = qr.qr_image;
+    document.getElementById('qr-code').textContent = qr.qr_code;
+  }
+
+  const statsRes = await fetch(`${API}/sales/agent/${agent.id}/stats`, {headers});
+  if (statsRes.ok) {
+    const stats = await statsRes.json();
+    document.getElementById('sales').textContent = stats.sales;
+    document.getElementById('commission').textContent = '€' + stats.commission;
+  }
+
+  if (agent.is_manager) {
+    document.getElementById('team-section').classList.remove('hidden');
+    const teamRes = await fetch(`${API}/sales/my-team`, {headers});
+    if (teamRes.ok) {
+      const team = await teamRes.json();
+      document.getElementById('team-members').innerHTML = team.members.length 
+        ? team.members.map(m => `<p>${m.name} (${m.email})</p>`).join('')
+        : 'Niciun membru încă';
+    }
+  } else if (agent.role === 'agent') {
+    document.getElementById('create-team-section').classList.remove('hidden');
+  }
+
+  if (agent.role === 'admin' || agent.role === 'owner') {
+    document.getElementById('admin-section').classList.remove('hidden');
+    loadAdmin();
+  }
+}
+
+async function loadAdmin() {
+  const headers = {Authorization: `Bearer ${token}`};
+  const pendingRes = await fetch(`${API}/sales/pending`, {headers});
+  if (pendingRes.ok) {
+    const pending = await pendingRes.json();
+    document.getElementById('pending-list').innerHTML = pending.map(a => 
+      `<tr><td>${a.name}</td><td>${a.email}</td><td><button class="btn" onclick="validate(${a.id})">Validează</button></td></tr>`
+    ).join('') || '<tr><td colspan="3">Niciun agent în așteptare</td></tr>';
+  }
+  const teamsRes = await fetch(`${API}/sales/teams/pending`, {headers});
+  if (teamsRes.ok) {
+    const teams = await teamsRes.json();
+    document.getElementById('pending-teams').innerHTML = teams.map(t =>
+      `<tr><td>${t.name}</td><td>${t.manager}</td><td><button class="btn" onclick="approveTeam(${t.team_id})">Aprobă</button></td></tr>`
+    ).join('') || '<tr><td colspan="3">Nicio echipă în așteptare</td></tr>';
+  }
+}
+
+async function validate(id) {
+  await fetch(`${API}/sales/validate/${id}?role=agent`, {method:'POST', headers:{Authorization:`Bearer ${token}`}});
+  loadAdmin();
+}
+
+async function approveTeam(id) {
+  await fetch(`${API}/sales/team/approve/${id}`, {method:'POST', headers:{Authorization:`Bearer ${token}`}});
+  loadAdmin();
+}
+
+async function requestTeam() {
+  const name = document.getElementById('team-name').value;
+  const res = await fetch(`${API}/sales/team/request?name=${encodeURIComponent(name)}`, {method:'POST', headers:{Authorization:`Bearer ${token}`}});
+  const data = await res.json();
+  document.getElementById('team-msg').textContent = data.message || data.detail;
+}
+
+function logout() {
+  localStorage.removeItem('loial_agent_token');
+  localStorage.removeItem('loial_agent');
+  window.location.href = 'agent-login.html';
+}
+
+loadDashboard();
+</script>
+</body>
+</html>

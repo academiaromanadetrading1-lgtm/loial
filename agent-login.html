@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loial – Cont Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0a0b10; --surface:#14161f; --primary:#7c5cff; --accent:#22d3ee; --text:#f8fafc; --dim:#94a3b8; --success:#10b981; --warning:#f59e0b; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+.container { max-width:500px; margin:0 auto; padding:40px 24px; }
+.card { background:var(--surface); border-radius:16px; padding:32px; }
+h1 { font-size:1.5rem; margin-bottom:8px; }
+p { color:var(--dim); margin-bottom:20px; }
+input { width:100%; padding:14px; margin:8px 0; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:#1a1d28; color:white; }
+.btn { width:100%; background:var(--primary); color:white; border:none; padding:14px; border-radius:10px; font-weight:600; cursor:pointer; margin-top:12px; }
+.btn-outline { background:transparent; border:1px solid var(--primary); }
+.tabs { display:flex; gap:12px; margin-bottom:20px; }
+.tab { padding:8px 16px; border-radius:8px; cursor:pointer; color:var(--dim); }
+.tab.active { background:var(--primary); color:white; }
+.hidden { display:none; }
+.error { color:#ef4444; font-size:0.9rem; margin-top:8px; }
+.success { color:var(--success); }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('login')">Login</div>
+      <div class="tab" onclick="showTab('register')">Înregistrare</div>
+    </div>
+
+    <div id="login-form">
+      <h1>Intră în cont</h1>
+      <p>Loial detectează automat rolul tău.</p>
+      <input type="email" id="login-email" placeholder="Email">
+      <input type="password" id="login-password" placeholder="Parolă">
+      <button class="btn" onclick="doLogin()">Intră</button>
+      <p id="login-error" class="error"></p>
+    </div>
+
+    <div id="register-form" class="hidden">
+      <h1>Devino Agent</h1>
+      <p>După înregistrare, adminul te validează.</p>
+      <input type="text" id="reg-name" placeholder="Nume complet">
+      <input type="email" id="reg-email" placeholder="Email">
+      <input type="tel" id="reg-phone" placeholder="Telefon">
+      <input type="password" id="reg-password" placeholder="Parolă">
+      <button class="btn" onclick="doRegister()">Creează cont</button>
+      <p id="reg-msg"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const res = await fetch(`${API}/sales/login?email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`, {method:'POST'});
+  const data = await res.json();
+  if (data.access_token) {
+    localStorage.setItem('loial_agent_token', data.access_token);
+    localStorage.setItem('loial_agent', JSON.stringify(data.agent));
+    window.location.href = 'agent-dashboard.html';
+  } else {
+    document.getElementById('login-error').textContent = data.detail || 'Eroare';
+  }
+}
+
+async function doRegister() {
+  const params = new URLSearchParams({
+    name: document.getElementById('reg-name').value,
+    email: document.getElementById('reg-email').value,
+    phone: document.getElementById('reg-phone').value,
+    password: document.getElementById('reg-password').value
+  });
+  const res = await fetch(`${API}/sales/register?${params}`, {method:'POST'});
+  const data = await res.json();
+  const msg = document.getElementById('reg-msg');
+  if (data.status === 'pending') {
+    msg.className = 'success';
+    msg.textContent = data.message;
+  } else {
+    msg.className = 'error';
+    msg.textContent = data.detail || 'Eroare';
+  }
+}
+</script>
+</body>
+</html>

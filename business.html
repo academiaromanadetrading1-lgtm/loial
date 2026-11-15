@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loial – Dashboard Afacere</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0a0b10; --surface:#14161f; --primary:#7c5cff; --accent:#22d3ee; --text:#f8fafc; --dim:#94a3b8; --success:#10b981; --gold:#f59e0b; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--text); }
+.container { max-width:1000px; margin:0 auto; padding:24px; }
+header { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+h1 { font-size:1.4rem; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:24px; }
+.card { background:var(--surface); border-radius:16px; padding:20px; }
+.stat-value { font-size:2rem; font-weight:700; }
+.stat-label { color:var(--dim); font-size:0.85rem; }
+table { width:100%; border-collapse:collapse; }
+th, td { text-align:left; padding:12px; border-bottom:1px solid rgba(255,255,255,0.06); }
+th { color:var(--dim); font-weight:500; font-size:0.85rem; }
+.badge { padding:4px 10px; border-radius:20px; font-size:0.75rem; }
+.badge-gold { background:var(--gold); color:#000; }
+.badge-green { background:var(--success); }
+.qr-section { text-align:center; }
+.qr-section img { width:150px; height:150px; background:white; padding:8px; border-radius:8px; }
+.btn { background:var(--primary); color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Dashboard <span id="biz-name">Afacere</span></h1>
+    <button class="btn" onclick="loadData()">Actualizează</button>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <div class="stat-value" id="total-customers">0</div>
+      <div class="stat-label">Clienți înregistrați</div>
+    </div>
+    <div class="card">
+      <div class="stat-value" id="birthdays">0</div>
+      <div class="stat-label">Zile de naștere luna asta</div>
+    </div>
+    <div class="card">
+      <div class="stat-value" id="active">0</div>
+      <div class="stat-label">Activi (cu ștampile)</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:24px;">
+    <h2 style="margin-bottom:16px;">QR pentru clienți</h2>
+    <div class="qr-section">
+      <p style="color:var(--dim); margin-bottom:12px;">Pune acest QR la intrare sau pe social media</p>
+      <img id="customer-qr" src="" alt="Customer QR">
+      <p style="margin-top:8px; font-size:0.8rem; color:var(--dim);" id="qr-link"></p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-bottom:16px;">Clienții tăi</h2>
+    <table>
+      <thead>
+        <tr><th>Nume</th><th>Email</th><th>Telefon</th><th>Zi naștere</th><th>Ștampile</th></tr>
+      </thead>
+      <tbody id="customers-table">
+        <tr><td colspan="5" style="color:var(--dim);">Niciun client încă</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+const params = new URLSearchParams(window.location.search);
+const bizId = params.get('id') || '1';
+const bizName = params.get('name') || 'Afacerea mea';
+document.getElementById('biz-name').textContent = bizName;
+
+const joinUrl = `${window.location.origin}/join.html?b=${bizId}&name=${encodeURIComponent(bizName)}`;
+document.getElementById('qr-link').textContent = joinUrl;
+document.getElementById('customer-qr').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(joinUrl)}`;
+
+function loadData() {
+  const customers = JSON.parse(localStorage.getItem('loial_customers_list') || '[]');
+  document.getElementById('total-customers').textContent = customers.length;
+  
+  const now = new Date();
+  const bdays = customers.filter(c => c.birthday && new Date(c.birthday).getMonth() === now.getMonth()).length;
+  document.getElementById('birthdays').textContent = bdays;
+  
+  const active = customers.filter(c => c.stamps > 0).length;
+  document.getElementById('active').textContent = active;
+
+  const tbody = document.getElementById('customers-table');
+  if (customers.length) {
+    tbody.innerHTML = customers.map(c => `
+      <tr>
+        <td>${c.name}</td>
+        <td>${c.email}</td>
+        <td>${c.phone || '-'}</td>
+        <td>${c.birthday ? `<span class="badge badge-gold">${c.birthday}</span>` : '-'}</td>
+        <td><span class="badge badge-green">${c.stamps || 0}/6</span></td>
+      </tr>
+    `).join('');
+  }
+}
+
+const stored = localStorage.getItem('loial_customer');
+if (stored) {
+  const c = JSON.parse(stored);
+  c.stamps = 0;
+  const list = JSON.parse(localStorage.getItem('loial_customers_list') || '[]');
+  if (!list.find(x => x.email === c.email)) {
+    list.push(c);
+    localStorage.setItem('loial_customers_list', JSON.stringify(list));
+  }
+  localStorage.removeItem('loial_customer');
+}
+
+loadData();
+</script>
+</body>
+</html>

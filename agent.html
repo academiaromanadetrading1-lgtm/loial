@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loial Sales – Agent Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0a0b10; --surface:#14161f; --primary:#7c5cff; --accent:#22d3ee; --text:#f8fafc; --dim:#94a3b8; --success:#10b981; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+.container { max-width:900px; margin:0 auto; padding:24px; }
+header { display:flex; justify-content:space-between; align-items:center; margin-bottom:32px; }
+h1 { font-size:1.5rem; }
+.card { background:var(--surface); border-radius:16px; padding:24px; margin-bottom:20px; }
+.qr-box { text-align:center; padding:20px; }
+.qr-box img { width:200px; height:200px; border-radius:12px; background:white; padding:10px; }
+.stats { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+.stat { text-align:center; }
+.stat-value { font-size:2rem; font-weight:700; color:var(--accent); }
+.stat-label { color:var(--dim); font-size:0.85rem; }
+.btn { background:var(--primary); color:white; border:none; padding:12px 24px; border-radius:10px; cursor:pointer; font-weight:600; }
+.btn:hover { opacity:0.9; }
+.sales-list { list-style:none; }
+.sales-list li { padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.06); display:flex; justify-content:space-between; }
+.badge { background:var(--success); color:white; padding:4px 10px; border-radius:20px; font-size:0.75rem; }
+input { width:100%; padding:12px; margin:8px 0; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:#1a1d28; color:white; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Loial Sales</h1>
+    <span id="agent-name">Agent</span>
+  </header>
+
+  <div class="card">
+    <h2 style="margin-bottom:16px;">Codul tău QR</h2>
+    <div class="qr-box">
+      <img id="qr-image" src="" alt="QR Code">
+      <p style="margin-top:12px; color:var(--dim);">Arată acest cod administratorului firmei</p>
+      <p id="qr-code" style="font-size:0.8rem; color:var(--dim); margin-top:8px;"></p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-bottom:16px;">Statisticile tale</h2>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value" id="sales-count">0</div>
+        <div class="stat-label">Vânzări luna asta</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="commission">€0</div>
+        <div class="stat-label">Comision</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="rate">€20</div>
+        <div class="stat-label">Per client</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-bottom:16px;">Vânzări recente</h2>
+    <ul class="sales-list" id="sales-list">
+      <li style="color:var(--dim);">Nicio vânzare încă</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-bottom:16px;">Login Agent</h2>
+    <input type="number" id="agent-id" placeholder="ID Agent" value="1">
+    <button class="btn" onclick="loadAgent()">Încarcă</button>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+let token = null;
+
+async function login() {
+  const res = await fetch(`${API}/auth/login`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({email: 'demo@loial.app', password: 'demo123'})
+  });
+  const data = await res.json();
+  token = data.access_token;
+}
+
+async function loadAgent() {
+  if (!token) await login();
+  const id = document.getElementById('agent-id').value || 1;
+  
+  const qrRes = await fetch(`${API}/sales/agent/${id}/qr`, {headers: {Authorization: `Bearer ${token}`}});
+  const qr = await qrRes.json();
+  document.getElementById('qr-image').src = qr.qr_image;
+  document.getElementById('qr-code').textContent = qr.qr_code;
+  document.getElementById('agent-name').textContent = qr.agent_name;
+
+  const statsRes = await fetch(`${API}/sales/agent/${id}/stats`, {headers: {Authorization: `Bearer ${token}`}});
+  const stats = await statsRes.json();
+  document.getElementById('sales-count').textContent = stats.sales;
+  document.getElementById('commission').textContent = '€' + stats.commission;
+
+  const liveRes = await fetch(`${API}/sales/live`, {headers: {Authorization: `Bearer ${token}`}});
+  const live = await liveRes.json();
+  const list = document.getElementById('sales-list');
+  if (live.length) {
+    list.innerHTML = live.filter(s => s.agent_id == id).map(s => 
+      `<li><span>${s.business}</span><span class="badge">${s.type}</span></li>`
+    ).join('') || '<li style="color:var(--dim);">Nicio vânzare încă</li>';
+  }
+}
+
+loadAgent();
+setInterval(loadAgent, 10000);
+</script>
+</body>
+</html>

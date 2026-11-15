@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loial – Înregistrare Afacere</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0a0b10; --surface:#14161f; --primary:#7c5cff; --text:#f8fafc; --dim:#94a3b8; --success:#10b981; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; }
+.card { background:var(--surface); border-radius:20px; padding:40px; max-width:440px; width:90%; }
+h1 { font-size:1.6rem; margin-bottom:8px; }
+p { color:var(--dim); margin-bottom:24px; }
+input, select { width:100%; padding:14px; margin:8px 0; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:#1a1d28; color:white; font-size:1rem; }
+.btn { width:100%; background:linear-gradient(135deg,#7c5cff,#6366f1); color:white; border:none; padding:16px; border-radius:12px; font-weight:600; font-size:1rem; cursor:pointer; margin-top:16px; }
+.btn:hover { opacity:0.9; }
+.success { text-align:center; }
+.success h2 { color:var(--success); margin-bottom:12px; }
+.hidden { display:none; }
+</style>
+</head>
+<body>
+<div class="card" id="form-card">
+  <h1>Bun venit în Loial</h1>
+  <p>Completează datele afacerii tale pentru a activa programul de fidelitate.</p>
+  <form id="onboard-form">
+    <input type="text" id="business-name" placeholder="Numele afacerii" required>
+    <input type="email" id="business-email" placeholder="Email" required>
+    <select id="business-type">
+      <option value="cafe">Cafenea</option>
+      <option value="restaurant">Restaurant</option>
+      <option value="bar">Bar</option>
+      <option value="florist">Florărie</option>
+      <option value="pizzeria">Pizzerie</option>
+      <option value="other">Altele</option>
+    </select>
+    <select id="plan">
+      <option value="pro">Pro – €49/lună</option>
+      <option value="starter">Starter – Gratuit</option>
+    </select>
+    <button type="submit" class="btn">Activează Loial</button>
+  </form>
+</div>
+
+<div class="card success hidden" id="success-card">
+  <h2>✓ Afacerea ta este activă!</h2>
+  <p>Programul de fidelitate Loial este gata. Clienții tăi pot scana QR-ul pentru a se înregistra.</p>
+  <p style="margin-top:16px;">Agent: <strong id="agent-name"></strong></p>
+  <p>Comision: <strong id="commission"></strong></p>
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+const params = new URLSearchParams(window.location.search);
+const qrCode = params.get('qr') || '';
+
+document.getElementById('onboard-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const res = await fetch(`${API}/sales/onboard?` + new URLSearchParams({
+    qr_code: qrCode,
+    business_name: document.getElementById('business-name').value,
+    business_email: document.getElementById('business-email').value,
+    business_type: document.getElementById('business-type').value,
+    plan: document.getElementById('plan').value
+  }), {method: 'POST'});
+  const data = await res.json();
+  if (data.status === 'onboarded') {
+    document.getElementById('form-card').classList.add('hidden');
+    document.getElementById('success-card').classList.remove('hidden');
+    document.getElementById('agent-name').textContent = data.agent;
+    document.getElementById('commission').textContent = '€' + data.commission;
+  } else {
+    alert(data.detail || 'Eroare');
+  }
+};
+</script>
+</body>
+</html>
