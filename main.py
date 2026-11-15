@@ -466,7 +466,7 @@ def root(request: Request):
             return FileResponse("platform.html")
         except:
             pass
-    return FileResponse("login.html")
+    return FileResponse("index.html")
 
 @app.post("/auth/login")
 @limiter.limit("10/minute")
