@@ -104,14 +104,18 @@ class User(Base):
 class Customer(Base):
     __tablename__ = "customers"
     id = Column(Integer, primary_key=True, index=True)
+    uuid = Column(String, unique=True, index=True, nullable=True)
     name = Column(String, index=True)
+    phone = Column(String, nullable=True)
     stamps = Column(Integer, default=0, index=True)
     lang = Column(String, default="en", index=True)
-    email = Column(String, index=True)
-    lat = Column(Float)
-    lng = Column(Float)
-    last_visit = Column(String, index=True)
+    email = Column(String, index=True, nullable=True)
+    business_id = Column(Integer, index=True, nullable=True)
+    lat = Column(Float, nullable=True)
+    lng = Column(Float, nullable=True)
+    last_visit = Column(String, index=True, nullable=True)
     __table_args__ = (Index("ix_customer_stamps_lang", "stamps", "lang"),)
+
 
 class Location(Base):
     __tablename__ = "locations"
@@ -183,11 +187,17 @@ class BusinessAccount(Base):
     name = Column(String)
     email = Column(String, unique=True, index=True)
     password = Column(String)
-    business_type = Column(String)
-    plan = Column(String, default="pro")
-    agent_id = Column(Integer, index=True)
+    business_type = Column(String, nullable=True)
+    plan = Column(String, default="free")
+    max_customers = Column(Integer, default=50)
+    google_review_url = Column(String, nullable=True)
+    reward_text = Column(String, default="A 6-a e din partea casei!")
+    card_color = Column(String, default="#1e293b")
+    staff_pin = Column(String, default="1234")
+    agent_id = Column(Integer, index=True, nullable=True)
     created_at = Column(String)
     birthday = Column(String, nullable=True)
+
 
 class BusinessFeedback(Base):
     __tablename__ = "business_feedback"
@@ -1690,6 +1700,218 @@ def setup_admin(email: str = "ciprianpop@academiadetrading.llc", db: Session = D
         user.plan = "network"
     db.commit()
     return {"status": "admin", "email": email, "role": "admin"}
+
+# ==========================================
+# LOIAL GROWTH, QR, REVIEW GATE & SEO ROUTES
+# ==========================================
+from fastapi.responses import HTMLResponse, Response
+from sqlalchemy import text
+
+class PublicReviewFeedback(Base):
+    __tablename__ = "public_review_feedback"
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, index=True)
+    rating = Column(Integer)
+    message = Column(String)
+    created_at = Column(String)
+
+Base.metadata.create_all(bind=engine)
+
+def run_loial_migrations():
+    with engine.connect() as conn:
+        biz_cols = [
+            ("max_customers", "INTEGER DEFAULT 50"),
+            ("google_review_url", "VARCHAR"),
+            ("reward_text", "VARCHAR DEFAULT 'A 6-a e din partea casei!'"),
+            ("card_color", "VARCHAR DEFAULT '#1e293b'"),
+            ("staff_pin", "VARCHAR DEFAULT '1234'")
+        ]
+        for col, typ in biz_cols:
+            try:
+                conn.execute(text(f"ALTER TABLE business_accounts ADD COLUMN {col} {typ}"))
+            except Exception:
+                pass
+        cust_cols = [
+            ("uuid", "VARCHAR"),
+            ("phone", "VARCHAR"),
+            ("business_id", "INTEGER")
+        ]
+        for col, typ in cust_cols:
+            try:
+                conn.execute(text(f"ALTER TABLE customers ADD COLUMN {col} {typ}"))
+            except Exception:
+                pass
+        conn.commit()
+
+run_loial_migrations()
+
+class QuickRegisterRequest(BaseModel):
+    email: str
+    password: str
+    business_name: str
+    reward: str = "A 6-a e din partea casei!"
+    color: str = "#1e293b"
+
+@app.post("/api/register")
+def quick_register(req: QuickRegisterRequest, db: Session = Depends(get_db)):
+    existing = db.query(BusinessAccount).filter(BusinessAccount.email == req.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email deja înregistrat")
+    business = BusinessAccount(
+        name=req.business_name,
+        email=req.email,
+        password=pwd_context.hash(req.password),
+        plan="free",
+        max_customers=50,
+        reward_text=req.reward,
+        card_color=req.color,
+        staff_pin="1234",
+        created_at=datetime.now().isoformat()
+    )
+    db.add(business)
+    db.commit()
+    db.refresh(business)
+    token = create_access_token({"sub": req.email, "role": "business", "business_id": business.id})
+    return {"token": token, "business_id": business.id, "plan": "free"}
+
+@app.get("/api/business-public/{business_id}")
+def get_business_public(business_id: int, db: Session = Depends(get_db)):
+    biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found")
+    return {
+        "name": biz.name,
+        "google_review_url": biz.google_review_url,
+        "reward_text": biz.reward_text or "Colectează ștampile și primești premii!",
+        "card_color": biz.card_color or "#1e293b"
+    }
+
+@app.get("/join/{business_id}")
+def join_qr_page(business_id: int):
+    return FileResponse("join.html")
+
+class QREnrollRequest(BaseModel):
+    business_id: int
+    name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+@app.post("/api/enroll")
+def qr_enroll(req: QREnrollRequest, db: Session = Depends(get_db)):
+    biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found")
+    count = db.query(Customer).filter(Customer.business_id == req.business_id).count()
+    if biz.plan == "free" and count >= (biz.max_customers or 50):
+        raise HTTPException(status_code=403, detail="LIMIT_REACHED")
+    new_uuid = str(uuid.uuid4())[:8]
+    customer = Customer(
+        uuid=new_uuid,
+        name=req.name,
+        phone=req.phone,
+        email=req.email,
+        stamps=0,
+        business_id=req.business_id,
+        last_visit=datetime.now().isoformat()
+    )
+    db.add(customer)
+    db.commit()
+    return {"uuid": new_uuid, "name": customer.name}
+
+@app.get("/scan/{business_id}")
+def staff_scan_page(business_id: int):
+    return FileResponse("scan.html")
+
+class QRScanRequest(BaseModel):
+    pin: str
+    business_id: int
+    customer_uuid: str
+
+@app.post("/api/scan")
+def qr_scan_stamp(req: QRScanRequest, db: Session = Depends(get_db)):
+    biz = db.query(BusinessAccount).filter(
+        BusinessAccount.id == req.business_id,
+        BusinessAccount.staff_pin == req.pin
+    ).first()
+    if not biz:
+        raise HTTPException(status_code=401, detail="PIN incorect")
+    customer = db.query(Customer).filter(
+        Customer.uuid == req.customer_uuid,
+        Customer.business_id == req.business_id
+    ).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Client negăsit la această locație")
+    customer.stamps = (customer.stamps or 0) + 1
+    customer.last_visit = datetime.now().isoformat()
+    db.commit()
+    return {"stamps": customer.stamps, "name": customer.name, "business_id": biz.id}
+
+@app.get("/review/{business_id}")
+def review_gate_page(business_id: int):
+    return FileResponse("review.html")
+
+class PublicFeedbackRequest(BaseModel):
+    business_id: int
+    rating: int
+    message: str
+
+@app.post("/api/private-feedback")
+def save_public_review_feedback(req: PublicFeedbackRequest, db: Session = Depends(get_db)):
+    fb = PublicReviewFeedback(
+        business_id=req.business_id,
+        rating=req.rating,
+        message=req.message,
+        created_at=datetime.now().isoformat()
+    )
+    db.add(fb)
+    db.commit()
+    return {"status": "saved"}
+
+INDUSTRIES = {
+    "cafenele": {"title": "Carduri de loialitate pentru cafenele", "reward": "A 6-a cafea e din partea casei!", "h1": "Fidelizează clienții cafenelei tale"},
+    "restaurante": {"title": "Carduri de loialitate pentru restaurante", "reward": "A 10-a masă e gratuită!", "h1": "Clienți fideli pentru restaurantul tău"},
+    "pizzerii": {"title": "Carduri de loialitate pentru pizzerii", "reward": "A 5-a pizza e gratuită!", "h1": "Pizzerie cu clienți recurenți"},
+    "florarii": {"title": "Carduri de loialitate pentru florării", "reward": "10% reducere la următoarea comandă", "h1": "Clienți fideli pentru florăria ta"},
+    "saloane": {"title": "Carduri de loialitate pentru saloane", "reward": "A 6-a vizită e gratuită!", "h1": "Salon cu programări recurente"},
+    "frizerii": {"title": "Carduri de loialitate pentru frizerii", "reward": "A 5-a tunsoare e gratuită!", "h1": "Frizerie cu clienți fideli"},
+    "spalatorii-auto": {"title": "Carduri de loialitate pentru spălătorii auto", "reward": "A 5-a spălare e gratuită!", "h1": "Clienți recurenți pentru spălătorie"},
+    "service-auto": {"title": "Carduri de loialitate pentru service auto", "reward": "10% reducere la următoarea revizie", "h1": "Service auto cu clienți fideli"},
+    "clinici-stomatologice": {"title": "Carduri de loialitate pentru clinici", "reward": "Consultație gratuită la a 5-a vizită", "h1": "Pacienți fideli pentru clinica ta"},
+    "pet-shop": {"title": "Carduri de loialitate pentru pet shop", "reward": "A 5-a achiziție cu 20% reducere", "h1": "Clienți fideli pentru pet shop"}
+}
+
+@app.get("/solutii/{industrie}")
+def industry_seo_page(industrie: str):
+    if industrie not in INDUSTRIES:
+        raise HTTPException(status_code=404, detail="Industrie negăsită")
+    data = INDUSTRIES[industrie]
+    html = f'''<!DOCTYPE html>
+<html lang="ro"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{data["title"]} - Loial.space</title>
+<meta name="description" content="{data["title"]}. Creează carduri digitale de fidelitate cu cod QR gratuit în 3 minute.">
+<style>body{{font-family:system-ui;background:#0a0a0f;color:#fff;padding:40px;max-width:720px;margin:auto;line-height:1.6}}
+.btn{{display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#a855f7,#06b6d4);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;margin-top:20px}}</style>
+</head><body>
+<p style="color:#a855f7;font-weight:600">SOLUȚII DE LOIALITATE • LOIAL.SPACE</p>
+<h1>{data["h1"]}</h1>
+<p>Renunță la cartonașele de carton care se pierd. Oferă clienților tăi un card digital pe care îl salvează în telefon printr-o simplă scanare QR.</p>
+<div style="background:#14161f;padding:20px;border-radius:14px;border:1px solid #222;margin:20px 0">
+<strong>Exemplu ofertă recomandată:</strong><br><span style="color:#38bdf8;font-size:1.1rem">{data["reward"]}</span>
+</div>
+<a href="/register.html" class="btn">Creează-ți primul card gratuit →</a>
+</body></html>'''
+    return HTMLResponse(content=html)
+
+@app.get("/sitemap.xml")
+def dynamic_sitemap():
+    base = "https://loial.space"
+    urls = [f"{base}/"] + [f"{base}/solutii/{ind}" for ind in INDUSTRIES.keys()]
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://sitemaps.org">\n'
+    for u in urls:
+        xml += f'  <url><loc>{u}</loc><changefreq>weekly</changefreq></url>\n'
+    xml += '</urlset>'
+    return Response(content=xml, media_type="application/xml")
+
 
 if __name__ == "__main__":
     import uvicorn
