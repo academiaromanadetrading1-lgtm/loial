@@ -2035,3 +2035,154 @@ def update_my_business_settings(req: BusinessSettingsUpdate, credentials: HTTPAu
         biz.reward_text = req.reward_text.strip()
     db.commit()
     return {"status": "updated"}
+
+# ==========================================
+# STAFF MANAGEMENT, CUSTOM OFFERS & SERVER QR
+# ==========================================
+class StaffMember(Base):
+    __tablename__ = "staff_members"
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, index=True)
+    name = Column(String)
+    pin = Column(String)
+    scans_count = Column(Integer, default=0)
+    active = Column(Integer, default=1)
+    created_at = Column(String)
+
+Base.metadata.create_all(bind=engine)
+
+def migrate_custom_offers():
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE business_accounts ADD COLUMN stamps_required INTEGER DEFAULT 6"))
+        except Exception:
+            pass
+        conn.commit()
+
+migrate_custom_offers()
+
+@app.get("/api/qr-image/{business_id}")
+def get_business_qr_image(business_id: int):
+    join_url = f"https://loial.space{business_id}"
+    img = qrcode.make(join_url)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    return {"qr_base64": f"data:image/png;base64,{b64}", "url": join_url}
+
+class StaffCreateRequest(BaseModel):
+    name: str
+    pin: str
+
+@app.get("/api/my-business/staff")
+def list_staff(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Neautentificat")
+    payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+    biz = db.query(BusinessAccount).filter(BusinessAccount.email == payload.get("sub")).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Afacere negăsită")
+    staff = db.query(StaffMember).filter(StaffMember.business_id == biz.id, StaffMember.active == 1).all()
+    return [{"id": s.id, "name": s.name, "pin": s.pin, "scans_count": s.scans_count or 0} for s in staff]
+
+@app.post("/api/my-business/staff")
+def add_staff_member(req: StaffCreateRequest, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Neautentificat")
+    payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+    biz = db.query(BusinessAccount).filter(BusinessAccount.email == payload.get("sub")).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Afacere negăsită")
+    if len(req.pin) != 4 or not req.pin.isdigit():
+        raise HTTPException(status_code=400, detail="PIN-ul trebuie să aibă exact 4 cifre")
+    existing_pin = db.query(StaffMember).filter(StaffMember.business_id == biz.id, StaffMember.pin == req.pin, StaffMember.active == 1).first()
+    if existing_pin:
+        raise HTTPException(status_code=400, detail="Acest PIN este deja folosit de alt angajat")
+    member = StaffMember(
+        business_id=biz.id,
+        name=sanitize_input(req.name, 60),
+        pin=req.pin,
+        scans_count=0,
+        active=1,
+        created_at=datetime.now().isoformat()
+    )
+    db.add(member)
+    db.commit()
+    return {"status": "added", "id": member.id}
+
+@app.delete("/api/my-business/staff/{staff_id}")
+def remove_staff_member(staff_id: int, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Neautentificat")
+    payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+    biz = db.query(BusinessAccount).filter(BusinessAccount.email == payload.get("sub")).first()
+    member = db.query(StaffMember).filter(StaffMember.id == staff_id, StaffMember.business_id == biz.id).first()
+    if member:
+        member.active = 0
+        db.commit()
+    return {"status": "removed"}
+
+class FullBusinessSettings(BaseModel):
+    reward_text: Optional[str] = None
+    stamps_required: Optional[int] = 6
+    google_review_url: Optional[str] = None
+
+@app.post("/api/my-business/offer")
+def update_business_offer(req: FullBusinessSettings, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Neautentificat")
+    payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+    biz = db.query(BusinessAccount).filter(BusinessAccount.email == payload.get("sub")).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Afacere negăsită")
+    if req.reward_text:
+        biz.reward_text = req.reward_text.strip()
+    if req.stamps_required and 2 <= req.stamps_required <= 20:
+        biz.stamps_required = req.stamps_required
+    if req.google_review_url is not None:
+        biz.google_review_url = req.google_review_url.strip()
+    db.commit()
+    return {"status": "updated"}
+
+@app.post("/api/scan-v2")
+def qr_scan_with_staff(req: QRScanRequest, db: Session = Depends(get_db)):
+    biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Afacere negăsită")
+    
+    staff = db.query(StaffMember).filter(
+        StaffMember.business_id == req.business_id,
+        StaffMember.pin == req.pin,
+        StaffMember.active == 1
+    ).first()
+    
+    # Acceptă fie PIN-ul unui angajat activ, fie PIN-ul principal al administratorului
+    if not staff and biz.staff_pin != req.pin:
+        raise HTTPException(status_code=401, detail="PIN incorect sau angajat dezactivat")
+    
+    customer = db.query(Customer).filter(
+        Customer.uuid == req.customer_uuid,
+        Customer.business_id == req.business_id
+    ).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Client negăsit la această locație")
+    
+    target = getattr(biz, "stamps_required", None) or 6
+    customer.stamps = (customer.stamps or 0) + 1
+    reward_unlocked = False
+    if customer.stamps >= target:
+        reward_unlocked = True
+    
+    if staff:
+        staff.scans_count = (staff.scans_count or 0) + 1
+        
+    customer.last_visit = datetime.now().isoformat()
+    db.commit()
+    return {
+        "stamps": customer.stamps,
+        "target": target,
+        "reward_unlocked": reward_unlocked,
+        "name": customer.name,
+        "staff_name": staff.name if staff else "Administrator",
+        "business_id": biz.id
+    }
