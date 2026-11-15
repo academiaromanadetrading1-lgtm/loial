@@ -3,16 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Review - Loial</title>
+<title>Părerea ta contează - Loial</title>
+<link href="https://googleapis.com" rel="stylesheet">
 <style>
-body { font-family: system-ui; background: #0a0a0f; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-.box { text-align: center; padding: 40px; max-width: 400px; }
-.stars { font-size: 48px; cursor: pointer; margin: 20px 0; }
-.star { color: #333; transition: 0.2s; }
-.star.active { color: #fbbf24; }
-textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #333; background: #1a1a1f; color: #fff; margin-top: 16px; box-sizing: border-box; }
-.btn { padding: 12px 24px; border: none; border-radius: 8px; background: linear-gradient(135deg, #a855f7, #06b6d4); color: #fff; cursor: pointer; margin-top: 16px; }
-.hidden { display: none; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: #f6f9f7; color: #111f18; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 16px; }
+  .box { background: #ffffff; border: 1px solid #dce6e0; border-radius: 24px; text-align: center; padding: 36px; max-width: 400px; width: 100%; box-shadow: 0 20px 40px rgba(17, 31, 24, 0.06); }
+  h2 { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+  p { color: #475d52; font-size: 15px; }
+  .stars { font-size: 46px; cursor: pointer; margin: 20px 0; }
+  .star { color: #dce6e0; transition: 0.2s; }
+  .star.active { color: #f59e0b; }
+  textarea { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #dce6e0; background: #f6f9f7; color: #111f18; margin-top: 12px; box-sizing: border-box; font-family: inherit; font-size: 14px; }
+  .btn { width: 100%; padding: 14px 24px; border: none; border-radius: 12px; background: linear-gradient(135deg, #2d6a4f, #40916c); color: #ffffff; font-weight: 700; font-size: 15px; cursor: pointer; margin-top: 14px; }
+  .hidden { display: none; }
 </style>
 </head>
 <body>
@@ -23,10 +26,10 @@ textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #33
     <span class="star" data-r="1">★</span><span class="star" data-r="2">★</span><span class="star" data-r="3">★</span><span class="star" data-r="4">★</span><span class="star" data-r="5">★</span>
   </div>
   <div id="feedbackForm" class="hidden">
-    <textarea id="msg" placeholder="Spune-ne ce putem îmbunătăți"></textarea>
-    <button class="btn" onclick="submitFeedback()">Trimite feedback</button>
+    <textarea id="msg" rows="3" placeholder="Spune-ne ce putem îmbunătăți pentru data viitoare..."></textarea>
+    <button class="btn" onclick="submitFeedback()">Trimite feedback-ul</button>
   </div>
-  <p id="thanks" class="hidden">Mulțumim pentru feedback!</p>
+  <p id="thanks" class="hidden" style="color:#2d6a4f;font-weight:700;margin-top:16px;">✓ Mulțumim pentru feedback!</p>
 </div>
 <script>
 const bizId = location.pathname.split('/').pop();
@@ -36,7 +39,7 @@ let googleUrl = null;
 fetch('/api/business-public/' + bizId)
   .then(r => r.json())
   .then(data => {
-    document.getElementById('bizName').textContent = data.name || 'Afacere';
+    document.getElementById('bizName').textContent = data.name || 'Afacere Parteneră';
     googleUrl = data.google_review_url;
   });
 
