@@ -5,124 +5,91 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Cardul meu de fidelitate - Loial</title>
-<link href="https://googleapis.com" rel="stylesheet">
+<meta name="theme-color" content="#2d6a4f">
+<link rel="manifest" href="/manifest.json">
+<title>Cardul meu - Loial</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Inter', system-ui, sans-serif; background: #f6f9f7; color: #111f18; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }
-  
-  .reminder-pill {
-    background: #fef3c7; border: 1.5px solid #f59e0b; color: #92400e;
-    padding: 11px 16px; border-radius: 14px; font-size: 13.5px; font-weight: 700;
-    margin-bottom: 14px; width: 100%; max-width: 390px; text-align: center;
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
-  }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #f6f9f7; color: #111f18; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 14px; }
+  .reminder-pill { background: #fef3c7; border: 1.5px solid #f59e0b; color: #92400e; padding: 10px 14px; border-radius: 14px; font-size: 13.5px; font-weight: 700; margin-bottom: 12px; width: 100%; max-width: 380px; text-align: center; }
   .reminder-pill.confirmed { background: #dcfce7; border-color: #22c55e; color: #166534; }
-
-  .wallet-pass {
-    background: #ffffff; border-radius: 26px; width: 100%; max-width: 390px;
-    box-shadow: 0 20px 45px -10px rgba(17, 31, 24, 0.14);
-    border: 1px solid #dce6e0; overflow: hidden; text-align: center;
-  }
-  .pass-top { padding: 22px 24px; color: #ffffff; background: #2d6a4f; }
-  .pass-brand { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.85; font-weight: 700; }
-  .pass-biz { font-size: 24px; font-weight: 800; margin-top: 4px; }
-  .pass-reward { font-size: 13.5px; margin-top: 8px; background: rgba(255,255,255,0.18); padding: 6px 14px; border-radius: 10px; display: inline-block; font-weight: 600; }
-
-  .pass-body { padding: 24px; }
-  .qr-stage {
-    background: #ffffff; border: 2px solid #2d6a4f; border-radius: 20px;
-    padding: 16px; display: inline-block; margin-bottom: 12px;
-    box-shadow: 0 8px 20px rgba(45, 106, 79, 0.12);
-  }
-  .scan-hint { font-size: 14px; font-weight: 700; color: #111f18; margin-bottom: 16px; }
-
-  .stamps-row {
-    display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
-    background: #f6f9f7; padding: 14px; border-radius: 16px; border: 1px solid #dce6e0;
-    margin-bottom: 16px;
-  }
-  .dot {
-    aspect-ratio: 1; border-radius: 50%; border: 2px dashed #b7d7c5;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 800; color: #475d52; transition: 0.3s;
-  }
-  .dot.filled {
-    background: #2d6a4f; border: none; color: #ffffff;
-    box-shadow: 0 4px 10px rgba(45, 106, 79, 0.35); transform: scale(1.06);
-  }
-
-  input {
-    width: 100%; padding: 14px; margin: 6px 0; border-radius: 12px;
-    border: 1px solid #dce6e0; background: #f6f9f7; color: #111f18;
-    font-size: 15px; font-family: inherit;
-  }
-  input:focus { outline: none; border-color: #2d6a4f; background: #ffffff; }
-  .btn-main {
-    width: 100%; padding: 15px; border: none; border-radius: 12px;
-    background: linear-gradient(135deg, #2d6a4f, #40916c); color: #ffffff;
-    font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 10px;
-    box-shadow: 0 6px 18px rgba(45, 106, 79, 0.25);
-  }
-  .btn-shortcut {
-    width: 100%; padding: 12px; border: 1px solid #b7d7c5; border-radius: 12px;
-    background: #edf3ef; color: #2d6a4f; font-size: 13px; font-weight: 700;
-    cursor: pointer; margin-top: 8px; font-family: inherit;
-  }
+  .wallet-pass { background: #ffffff; border-radius: 24px; width: 100%; max-width: 380px; box-shadow: 0 18px 40px rgba(17, 31, 24, 0.12); border: 1px solid #dce6e0; overflow: hidden; text-align: center; }
+  .pass-top { padding: 20px; color: #ffffff; background: #2d6a4f; }
+  .pass-brand { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.85; font-weight: 700; }
+  .pass-biz { font-size: 23px; font-weight: 800; margin-top: 3px; }
+  .pass-reward { font-size: 13px; margin-top: 6px; background: rgba(255,255,255,0.18); padding: 5px 12px; border-radius: 10px; display: inline-block; font-weight: 600; }
+  .pass-body { padding: 20px; }
+  .qr-stage { background: #ffffff; border: 2px solid #2d6a4f; border-radius: 18px; padding: 12px; display: inline-block; margin-bottom: 10px; }
+  .qr-stage img { width: 180px; height: 180px; display: block; }
+  .scan-hint { font-size: 14px; font-weight: 700; color: #111f18; margin-bottom: 14px; }
+  .stamps-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; background: #f6f9f7; padding: 12px; border-radius: 16px; border: 1px solid #dce6e0; margin-bottom: 14px; }
+  .dot { aspect-ratio: 1; border-radius: 50%; border: 2px dashed #b7d7c5; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #475d52; }
+  .dot.filled { background: #2d6a4f; border: none; color: #ffffff; }
+  input { width: 100%; padding: 14px; margin: 6px 0; border-radius: 12px; border: 1px solid #dce6e0; background: #f6f9f7; color: #111f18; font-size: 16px; }
+  .btn-main { width: 100%; padding: 15px; border: none; border-radius: 12px; background: linear-gradient(135deg, #2d6a4f, #40916c); color: #ffffff; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+  .btn-install { width: 100%; padding: 13px; border: 1.5px solid #2d6a4f; border-radius: 12px; background: #edf3ef; color: #2d6a4f; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 6px; }
+  .ios-tip { display: none; background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px; border-radius: 12px; font-size: 12.5px; color: #334155; margin-top: 8px; }
   .hidden { display: none; }
 </style>
 </head>
 <body>
 
-  <div class="reminder-pill" id="reminderBanner">
-    💡 Nu uita de ștampila ta! Arată acest card la casă.
-  </div>
+  <div class="reminder-pill" id="reminderBanner">💡 Nu uita de ștampila ta! Arată acest card la casă.</div>
 
   <div class="wallet-pass">
     <div class="pass-top" id="passHeader">
       <div class="pass-brand">CARD DIGITAL DE FIDELITATE</div>
-      <div class="pass-biz" id="bizName">Se încarcă...</div>
+      <div class="pass-biz" id="bizName">Card Fidelitate</div>
       <div class="pass-reward" id="rewardText">🎁 Colectează ștampile</div>
     </div>
 
     <div class="pass-body">
       <div id="enrollView">
-        <p style="font-size: 14px; color: #475d52; margin-bottom: 14px;">
-          Introdu prenumele tău pentru a-ți genera cardul digital instant:
-        </p>
         <form id="enrollForm">
-          <input type="text" id="nameInput" placeholder="Prenumele tău (ex: Cip)" required>
-          <button type="submit" id="submitBtn" class="btn-main">Afișează cardul meu acum →</button>
+          <input type="text" id="nameInput" placeholder="Scrie prenumele tău aici..." required autocomplete="given-name">
+          <button type="submit" class="btn-main">Afișează cardul meu instant →</button>
         </form>
       </div>
 
       <div id="cardView" class="hidden">
-        <div class="qr-stage">
-          <div id="qrcode"></div>
-        </div>
+        <div class="qr-stage"><img id="qrImg" src="" alt="Cod QR"></div>
         <div class="scan-hint" id="holderLabel">Arată acest QR la casă</div>
-
         <div style="font-size:12.5px;font-weight:700;color:#475d52;margin-bottom:6px;" id="progressText">0 / 6 ștampile</div>
         <div class="stamps-row" id="stampsRow"></div>
-
-        <button type="button" class="btn-shortcut" onclick="alert('Apasă pe meniul browserului (Share / ⋮) și alege «Adaugă pe ecranul principal» pentru a avea cardul ca o aplicație pe telefon!')">
-          📲 Salvează cardul pe ecranul principal al telefonului
-        </button>
+        <button type="button" id="installBtn" class="btn-install" onclick="triggerInstall()">📲 Salvează cardul pe telefon (1 clic)</button>
+        <div id="iosTip" class="ios-tip">Pe iPhone: apasă butonul <strong>Share (↑)</strong> din bara de jos și alege <strong>„Adaugă la Ecran Principal”</strong>.</div>
       </div>
     </div>
   </div>
 
-<script src="https://jsdelivr.net"></script>
 <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(() => {}); }
+
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; });
+
+  function triggerInstall() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+    } else {
+      const tip = document.getElementById('iosTip');
+      tip.style.display = tip.style.display === 'block' ? 'none' : 'block';
+    }
   }
 
-  const bizId = parseInt(location.pathname.split('/').pop());
+  const bizId = parseInt(location.pathname.split('/').pop()) || 1;
   const storageKey = 'loial_card_' + bizId;
   let saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
   let knownStamps = 0;
   let targetStamps = 6;
+
+  const cachedBiz = JSON.parse(localStorage.getItem('loial_biz_' + bizId) || 'null');
+  if (cachedBiz) {
+    document.getElementById('bizName').textContent = cachedBiz.name;
+    document.getElementById('rewardText').textContent = '🎁 ' + cachedBiz.reward_text;
+    targetStamps = cachedBiz.stamps_required || 6;
+  }
 
   fetch('/api/biz-full/' + bizId)
     .then(r => r.json())
@@ -130,51 +97,36 @@
       document.getElementById('bizName').textContent = d.name || 'Afacere Parteneră';
       document.getElementById('rewardText').textContent = '🎁 ' + (d.reward_text || 'Colectează ștampile!');
       targetStamps = d.stamps_required || 6;
-      if (saved && saved.uuid) {
-        renderDots(knownStamps, targetStamps);
-      }
+      localStorage.setItem('loial_biz_' + bizId, JSON.stringify(d));
+      if (saved && saved.uuid) renderDots(knownStamps, targetStamps);
     })
     .catch(() => {});
 
-  if (saved && saved.uuid) {
-    activateCardScreen(saved.uuid, saved.name, saved.stamps || 0);
-  }
+  if (saved && saved.uuid) { showCardInstant(saved.uuid, saved.name, saved.stamps || 0); }
 
-  document.getElementById('enrollForm').onsubmit = async (e) => {
+  document.getElementById('enrollForm').onsubmit = (e) => {
     e.preventDefault();
-    const btn = document.getElementById('submitBtn');
-    btn.textContent = 'Se generează cardul...';
-    btn.disabled = true;
-
     const nameVal = document.getElementById('nameInput').value.trim();
-    const res = await fetch('/api/enroll', {
+    if (!nameVal) return;
+
+    const instantUuid = Math.random().toString(36).substring(2, 10);
+    saved = { uuid: instantUuid, name: nameVal, stamps: 0 };
+    localStorage.setItem(storageKey, JSON.stringify(saved));
+    showCardInstant(instantUuid, nameVal, 0);
+
+    fetch('/api/enroll-sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ business_id: bizId, name: nameVal })
-    });
-    if (res.status === 403) {
-      alert('Locația a atins limita planului gratuit.');
-      btn.disabled = false;
-      return;
-    }
-    if (res.ok) {
-      const data = await res.json();
-      saved = { uuid: data.uuid, name: data.name, stamps: 0 };
-      localStorage.setItem(storageKey, JSON.stringify(saved));
-      activateCardScreen(data.uuid, data.name, 0);
-    } else {
-      alert('Eroare la activare. Încearcă din nou.');
-      btn.disabled = false;
-    }
+      body: JSON.stringify({ business_id: bizId, name: nameVal, uuid: instantUuid })
+    }).catch(() => {});
   };
 
-  function activateCardScreen(uuid, name, stamps) {
+  function showCardInstant(uuid, name, stamps) {
     knownStamps = stamps;
     document.getElementById('enrollView').classList.add('hidden');
     document.getElementById('cardView').classList.remove('hidden');
     document.getElementById('holderLabel').textContent = 'Titular: ' + name + ' • Arată QR-ul la casă';
-    document.getElementById('qrcode').innerHTML = '';
-    new QRCode(document.getElementById('qrcode'), { text: uuid, width: 185, height: 185 });
+    document.getElementById('qrImg').src = `/api/qr-raw/${uuid}`;
     renderDots(stamps, targetStamps);
 
     fetch(`/api/presence/${bizId}/${uuid}`, { method: 'POST' }).catch(() => {});
