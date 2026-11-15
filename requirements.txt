@@ -10,3 +10,4 @@ slowapi
 python-dotenv
 pytest
 httpx
+bcrypt==4.0.1
