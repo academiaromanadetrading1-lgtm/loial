@@ -65,6 +65,9 @@ document.getElementById('regForm').onsubmit = async (e) => {
   if (res.ok) {
     const result = await res.json();
     localStorage.setItem('token', result.token);
+    localStorage.setItem('biz_id', result.business_id);
+    localStorage.setItem('biz_name', data.business_name);
+    localStorage.setItem('biz_reward', data.reward);
     localStorage.removeItem('draft_biz');
     localStorage.removeItem('draft_reward');
     localStorage.removeItem('draft_color');
