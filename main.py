@@ -1668,6 +1668,19 @@ def health(db: Session = Depends(get_db)):
     count = db.query(func.count(Customer.id)).scalar()
     return {"status": "healthy", "db": "sqlite", "customers": count, "timestamp": datetime.now().isoformat()}
 
+@app.post("/setup-admin")
+def setup_admin(email: str = "ciprianpop@academiadetrading.llc", db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        user = User(email=email, password=pwd_context.hash("Admin123!"), name="Ciprian Pop", plan="network", role="admin")
+        db.add(user)
+    else:
+        user.role = "admin"
+        user.plan = "network"
+    db.commit()
+    return {"status": "admin", "email": email, "role": "admin"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
