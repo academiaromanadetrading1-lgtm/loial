@@ -3,64 +3,137 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alătură-te - Loial</title>
+<title>Loial - Carduri digitale de loialitate fără aplicații</title>
+<meta name="description" content="Creează carduri digitale de loialitate în Apple și Google Wallet în 3 minute. Gratuit până la 50 de clienți.">
 <style>
-body { font-family: system-ui; background: #0a0a0f; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-.box { background: #111; padding: 32px; border-radius: 16px; width: 100%; max-width: 360px; text-align: center; }
-.card-preview { padding: 20px; border-radius: 12px; margin: 16px 0; }
-input { width: 100%; padding: 12px; border: 1px solid #333; border-radius: 8px; background: #1a1a1f; color: #fff; margin-top: 8px; box-sizing: border-box; }
-.btn { width: 100%; padding: 14px; border: none; border-radius: 8px; background: linear-gradient(135deg, #a855f7, #06b6d4); color: #fff; cursor: pointer; margin-top: 16px; }
-.qr { margin-top: 20px; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0f; color: #fff; line-height: 1.5; }
+.gradient-text { background: linear-gradient(135deg, #a855f7, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+header { display: flex; justify-content: space-between; align-items: center; padding: 16px 40px; border-bottom: 1px solid #222; max-width: 1280px; margin: 0 auto; }
+@media (max-width: 768px) { header { padding: 16px 20px; } nav a { display: none; } }
+.logo { display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 800; letter-spacing: 0.5px; }
+.logo-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #a855f7, #06b6d4); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+nav { display: flex; gap: 20px; align-items: center; }
+nav a { color: #aaa; text-decoration: none; font-size: 14px; transition: 0.2s; }
+nav a:hover { color: #fff; }
+.lang-select { background: #1a1a1f; border: 1px solid #333; color: #fff; padding: 6px 10px; border-radius: 8px; font-size: 12px; cursor: pointer; }
+.btn-outline { padding: 9px 18px; border: 1px solid #333; border-radius: 10px; background: transparent; color: #fff; cursor: pointer; font-weight: 600; transition: 0.2s; }
+.btn-outline:hover { border-color: #666; background: rgba(255,255,255,0.05); }
+.btn-gradient { padding: 10px 22px; border: none; border-radius: 10px; background: linear-gradient(135deg, #a855f7, #06b6d4); color: #fff; cursor: pointer; font-weight: 700; transition: transform 0.2s, box-shadow 0.2s; }
+.btn-gradient:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(168, 85, 247, 0.35); }
+
+.hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 50px; padding: 60px 40px; align-items: center; max-width: 1280px; margin: 0 auto; }
+@media (max-width: 960px) { .hero { grid-template-columns: 1fr; padding: 40px 20px; gap: 40px; } }
+.badge { display: inline-block; padding: 6px 14px; background: rgba(168, 85, 247, 0.18); border: 1px solid rgba(168, 85, 247, 0.35); color: #e9d5ff; border-radius: 20px; font-size: 13px; font-weight: 500; margin-bottom: 18px; }
+.hero h1 { font-size: 52px; line-height: 1.1; margin-bottom: 18px; font-weight: 800; }
+@media (max-width: 600px) { .hero h1 { font-size: 36px; } }
+.hero p.subtitle { color: #a1a1aa; font-size: 17px; margin-bottom: 28px; max-width: 540px; }
+.cta-big { padding: 16px 32px; font-size: 16px; border-radius: 12px; }
+.micro { font-size: 13px; color: #71717a; margin-top: 12px; }
+.stats { display: flex; gap: 36px; margin-top: 36px; padding-top: 24px; border-top: 1px solid #1f1f27; }
+.stat-value { font-size: 24px; font-weight: 800; color: #fff; }
+.stat-label { font-size: 12px; color: #888; }
+
+/* Simulator Card */
+.simulator { background: #12121a; border: 1px solid #272732; border-radius: 24px; padding: 28px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); }
+.sim-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: #e4e4e7; text-align: center; }
+.sim-controls label { display: block; font-size: 12px; color: #9ca3af; margin-bottom: 5px; margin-top: 12px; font-weight: 600; }
+.sim-controls input { width: 100%; padding: 11px 14px; border: 1px solid #2e2e3a; border-radius: 10px; background: #1a1a24; color: #fff; font-size: 14px; }
+.sim-controls input:focus { outline: none; border-color: #a855f7; }
+.colors { display: flex; gap: 10px; margin-top: 8px; }
+.color-btn { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: 0.2s; }
+.color-btn.active { border-color: #38bdf8; transform: scale(1.15); }
+
+.wallet-card { width: 290px; margin: 22px auto; border-radius: 18px; padding: 18px; transition: background 0.3s ease; box-shadow: 0 18px 35px rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.12); }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-weight: 700; font-size: 15px; }
+.stamps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 12px; }
+.stamp { height: 40px; border-radius: 50%; border: 1.5px dashed rgba(255,255,255,0.35); display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.stamp.filled { background: #fff; color: #0f172a; border: none; font-weight: 900; box-shadow: 0 3px 8px rgba(0,0,0,0.25); }
+.card-qr { background: #fff; border-radius: 10px; padding: 8px; margin-top: 12px; text-align: center; }
+.card-qr span { display: block; color: #475569; font-size: 10px; font-weight: 600; margin-top: 4px; }
+
+/* Bento Grid */
+.bento-section { max-width: 1280px; margin: 20px auto 60px auto; padding: 0 40px; }
+@media (max-width: 768px) { .bento-section { padding: 0 20px; } }
+.bento-section h2 { text-align: center; font-size: 28px; margin-bottom: 28px; }
+.bento { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+@media (max-width: 900px) { .bento { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 500px) { .bento { grid-template-columns: 1fr; } }
+.bento-card { background: #12121a; border: 1px solid #22222d; border-radius: 18px; padding: 24px; transition: border-color 0.2s; }
+.bento-card:hover { border-color: #a855f7; }
+.bento-card h3 { font-size: 17px; margin-bottom: 8px; }
+.bento-card p { font-size: 14px; color: #9ca3af; }
 </style>
 </head>
 <body>
-<div class="box">
-  <h2 id="bizName">Se încarcă...</h2>
-  <div class="card-preview" id="cardPreview"><p id="reward"></p></div>
-  <form id="enrollForm">
-    <input type="text" id="name" placeholder="Numele tău" required>
-    <input type="tel" id="phone" placeholder="Telefon (opțional)">
-    <button type="submit" class="btn">Descarcă cardul în Wallet →</button>
-  </form>
-  <div id="result" class="qr" style="display:none">
-    <p>Cardul tău e gata!</p>
-    <div id="qrcode"></div>
-    <p style="font-size:12px;color:#888">Arată acest QR la casă</p>
+
+<header>
+  <div class="logo"><div class="logo-icon">L</div> LOIAL</div>
+  <nav>
+    <a href="#features">Soluții</a>
+    <a href="/solutii/cafenele">Cafenele</a>
+    <a href="/solutii/frizerii">Frizerii</a>
+    <select class="lang-select" id="langSelect">
+      <option value="ro">RO</option><option value="en">EN</option><option value="de">DE</option>
+      <option value="fr">FR</option><option value="it">IT</option><option value="es">ES</option>
+      <option value="nl">NL</option><option value="pl">PL</option><option value="hu">HU</option>
+    </select>
+    <button class="btn-outline" onclick="location.href='/login.html'">Login</button>
+    <button class="btn-gradient" onclick="goRegister()">Creează card</button>
+  </nav>
+</header>
+
+<section class="hero">
+  <div>
+    <span class="badge">✨ Fără aplicații de descărcat. Direct prin cod QR & Wallet.</span>
+    <h1>Transformă clienții<br><span class="gradient-text">ocazionali în fideli.</span></h1>
+    <p class="subtitle">Creează carduri digitale cu ștampile, puncte sau cashback în 3 minute. Clienții le salvează în telefon printr-o simplă scanare QR, iar tu îi aduci înapoi și crești recenziile pe Google.</p>
+    <button class="btn-gradient cta-big" onclick="goRegister()">Creează-ți primul card gratuit →</button>
+    <p class="micro">Gratuit până la primii 50 de clienți • Fără card bancar • Gata în 3 minute</p>
+    <div class="stats">
+      <div><div class="stat-value">2 sec</div><div class="stat-label">Timp scanare la casă</div></div>
+      <div><div class="stat-value">+34%</div><div class="stat-label">Clienți care revin</div></div>
+      <div><div class="stat-value">0 RON</div><div class="stat-label">Cost de pornire</div></div>
+    </div>
   </div>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script>
-const bizId = location.pathname.split('/').pop();
-const storageKey = 'loial_card_' + bizId;
-const savedUuid = localStorage.getItem(storageKey);
 
-fetch('/api/business-public/' + bizId).then(r => r.json()).then(d => {
-  document.getElementById('bizName').textContent = d.name;
-  document.getElementById('reward').textContent = d.reward_text || 'Recompensă';
-  document.getElementById('cardPreview').style.background = d.card_color || '#1e293b';
-});
+  <div class="simulator">
+    <div class="sim-title">🎨 Personalizează-ți cardul live</div>
+    <div class="sim-controls">
+      <label>Numele afacerii tale</label>
+      <input type="text" id="bizName" value="Cafeneaua Artizanală" maxlength="24">
+      <label>Recompensa oferită</label>
+      <input type="text" id="rewardText" value="A 6-a cafea e din partea casei!" maxlength="42">
+      <label>Culoarea cardului</label>
+      <div class="colors">
+        <button type="button" class="color-btn active" data-bg="#1e293b" style="background:#1e293b"></button>
+        <button type="button" class="color-btn" data-bg="#78350f" style="background:#78350f"></button>
+        <button type="button" class="color-btn" data-bg="#065f46" style="background:#065f46"></button>
+        <button type="button" class="color-btn" data-bg="#9f1239" style="background:#9f1239"></button>
+        <button type="button" class="color-btn" data-bg="#4338ca" style="background:#4338ca"></button>
+      </div>
+    </div>
 
-if (savedUuid) {
-  document.getElementById('enrollForm').style.display = 'none';
-  document.getElementById('result').style.display = 'block';
-  new QRCode(document.getElementById('qrcode'), savedUuid);
-  document.querySelector('#result p').textContent = 'Cardul tău:';
-}
+    <div class="wallet-card" id="walletCard" style="background:#1e293b">
+      <div class="card-header">
+        <span id="previewName">Cafeneaua Artizanală</span>
+        <span id="stampCount">4/6</span>
+      </div>
+      <div class="stamps-grid" id="stampsGrid"></div>
+      <p id="previewReward" style="font-size:13px;opacity:0.9">A 6-a cafea e din partea casei!</p>
+      <div class="card-qr">
+        <svg viewBox="0 0 100 100" width="48" height="48">
+          <path d="M10,10 h30 v30 h-30 z M16,16 v18 h18 v-18 z M22,22 h6 v6 h-6 z M60,10 h30 v30 h-30 z M66,16 v18 h18 v-18 z M72,22 h6 v6 h-6 z M10,60 h30 v30 h-30 z M16,66 v18 h18 v-18 z M22,72 h6 v6 h-6 z M48,15 h6 v20 h-6 z M45,45 h15 v10 h-15 z M65,50 h25 v6 h-25 z M52,65 h10 v25 h-10 z M72,70 h18 v20 h-18 z" fill="#0f172a"/>
+        </svg>
+        <span>Scanează la casă • Powered by Loial.space</span>
+      </div>
+    </div>
 
-document.getElementById('enrollForm').onsubmit = async (e) => {
-  e.preventDefault();
-  const res = await fetch('/api/enroll', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ business_id: parseInt(bizId), name: document.getElementById('name').value, phone: document.getElementById('phone').value })
-  });
-  if (res.status === 403) { alert('Limita de clienți atinsă'); return; }
-  const data = await res.json();
-  localStorage.setItem(storageKey, data.uuid);
-  document.getElementById('enrollForm').style.display = 'none';
-  document.getElementById('result').style.display = 'block';
-  new QRCode(document.getElementById('qrcode'), data.uuid);
-};
-</script>
-</body>
-</html>
+    <button type="button" class="btn-outline" id="addStamp" style="width:100%">+ Simulează o ștampilă la casă</button>
+  </div>
+</section>
+
+<section class="bento-section" id="features">
+  <h2>Construit pentru afaceri locale care vor clienți recurenți</h2>
+  <div class="bento">
+    <div class="bento-card"><h3>☕ Cafenele & Brutării</h3><p>Înlocuiește cartonașele de carton. Ștampile digitale scanate în 2 secunde la casă.</p></div>
