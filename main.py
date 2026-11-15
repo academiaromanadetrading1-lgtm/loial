@@ -458,7 +458,7 @@ def index_page():
 
 @app.get("/")
 def root():
-    return {"message": "Loial Loyalty API", "status": "running", "version": "2.2", "db": "sqlite-optimized", "rate_limit": "enabled"}
+    return FileResponse("login.html")
 
 @app.post("/auth/login")
 @limiter.limit("10/minute")
