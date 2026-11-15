@@ -20,15 +20,14 @@
   .pass-reward { font-size: 13px; margin-top: 6px; background: rgba(255,255,255,0.18); padding: 5px 12px; border-radius: 10px; display: inline-block; font-weight: 600; }
   .pass-body { padding: 20px; }
   .qr-stage { background: #ffffff; border: 2px solid #2d6a4f; border-radius: 18px; padding: 12px; display: inline-block; margin-bottom: 10px; }
-  .qr-stage img { width: 180px; height: 180px; display: block; }
+  .qr-stage img { width: 185px; height: 185px; display: block; }
   .scan-hint { font-size: 14px; font-weight: 700; color: #111f18; margin-bottom: 14px; }
   .stamps-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; background: #f6f9f7; padding: 12px; border-radius: 16px; border: 1px solid #dce6e0; margin-bottom: 14px; }
   .dot { aspect-ratio: 1; border-radius: 50%; border: 2px dashed #b7d7c5; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #475d52; }
   .dot.filled { background: #2d6a4f; border: none; color: #ffffff; }
   input { width: 100%; padding: 14px; margin: 6px 0; border-radius: 12px; border: 1px solid #dce6e0; background: #f6f9f7; color: #111f18; font-size: 16px; }
   .btn-main { width: 100%; padding: 15px; border: none; border-radius: 12px; background: linear-gradient(135deg, #2d6a4f, #40916c); color: #ffffff; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 8px; }
-  .btn-install { width: 100%; padding: 13px; border: 1.5px solid #2d6a4f; border-radius: 12px; background: #edf3ef; color: #2d6a4f; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 6px; }
-  .ios-tip { display: none; background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px; border-radius: 12px; font-size: 12.5px; color: #334155; margin-top: 8px; }
+  .btn-save { width: 100%; padding: 14px; border: 1.5px solid #2d6a4f; border-radius: 12px; background: #edf3ef; color: #2d6a4f; font-size: 14.5px; font-weight: 700; cursor: pointer; margin-top: 6px; }
   .hidden { display: none; }
 </style>
 </head>
@@ -37,7 +36,7 @@
   <div class="reminder-pill" id="reminderBanner">💡 Nu uita de ștampila ta! Arată acest card la casă.</div>
 
   <div class="wallet-pass">
-    <div class="pass-top" id="passHeader">
+    <div class="pass-top">
       <div class="pass-brand">CARD DIGITAL DE FIDELITATE</div>
       <div class="pass-biz" id="bizName">Card Fidelitate</div>
       <div class="pass-reward" id="rewardText">🎁 Colectează ștampile</div>
@@ -52,40 +51,26 @@
       </div>
 
       <div id="cardView" class="hidden">
-        <div class="qr-stage"><img id="qrImg" src="" alt="Cod QR"></div>
+        <div class="qr-stage"><img id="qrImg" crossorigin="anonymous" src="" alt="Cod QR"></div>
         <div class="scan-hint" id="holderLabel">Arată acest QR la casă</div>
         <div style="font-size:12.5px;font-weight:700;color:#475d52;margin-bottom:6px;" id="progressText">0 / 6 ștampile</div>
         <div class="stamps-row" id="stampsRow"></div>
-        <button type="button" id="installBtn" class="btn-install" onclick="triggerInstall()">📲 Salvează cardul pe telefon (1 clic)</button>
-        <div id="iosTip" class="ios-tip">Pe iPhone: apasă butonul <strong>Share (↑)</strong> din bara de jos și alege <strong>„Adaugă la Ecran Principal”</strong>.</div>
+        <button type="button" class="btn-save" onclick="saveCardImage()">📥 Salvează Cardul în Telefon (1 clic)</button>
       </div>
     </div>
   </div>
 
 <script>
-  if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(() => {}); }
-
-  let deferredPrompt = null;
-  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; });
-
-  function triggerInstall() {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
-    } else {
-      const tip = document.getElementById('iosTip');
-      tip.style.display = tip.style.display === 'block' ? 'none' : 'block';
-    }
-  }
-
   const bizId = parseInt(location.pathname.split('/').pop()) || 1;
   const storageKey = 'loial_card_' + bizId;
   let saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
   let knownStamps = 0;
   let targetStamps = 6;
+  let currentBizName = 'Card Loial';
 
   const cachedBiz = JSON.parse(localStorage.getItem('loial_biz_' + bizId) || 'null');
   if (cachedBiz) {
+    currentBizName = cachedBiz.name;
     document.getElementById('bizName').textContent = cachedBiz.name;
     document.getElementById('rewardText').textContent = '🎁 ' + cachedBiz.reward_text;
     targetStamps = cachedBiz.stamps_required || 6;
@@ -94,7 +79,8 @@
   fetch('/api/biz-full/' + bizId)
     .then(r => r.json())
     .then(d => {
-      document.getElementById('bizName').textContent = d.name || 'Afacere Parteneră';
+      currentBizName = d.name || 'Afacere Parteneră';
+      document.getElementById('bizName').textContent = currentBizName;
       document.getElementById('rewardText').textContent = '🎁 ' + (d.reward_text || 'Colectează ștampile!');
       targetStamps = d.stamps_required || 6;
       localStorage.setItem('loial_biz_' + bizId, JSON.stringify(d));
@@ -162,6 +148,52 @@
       d.textContent = i <= count ? '★' : i;
       row.appendChild(d);
     }
+  }
+
+  async function saveCardImage() {
+    const img = document.getElementById('qrImg');
+    const canvas = document.createElement('canvas');
+    canvas.width = 600;
+    canvas.height = 760;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 600, 760);
+
+    ctx.fillStyle = '#2d6a4f';
+    ctx.fillRect(0, 0, 600, 170);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 34px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(currentBizName, 300, 85);
+
+    ctx.font = '22px sans-serif';
+    ctx.fillText('Titular: ' + (saved ? saved.name : ''), 300, 130);
+
+    ctx.drawImage(img, 125, 220, 350, 350);
+
+    ctx.fillStyle = '#111f18';
+    ctx.font = 'bold 24px sans-serif';
+    ctx.fillText('Arată acest cod QR la casă', 300, 635);
+
+    ctx.fillStyle = '#475d52';
+    ctx.font = '18px sans-serif';
+    ctx.fillText('Card Digital • Loial.space', 300, 680);
+
+    canvas.toBlob(async (blob) => {
+      const file = new File([blob], 'Card-Loial.png', { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'Cardul meu ' + currentBizName });
+          return;
+        } catch (e) {}
+      }
+      const link = document.createElement('a');
+      link.download = 'Card-Loial.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
   }
 </script>
 </body>
