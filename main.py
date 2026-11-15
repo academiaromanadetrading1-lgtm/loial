@@ -2186,3 +2186,80 @@ def qr_scan_with_staff(req: QRScanRequest, db: Session = Depends(get_db)):
         "staff_name": staff.name if staff else "Administrator",
         "business_id": biz.id
     }
+
+# ==========================================
+# DIRECT BUSINESS ID ROUTES (NO TOKEN ISSUES)
+# ==========================================
+@app.get("/api/biz-full/{business_id}")
+def get_biz_full_data(business_id: int, db: Session = Depends(get_db)):
+    biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Afacere negăsită")
+    customers = db.query(Customer).filter(Customer.business_id == biz.id).order_by(Customer.id.desc()).all()
+    staff = db.query(StaffMember).filter(StaffMember.business_id == biz.id, StaffMember.active == 1).all()
+    
+    join_url = f"https://loial.space{biz.id}"
+    img = qrcode.make(join_url)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    qr_b64 = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    
+    return {
+        "id": biz.id,
+        "name": biz.name,
+        "email": biz.email,
+        "plan": biz.plan or "free",
+        "max_customers": biz.max_customers or 50,
+        "reward_text": biz.reward_text or "Oferta ta aici",
+        "stamps_required": getattr(biz, "stamps_required", None) or 6,
+        "google_review_url": biz.google_review_url or "",
+        "qr_base64": qr_b64,
+        "customers_count": len(customers),
+        "customers": [{"name": c.name, "stamps": c.stamps or 0, "last_visit": c.last_visit} for c in customers[:20]],
+        "staff": [{"id": s.id, "name": s.name, "pin": s.pin, "scans_count": s.scans_count or 0} for s in staff]
+    }
+
+@app.post("/api/biz-full/{business_id}/offer")
+def save_biz_offer_direct(business_id: int, req: FullBusinessSettings, db: Session = Depends(get_db)):
+    biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Afacere negăsită")
+    if req.reward_text:
+        biz.reward_text = req.reward_text.strip()
+    if req.stamps_required and 1 <= req.stamps_required <= 200:
+        biz.stamps_required = req.stamps_required
+    if req.google_review_url is not None:
+        biz.google_review_url = req.google_review_url.strip()
+    db.commit()
+    return {"status": "ok"}
+
+@app.post("/api/biz-full/{business_id}/staff")
+def add_biz_staff_direct(business_id: int, req: StaffCreateRequest, db: Session = Depends(get_db)):
+    biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Afacere negăsită")
+    if len(req.pin) != 4 or not req.pin.isdigit():
+        raise HTTPException(status_code=400, detail="PIN-ul trebuie să aibă exact 4 cifre")
+    existing = db.query(StaffMember).filter(StaffMember.business_id == business_id, StaffMember.pin == req.pin, StaffMember.active == 1).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Acest PIN este deja folosit de alt angajat")
+    member = StaffMember(
+        business_id=business_id,
+        name=sanitize_input(req.name, 60),
+        pin=req.pin,
+        scans_count=0,
+        active=1,
+        created_at=datetime.now().isoformat()
+    )
+    db.add(member)
+    db.commit()
+    return {"status": "added"}
+
+@app.delete("/api/biz-full/{business_id}/staff/{staff_id}")
+def delete_biz_staff_direct(business_id: int, staff_id: int, db: Session = Depends(get_db)):
+    member = db.query(StaffMember).filter(StaffMember.id == staff_id, StaffMember.business_id == business_id).first()
+    if member:
+        member.active = 0
+        db.commit()
+    return {"status": "deleted"}
+
