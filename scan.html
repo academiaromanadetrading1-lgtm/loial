@@ -80,7 +80,7 @@
     const remaining = [];
     for (const item of queue) {
       try {
-        const res = await fetch('/api/scan', {
+        const res = await fetch('/api/scan-v2', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(item)
@@ -134,14 +134,15 @@
     const payload = { pin: pin, business_id: bizId, customer_uuid: uuid };
 
     try {
-      const res = await fetch('/api/scan', {
+      const res = await fetch('/api/scan-v2', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (res.ok) {
         const data = await res.json();
-        showSuccessConfirmation(`${data.name}: ${data.stamps}/6 ștampile`);
+      showSuccessConfirmation(`${data.name}: ${data.stamps}/${data.target} ștampile (scanat de ${data.staff_name})`);
+
       } else if (res.status === 401 || res.status === 404) {
         const errData = await res.json();
         document.getElementById('result').innerHTML = `<p style="color:#dc2626;font-weight:700;margin-top:12px;">${errData.detail}</p><button class="btn" onclick="resetScan()">Încearcă din nou</button>`;
