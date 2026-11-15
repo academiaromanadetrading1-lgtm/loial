@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scanare - Loial</title>
+<style>
+body { font-family: system-ui; background: #0a0a0f; color: #fff; margin: 0; padding: 20px; text-align: center; }
+input { padding: 14px; border: 1px solid #333; border-radius: 8px; background: #1a1a1f; color: #fff; font-size: 18px; text-align: center; width: 120px; }
+.btn { padding: 14px 28px; border: none; border-radius: 8px; background: linear-gradient(135deg, #a855f7, #06b6d4); color: #fff; cursor: pointer; margin-top: 16px; }
+#reader { width: 100%; max-width: 400px; margin: 20px auto; }
+.success { background: #065f46; padding: 20px; border-radius: 12px; margin-top: 20px; }
+</style>
+</head>
+<body>
+<h2>Scanare ștampile</h2>
+<div id="pinForm">
+  <input type="password" id="pin" placeholder="PIN" maxlength="4">
+  <button class="btn" onclick="startScan()">Start scanare</button>
+</div>
+<div id="scanner" style="display:none">
+  <div id="reader"></div>
+  <div id="result"></div>
+</div>
+<script src="https://unpkg.com"></script>
+<script>
+const bizId = parseInt(location.pathname.split('/').pop());
+let pin = '';
+let isProcessing = false;
+let scanner = null;
+
+function startScan() {
+  pin = document.getElementById('pin').value;
+  if (pin.length !== 4) { alert('PIN trebuie 4 cifre'); return; }
+  document.getElementById('pinForm').style.display = 'none';
+  document.getElementById('scanner').style.display = 'block';
+  scanner = new Html5Qrcode("reader");
+  scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScan);
+}
+
+async function onScan(uuid) {
+  if (isProcessing) return;
+  isProcessing = true;
+  const res = await fetch('/api/scan', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ pin: pin, business_id: bizId, customer_uuid: uuid })
+  });
+  const data = await res.json();
+  if (res.ok) {
+    document.getElementById('result').innerHTML = `<div class="success">✓ Ștampilă adăugată!<br>${data.name}: ${data.stamps}/6<br><a href="/review/${bizId}" style="color:#38bdf8;display:inline-block;margin:10px 0;">Cere recenzie Google →</a><br><button class="btn" onclick="resetScan()">Scanează următorul</button></div>`;
+  } else {
+    document.getElementById('result').innerHTML = '<p style="color:#ef4444">' + data.detail + '</p><button class="btn" onclick="resetScan()">Încearcă din nou</button>';
+  }
+  setTimeout(() => { isProcessing = false; }, 3500);
+}
+
+function resetScan() {
+  isProcessing = false;
+  document.getElementById('result').innerHTML = '';
+}
+</script>
+</body>
+</html>
