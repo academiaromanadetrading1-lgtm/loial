@@ -140,30 +140,30 @@
     </div>
   </div>
 
-  <div class="simulator">
+   <div class="simulator">
     <div class="sim-title">🎨 Personalizează-ți cardul live</div>
     <div class="sim-controls">
       <label>Numele afacerii tale</label>
-      <input type="text" id="bizName" value="Cafeneaua Artizanală" maxlength="24">
-      <label>Recompensa oferită</label>
-      <input type="text" id="rewardText" value="A 6-a cafea e din partea casei!" maxlength="42">
+      <input type="text" id="bizName" value="Numele Afacerii Tale" maxlength="24">
+      <label>Oferta / Premiul oferit clienților</label>
+      <input type="text" id="rewardText" value="La 5 vizite primești un premiu din partea noastră!" maxlength="50">
       <label>Culoarea cardului</label>
       <div class="colors">
-        <button type="button" class="color-btn active" data-bg="#1e293b" style="background:#1e293b"></button>
-        <button type="button" class="color-btn" data-bg="#4f46e5" style="background:#4f46e5"></button>
+        <button type="button" class="color-btn active" data-bg="#2d6a4f" style="background:#2d6a4f"></button>
+        <button type="button" class="color-btn" data-bg="#1e293b" style="background:#1e293b"></button>
         <button type="button" class="color-btn" data-bg="#065f46" style="background:#065f46"></button>
         <button type="button" class="color-btn" data-bg="#9f1239" style="background:#9f1239"></button>
         <button type="button" class="color-btn" data-bg="#78350f" style="background:#78350f"></button>
       </div>
     </div>
 
-    <div class="wallet-card" id="walletCard" style="background:#1e293b">
+    <div class="wallet-card" id="walletCard" style="background:#2d6a4f">
       <div class="card-header">
-        <span id="previewName">Cafeneaua Artizanală</span>
+        <span id="previewName">Numele Afacerii Tale</span>
         <span id="stampCount">4/6</span>
       </div>
       <div class="stamps-grid" id="stampsGrid"></div>
-      <p id="previewReward" style="font-size:13px;opacity:0.95">A 6-a cafea e din partea casei!</p>
+      <p id="previewReward" style="font-size:13px;opacity:0.95">La 5 vizite primești un premiu din partea noastră!</p>
       <div class="card-qr">
         <svg viewBox="0 0 100 100" width="48" height="48">
           <path d="M10,10 h30 v30 h-30 z M16,16 v18 h18 v-18 z M22,22 h6 v6 h-6 z M60,10 h30 v30 h-30 z M66,16 v18 h18 v-18 z M72,22 h6 v6 h-6 z M10,60 h30 v30 h-30 z M16,66 v18 h18 v-18 z M22,72 h6 v6 h-6 z M48,15 h6 v20 h-6 z M45,45 h15 v10 h-15 z M65,50 h25 v6 h-25 z M52,65 h10 v25 h-10 z M72,70 h18 v20 h-18 z" fill="#0f172a"/>
@@ -174,6 +174,7 @@
 
     <button type="button" class="btn-outline" id="addStamp" style="width:100%">+ Simulează o ștampilă la casă</button>
   </div>
+
 </section>
 
 <section class="industries-section" id="industriile-noastre">
@@ -245,7 +246,7 @@
 
   let stamps = 4;
   const total = 6;
-  let selectedColor = '#1e293b';
+  let selectedColor = '#2d6a4f';
 
   function renderStamps() {
     const stampsGrid = document.getElementById('stampsGrid');
