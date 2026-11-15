@@ -1,3 +1,5 @@
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -439,6 +441,20 @@ class NotificationRequest(BaseModel):
     customer_id: int
     message: str
     channel: str = "wallet"
+
+app.mount("/static", StaticFiles(directory="."), name="static")
+
+@app.get("/login.html")
+def login_page():
+    return FileResponse("login.html")
+
+@app.get("/platform.html")
+def platform_page():
+    return FileResponse("platform.html")
+
+@app.get("/index.html")
+def index_page():
+    return FileResponse("index.html")
 
 @app.get("/")
 def root():
