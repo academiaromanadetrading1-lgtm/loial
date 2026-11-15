@@ -5,135 +5,205 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Loial - Carduri digitale de loialitate fără aplicații</title>
 <meta name="description" content="Creează carduri digitale de loialitate în Apple și Google Wallet în 3 minute. Gratuit până la 50 de clienți.">
+<link href="https://googleapis.com" rel="stylesheet">
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0f; color: #fff; line-height: 1.5; }
-.gradient-text { background: linear-gradient(135deg, #a855f7, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 40px; border-bottom: 1px solid #222; max-width: 1280px; margin: 0 auto; }
-@media (max-width: 768px) { header { padding: 16px 20px; } nav a { display: none; } }
-.logo { display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 800; letter-spacing: 0.5px; }
-.logo-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #a855f7, #06b6d4); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
-nav { display: flex; gap: 20px; align-items: center; }
-nav a { color: #aaa; text-decoration: none; font-size: 14px; transition: 0.2s; }
-nav a:hover { color: #fff; }
-.lang-select { background: #1a1a1f; border: 1px solid #333; color: #fff; padding: 6px 10px; border-radius: 8px; font-size: 12px; cursor: pointer; }
-.btn-outline { padding: 9px 18px; border: 1px solid #333; border-radius: 10px; background: transparent; color: #fff; cursor: pointer; font-weight: 600; transition: 0.2s; }
-.btn-outline:hover { border-color: #666; background: rgba(255,255,255,0.05); }
-.btn-gradient { padding: 10px 22px; border: none; border-radius: 10px; background: linear-gradient(135deg, #a855f7, #06b6d4); color: #fff; cursor: pointer; font-weight: 700; transition: transform 0.2s, box-shadow 0.2s; }
-.btn-gradient:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(168, 85, 247, 0.35); }
+  :root {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --text-main: #0f172a;
+    --text-muted: #475569;
+    --border: #e2e8f0;
+    --primary: #4f46e5;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text-main); line-height: 1.6; }
+  
+  .gradient-text {
+    background: linear-gradient(135deg, #4f46e5 0%, #0ea5e9 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
 
-.hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 50px; padding: 60px 40px; align-items: center; max-width: 1280px; margin: 0 auto; }
-@media (max-width: 960px) { .hero { grid-template-columns: 1fr; padding: 40px 20px; gap: 40px; } }
-.badge { display: inline-block; padding: 6px 14px; background: rgba(168, 85, 247, 0.18); border: 1px solid rgba(168, 85, 247, 0.35); color: #e9d5ff; border-radius: 20px; font-size: 13px; font-weight: 500; margin-bottom: 18px; }
-.hero h1 { font-size: 52px; line-height: 1.1; margin-bottom: 18px; font-weight: 800; }
-@media (max-width: 600px) { .hero h1 { font-size: 36px; } }
-.hero p.subtitle { color: #a1a1aa; font-size: 17px; margin-bottom: 28px; max-width: 540px; }
-.cta-big { padding: 16px 32px; font-size: 16px; border-radius: 12px; }
-.micro { font-size: 13px; color: #71717a; margin-top: 12px; }
-.stats { display: flex; gap: 36px; margin-top: 36px; padding-top: 24px; border-top: 1px solid #1f1f27; }
-.stat-value { font-size: 24px; font-weight: 800; color: #fff; }
-.stat-label { font-size: 12px; color: #888; }
+  header {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .nav-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 40px;
+    max-width: 1240px;
+    margin: 0 auto;
+  }
+  @media (max-width: 768px) { .nav-container { padding: 14px 20px; } }
+  
+  .logo { display: flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 800; color: var(--text-main); text-decoration: none; }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, #4f46e5, #0ea5e9);
+    color: #fff; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; font-weight: 800;
+  }
 
-/* Simulator Card */
-.simulator { background: #12121a; border: 1px solid #272732; border-radius: 24px; padding: 28px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); }
-.sim-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: #e4e4e7; text-align: center; }
-.sim-controls label { display: block; font-size: 12px; color: #9ca3af; margin-bottom: 5px; margin-top: 12px; font-weight: 600; }
-.sim-controls input { width: 100%; padding: 11px 14px; border: 1px solid #2e2e3a; border-radius: 10px; background: #1a1a24; color: #fff; font-size: 14px; }
-.sim-controls input:focus { outline: none; border-color: #a855f7; }
-.colors { display: flex; gap: 10px; margin-top: 8px; }
-.color-btn { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: 0.2s; }
-.color-btn.active { border-color: #38bdf8; transform: scale(1.15); }
+  nav { display: flex; gap: 18px; align-items: center; }
+  .nav-link { color: var(--text-muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: 0.2s; }
+  .nav-link:hover { color: var(--primary); }
+  @media (max-width: 768px) { .hide-mobile { display: none; } }
 
-.wallet-card { width: 290px; margin: 22px auto; border-radius: 18px; padding: 18px; transition: background 0.3s ease; box-shadow: 0 18px 35px rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.12); }
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-weight: 700; font-size: 15px; }
-.stamps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 12px; }
-.stamp { height: 40px; border-radius: 50%; border: 1.5px dashed rgba(255,255,255,0.35); display: flex; align-items: center; justify-content: center; font-size: 14px; }
-.stamp.filled { background: #fff; color: #0f172a; border: none; font-weight: 900; box-shadow: 0 3px 8px rgba(0,0,0,0.25); }
-.card-qr { background: #fff; border-radius: 10px; padding: 8px; margin-top: 12px; text-align: center; }
-.card-qr span { display: block; color: #475569; font-size: 10px; font-weight: 600; margin-top: 4px; }
+  .dropdown { position: relative; display: inline-block; }
+  .dropdown-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border-radius: 8px;
+    background: #f1f5f9; border: 1px solid var(--border);
+    color: var(--text-main); font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .dropdown-btn:hover { background: #e2e8f0; }
+  .dropdown-menu {
+    display: none; position: absolute; top: 115%; left: 0;
+    background: #ffffff; min-width: 260px;
+    border-radius: 14px; border: 1px solid var(--border);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+    padding: 8px; z-index: 200;
+  }
+  .dropdown-menu.show { display: grid; grid-template-columns: 1fr; gap: 2px; }
+  .dropdown-menu a {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; text-decoration: none; color: var(--text-main);
+    font-size: 13.5px; font-weight: 500; border-radius: 8px; transition: 0.15s;
+  }
+  .dropdown-menu a:hover { background: #f1f5f9; color: var(--primary); }
 
-/* Bento Grid */
-.bento-section { max-width: 1280px; margin: 20px auto 60px auto; padding: 0 40px; }
-@media (max-width: 768px) { .bento-section { padding: 0 20px; } }
-.bento-section h2 { text-align: center; font-size: 28px; margin-bottom: 28px; }
-.bento { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
-@media (max-width: 900px) { .bento { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 500px) { .bento { grid-template-columns: 1fr; } }
-.bento-card { background: #12121a; border: 1px solid #22222d; border-radius: 18px; padding: 24px; transition: border-color 0.2s; }
-.bento-card:hover { border-color: #a855f7; }
-.bento-card h3 { font-size: 17px; margin-bottom: 8px; }
-.bento-card p { font-size: 14px; color: #9ca3af; }
+  .lang-select {
+    background: #ffffff; border: 1px solid var(--border);
+    color: var(--text-main); padding: 7px 10px; border-radius: 8px;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .btn-outline {
+    padding: 9px 18px; border: 1px solid var(--border); border-radius: 10px;
+    background: #ffffff; color: var(--text-main); cursor: pointer;
+    font-weight: 600; font-size: 14px; transition: 0.2s; font-family: inherit;
+  }
+  .btn-outline:hover { background: #f1f5f9; border-color: #cbd5e1; }
+  .btn-primary {
+    padding: 10px 22px; border: none; border-radius: 10px;
+    background: linear-gradient(135deg, #4f46e5, #0ea5e9);
+    color: #fff; cursor: pointer; font-weight: 600; font-size: 14px; font-family: inherit;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(79, 70, 229, 0.35); }
+
+  .hero {
+    display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 60px;
+    padding: 70px 40px; align-items: center; max-width: 1240px; margin: 0 auto;
+  }
+  @media (max-width: 960px) { .hero { grid-template-columns: 1fr; padding: 40px 20px; gap: 40px; } }
+  
+  .badge {
+    display: inline-block; padding: 6px 14px;
+    background: #eef2ff; border: 1px solid #c7d2fe; color: #4338ca;
+    border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 20px;
+  }
+  .hero h1 { font-size: 50px; line-height: 1.12; margin-bottom: 20px; font-weight: 800; letter-spacing: -0.02em; color: #0f172a; }
+  @media (max-width: 600px) { .hero h1 { font-size: 34px; } }
+  .hero p.subtitle { color: var(--text-muted); font-size: 17px; margin-bottom: 30px; max-width: 540px; }
+  .cta-big { padding: 16px 32px; font-size: 16px; border-radius: 12px; }
+  .micro { font-size: 13px; color: #64748b; margin-top: 12px; font-weight: 500; }
+  
+  .stats { display: flex; gap: 40px; margin-top: 40px; padding-top: 28px; border-top: 1px solid var(--border); }
+  .stat-value { font-size: 24px; font-weight: 800; color: #0f172a; }
+  .stat-label { font-size: 13px; color: var(--text-muted); }
+
+  .simulator {
+    background: #ffffff; border: 1px solid var(--border);
+    border-radius: 24px; padding: 30px;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.08);
+  }
+  .sim-title { font-size: 16px; font-weight: 700; margin-bottom: 14px; color: #0f172a; text-align: center; }
+  .sim-controls label { display: block; font-size: 12.5px; color: var(--text-muted); margin-bottom: 5px; margin-top: 12px; font-weight: 600; }
+  .sim-controls input {
+    width: 100%; padding: 11px 14px; border: 1px solid var(--border);
+    border-radius: 10px; background: #f8fafc; color: #0f172a; font-size: 14px; font-family: inherit;
+  }
+  .sim-controls input:focus { outline: none; border-color: var(--primary); background: #ffffff; }
+  .colors { display: flex; gap: 10px; margin-top: 8px; }
+  .color-btn { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 0 1px #cbd5e1; cursor: pointer; transition: 0.2s; }
+  .color-btn.active { box-shadow: 0 0 0 2.5px var(--primary); transform: scale(1.12); }
+
+  .wallet-card {
+    width: 295px; margin: 22px auto; border-radius: 18px; padding: 18px;
+    color: #ffffff; transition: background 0.3s ease;
+    box-shadow: 0 20px 35px -10px rgba(15, 23, 42, 0.35);
+  }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-weight: 700; font-size: 15px; }
+  .stamps-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    margin-bottom: 14px; background: rgba(255, 255, 255, 0.14);
+    padding: 12px; border-radius: 12px;
+  }
+  .stamp {
+    height: 40px; border-radius: 50%; border: 1.5px dashed rgba(255,255,255,0.45);
+    display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600;
+  }
+  .stamp.filled { background: #ffffff; color: #0f172a; border: none; font-weight: 800; box-shadow: 0 3px 8px rgba(0,0,0,0.2); }
+  .card-qr { background: #ffffff; border-radius: 12px; padding: 10px; margin-top: 14px; text-align: center; }
+  .card-qr span { display: block; color: #475569; font-size: 10.5px; font-weight: 600; margin-top: 4px; }
+
+  .industries-section { max-width: 1240px; margin: 20px auto 80px auto; padding: 0 40px; }
+  @media (max-width: 768px) { .industries-section { padding: 0 20px; } }
+  .section-header { text-align: center; max-width: 640px; margin: 0 auto 36px auto; }
+  .section-header h2 { font-size: 32px; font-weight: 800; color: #0f172a; margin-bottom: 10px; letter-spacing: -0.02em; }
+  .section-header p { color: var(--text-muted); font-size: 16px; }
+
+  .bento-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+  }
+  @media (max-width: 960px) { .bento-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 540px) { .bento-grid { grid-template-columns: 1fr; } }
+
+  .bento-card {
+    background: #ffffff; border: 1px solid var(--border); border-radius: 18px;
+    padding: 24px; text-decoration: none; color: inherit;
+    display: flex; flex-direction: column; justify-content: space-between;
+    transition: all 0.2s ease; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+  }
+  .bento-card:hover { border-color: var(--primary); transform: translateY(-3px); box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08); }
+  .bento-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; color: #0f172a; }
+  .bento-card p { font-size: 14px; color: var(--text-muted); margin-bottom: 14px; }
+  .card-link { font-size: 13px; font-weight: 600; color: var(--primary); }
+
+  .extra-industry { display: none; }
+  .bento-grid.expanded .extra-industry { display: flex; }
+
+  .toggle-wrapper { text-align: center; margin-top: 32px; }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo"><div class="logo-icon">L</div> LOIAL</div>
-  <nav>
-    <a href="#features">Soluții</a>
-    <a href="/solutii/cafenele">Cafenele</a>
-    <a href="/solutii/frizerii">Frizerii</a>
-    <select class="lang-select" id="langSelect">
-      <option value="ro">RO</option><option value="en">EN</option><option value="de">DE</option>
-      <option value="fr">FR</option><option value="it">IT</option><option value="es">ES</option>
-      <option value="nl">NL</option><option value="pl">PL</option><option value="hu">HU</option>
-    </select>
-    <button class="btn-outline" onclick="location.href='/login.html'">Login</button>
-    <button class="btn-gradient" onclick="goRegister()">Creează card</button>
-  </nav>
-</header>
-
-<section class="hero">
-  <div>
-    <span class="badge">✨ Fără aplicații de descărcat. Direct prin cod QR & Wallet.</span>
-    <h1>Transformă clienții<br><span class="gradient-text">ocazionali în fideli.</span></h1>
-    <p class="subtitle">Creează carduri digitale cu ștampile, puncte sau cashback în 3 minute. Clienții le salvează în telefon printr-o simplă scanare QR, iar tu îi aduci înapoi și crești recenziile pe Google.</p>
-    <button class="btn-gradient cta-big" onclick="goRegister()">Creează-ți primul card gratuit →</button>
-    <p class="micro">Gratuit până la primii 50 de clienți • Fără card bancar • Gata în 3 minute</p>
-    <div class="stats">
-      <div><div class="stat-value">2 sec</div><div class="stat-label">Timp scanare la casă</div></div>
-      <div><div class="stat-value">+34%</div><div class="stat-label">Clienți care revin</div></div>
-      <div><div class="stat-value">0 RON</div><div class="stat-label">Cost de pornire</div></div>
-    </div>
-  </div>
-
-  <div class="simulator">
-    <div class="sim-title">🎨 Personalizează-ți cardul live</div>
-    <div class="sim-controls">
-      <label>Numele afacerii tale</label>
-      <input type="text" id="bizName" value="Cafeneaua Artizanală" maxlength="24">
-      <label>Recompensa oferită</label>
-      <input type="text" id="rewardText" value="A 6-a cafea e din partea casei!" maxlength="42">
-      <label>Culoarea cardului</label>
-      <div class="colors">
-        <button type="button" class="color-btn active" data-bg="#1e293b" style="background:#1e293b"></button>
-        <button type="button" class="color-btn" data-bg="#78350f" style="background:#78350f"></button>
-        <button type="button" class="color-btn" data-bg="#065f46" style="background:#065f46"></button>
-        <button type="button" class="color-btn" data-bg="#9f1239" style="background:#9f1239"></button>
-        <button type="button" class="color-btn" data-bg="#4338ca" style="background:#4338ca"></button>
+  <div class="nav-container">
+    <a href="/" class="logo"><div class="logo-icon">L</div> LOIAL</a>
+    <nav>
+      <div class="dropdown">
+        <button type="button" class="dropdown-btn" id="industriesMenuBtn">
+          Afaceri & Industrii ▾
+        </button>
+        <div class="dropdown-menu" id="industriesDropdown">
+          <a href="/solutii/cafenele">☕ Cafenele & Brutării</a>
+          <a href="/solutii/restaurante">🍽️ Restaurante</a>
+          <a href="/solutii/pizzerii">🍕 Pizzerii & Fast-Food</a>
+          <a href="/solutii/frizerii">💈 Frizerii & Barber Shop</a>
+          <a href="/solutii/saloane">💅 Saloane de Înfrumusețare</a>
+          <a href="/solutii/florarii">💐 Florării & Cadouri</a>
+          <a href="/solutii/spalatorii-auto">🚿 Spălătorii Auto</a>
+          <a href="/solutii/service-auto">🔧 Service Auto & Vulcanizări</a>
+          <a href="/solutii/clinici-stomatologice">🦷 Clinici & Cabinete</a>
+          <a href="/solutii/pet-shop">🐾 Pet Shop & Cabinete Vet</a>
+        </div>
       </div>
-    </div>
 
-    <div class="wallet-card" id="walletCard" style="background:#1e293b">
-      <div class="card-header">
-        <span id="previewName">Cafeneaua Artizanală</span>
-        <span id="stampCount">4/6</span>
-      </div>
-      <div class="stamps-grid" id="stampsGrid"></div>
-      <p id="previewReward" style="font-size:13px;opacity:0.9">A 6-a cafea e din partea casei!</p>
-      <div class="card-qr">
-        <svg viewBox="0 0 100 100" width="48" height="48">
-          <path d="M10,10 h30 v30 h-30 z M16,16 v18 h18 v-18 z M22,22 h6 v6 h-6 z M60,10 h30 v30 h-30 z M66,16 v18 h18 v-18 z M72,22 h6 v6 h-6 z M10,60 h30 v30 h-30 z M16,66 v18 h18 v-18 z M22,72 h6 v6 h-6 z M48,15 h6 v20 h-6 z M45,45 h15 v10 h-15 z M65,50 h25 v6 h-25 z M52,65 h10 v25 h-10 z M72,70 h18 v20 h-18 z" fill="#0f172a"/>
-        </svg>
-        <span>Scanează la casă • Powered by Loial.space</span>
-      </div>
-    </div>
-
-    <button type="button" class="btn-outline" id="addStamp" style="width:100%">+ Simulează o ștampilă la casă</button>
-  </div>
-</section>
-
-<section class="bento-section" id="features">
-  <h2>Construit pentru afaceri locale care vor clienți recurenți</h2>
-  <div class="bento">
-    <div class="bento-card"><h3>☕ Cafenele & Brutării</h3><p>Înlocuiește cartonașele de carton. Ștampile digitale scanate în 2 secunde la casă.</p></div>
