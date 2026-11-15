@@ -2063,7 +2063,7 @@ migrate_custom_offers()
 
 @app.get("/api/qr-image/{business_id}")
 def get_business_qr_image(business_id: int):
-   join_url = "https://loial.space" + str(business_id)
+    join_url = "https://loial.space" + str(business_id)
     img = qrcode.make(join_url)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
