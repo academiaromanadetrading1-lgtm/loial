@@ -2063,7 +2063,7 @@ migrate_custom_offers()
 
 @app.get("/api/qr-image/{business_id}")
 def get_business_qr_image(business_id: int):
-    join_url = f"https://loial.space{biz.id}"
+   join_url = f"https://loial.space{business_id}"
     img = qrcode.make(join_url)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
@@ -2198,7 +2198,7 @@ def get_biz_full_data(business_id: int, db: Session = Depends(get_db)):
     customers = db.query(Customer).filter(Customer.business_id == biz.id).order_by(Customer.id.desc()).all()
     staff = db.query(StaffMember).filter(StaffMember.business_id == biz.id, StaffMember.active == 1).all()
     
-    join_url = f"https://loial.space{biz.id}"
+    join_url = f"https://loial.space{business_id}"
     img = qrcode.make(join_url)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
