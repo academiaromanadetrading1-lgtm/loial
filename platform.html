@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panou Afacere - Loial.space</title>
+<title>Panou Administrator - Loial.space</title>
 <link href="https://googleapis.com" rel="stylesheet">
 <style>
   :root {
@@ -21,9 +21,8 @@
   .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; color: var(--text-main); }
   .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, #2d6a4f, #52b788); color: #fff; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
   .btn-logout { padding: 8px 16px; border: 1px solid var(--border); border-radius: 10px; background: #ffffff; color: var(--text-muted); font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit; }
-  .btn-logout:hover { background: #edf3ef; color: var(--text-main); }
 
-  .container { max-width: 1120px; margin: 32px auto; padding: 0 24px; }
+  .container { max-width: 1140px; margin: 32px auto; padding: 0 24px; }
   .welcome-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
   .welcome-bar h1 { font-size: 28px; font-weight: 800; }
   .plan-badge { background: #e8f3ed; border: 1px solid #b7d7c5; color: #2d6a4f; padding: 7px 16px; border-radius: 20px; font-size: 13.5px; font-weight: 700; }
@@ -31,41 +30,36 @@
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
   @media (max-width: 860px) { .grid-2 { grid-template-columns: 1fr; } }
 
-  .card { background: #ffffff; border: 1px solid var(--border); border-radius: 22px; padding: 28px; box-shadow: 0 8px 20px rgba(17, 31, 24, 0.04); display: flex; flex-direction: column; justify-content: space-between; }
+  .card { background: #ffffff; border: 1px solid var(--border); border-radius: 22px; padding: 28px; box-shadow: 0 8px 20px rgba(17, 31, 24, 0.04); margin-bottom: 24px; }
   .step-tag { display: inline-block; background: #e8f3ed; color: #2d6a4f; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 8px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .card h2 { font-size: 20px; font-weight: 800; margin-bottom: 12px; color: #111f18; }
+  .card h2 { font-size: 20px; font-weight: 800; margin-bottom: 10px; color: #111f18; }
 
   .guide-box { background: #f6f9f7; border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 18px; font-size: 13.5px; }
-  .guide-box p { margin-bottom: 6px; color: var(--text-main); }
+  .guide-box p { margin-bottom: 5px; }
   .guide-box p:last-child { margin-bottom: 0; color: #2d6a4f; font-weight: 600; }
 
-  .btn-primary { display: block; width: 100%; padding: 15px 20px; border: none; border-radius: 12px; background: linear-gradient(135deg, #2d6a4f, #40916c); color: #ffffff; font-size: 15px; font-weight: 700; cursor: pointer; text-align: center; text-decoration: none; box-shadow: 0 4px 14px rgba(45, 106, 79, 0.25); font-family: inherit; transition: 0.2s; }
-  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(45, 106, 79, 0.35); }
-  
+  .btn-primary { display: block; width: 100%; padding: 14px 20px; border: none; border-radius: 12px; background: linear-gradient(135deg, #2d6a4f, #40916c); color: #ffffff; font-size: 15px; font-weight: 700; cursor: pointer; text-align: center; text-decoration: none; box-shadow: 0 4px 14px rgba(45, 106, 79, 0.25); font-family: inherit; margin-top: 12px; }
   .btn-secondary { display: block; width: 100%; padding: 12px 18px; border: 1px solid var(--border); border-radius: 12px; background: #ffffff; color: var(--text-main); font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; margin-top: 10px; font-family: inherit; }
-  .btn-secondary:hover { background: #edf3ef; }
+  .btn-danger { padding: 6px 12px; border: 1px solid #fecaca; background: #fef2f2; color: #dc2626; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
 
-  /* Afiș Printabil Tejghea */
   .poster-preview { border: 2px dashed #b7d7c5; background: #ffffff; border-radius: 18px; padding: 22px; text-align: center; margin-bottom: 16px; }
-  .poster-biz { font-size: 20px; font-weight: 800; color: #111f18; margin-bottom: 4px; }
-  .poster-offer { font-size: 14px; font-weight: 700; color: #2d6a4f; margin-bottom: 14px; }
-  .qr-frame { background: #f6f9f7; padding: 14px; border-radius: 16px; display: inline-block; border: 1px solid var(--border); }
-  .poster-cta { font-size: 13.5px; font-weight: 700; color: #111f18; margin-top: 12px; }
+  .poster-biz { font-size: 21px; font-weight: 800; margin-bottom: 4px; }
+  .poster-offer { font-size: 14.5px; font-weight: 700; color: #2d6a4f; margin-bottom: 14px; }
+  .qr-frame { background: #ffffff; padding: 10px; border-radius: 16px; display: inline-block; border: 1px solid var(--border); }
+  .qr-frame img { width: 170px; height: 170px; display: block; }
+  .poster-cta { font-size: 13.5px; font-weight: 700; margin-top: 10px; }
   .poster-sub { font-size: 11.5px; color: #475d52; }
 
-  /* Statistici & Inputuri */
-  .stat-row { display: flex; gap: 14px; margin-bottom: 18px; }
-  .stat-box { flex: 1; background: #f6f9f7; border: 1px solid var(--border); padding: 14px; border-radius: 14px; text-align: center; }
-  .stat-num { font-size: 26px; font-weight: 800; color: var(--primary); }
-  .stat-lbl { font-size: 12.5px; color: var(--text-muted); font-weight: 600; }
+  label { display: block; font-size: 13px; font-weight: 700; margin-top: 12px; margin-bottom: 5px; }
+  input, select { width: 100%; padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px; background: #f6f9f7; font-size: 14px; font-family: inherit; color: #111f18; }
+  input:focus, select:focus { outline: none; border-color: var(--primary); background: #ffffff; }
 
-  label { display: block; font-size: 13px; font-weight: 700; color: #111f18; margin-top: 14px; margin-bottom: 5px; }
-  input { width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: #f6f9f7; font-size: 14px; font-family: inherit; color: #111f18; }
-  input:focus { outline: none; border-color: var(--primary); background: #ffffff; }
+  .inline-form { display: grid; grid-template-columns: 1.5fr 1fr auto; gap: 10px; align-items: end; margin-top: 12px; }
+  @media (max-width: 600px) { .inline-form { grid-template-columns: 1fr; } }
 
-  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 14px; }
   th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--border); }
-  th { color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  th { color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
 
   @media print {
     body * { visibility: hidden; }
@@ -81,202 +75,105 @@
 <body>
 
 <header>
-  <div class="logo"><div class="logo-icon">L</div> LOIAL</div>
+  <div class="logo"><div class="logo-icon">L</div> LOIAL • ADMINISTRATOR</div>
   <button class="btn-logout" onclick="logout()">Ieșire din cont</button>
 </header>
 
 <div class="container">
   <div class="welcome-bar">
     <div>
-      <h1 id="bizTitle">Panoul Afacerii Tale</h1>
+      <h1 id="bizTitle">Patiseria Aby</h1>
       <p style="color: var(--text-muted); font-size: 14px;" id="bizEmail"></p>
     </div>
     <div class="plan-badge" id="planBadge">Plan Gratuit: 0 / 50 clienți</div>
   </div>
 
   <div class="grid-2">
-    <!-- PASUL 1: AFIȘUL QR PENTRU CLIENȚI -->
+    <!-- PASUL 1: AFIȘUL QR PENTRU TEJGHEA -->
     <div class="card">
-      <div>
-        <span class="step-tag">Pasul 1 • Atrage clienții</span>
-        <h2>Pune codul QR lângă casa de marcat</h2>
-        <div class="guide-box">
-          <p><strong>👉 Ce trebuie să faci:</strong> Apasă butonul verde de mai jos, printează afișul și așază-l pe tejghea.</p>
-          <p>✨ Ce obții: Clienții scanează codul cu telefonul și primesc cardul tău în 5 secunde, fără să descarce nicio aplicație.</p>
+      <span class="step-tag">Pasul 1 • Atrage clienții</span>
+      <h2>Afișul tău QR pentru tejghea</h2>
+      <div class="guide-box">
+        <p><strong>👉 Ce faci:</strong> Printezi acest afiș și îl pui lângă casa de marcat.</p>
+        <p>✨ Ce obții: Clienții scanează codul cu camera telefonului și primesc cardul tău în 5 secunde.</p>
+      </div>
+      
+      <div class="poster-preview" id="printablePoster">
+        <div class="poster-biz" id="posterBizName">Afacerea Ta</div>
+        <div class="poster-offer" id="posterReward">🎁 Oferta ta aici</div>
+        <div class="qr-frame">
+          <img id="qrImage" src="" alt="Cod QR Client">
         </div>
-        
-        <div class="poster-preview" id="printablePoster">
-          <div class="poster-biz" id="posterBizName">Afacerea Ta</div>
-          <div class="poster-offer" id="posterReward">🎁 Colectează ștampile și primești premii!</div>
-          <div class="qr-frame">
-            <div id="qrcode"></div>
-          </div>
-          <div class="poster-cta">Scanează cu camera telefonului</div>
-          <div class="poster-sub">Fără aplicații de descărcat • Powered by Loial.space</div>
-        </div>
+        <div class="poster-cta">Scanează cu camera telefonului</div>
+        <div class="poster-sub">Fără aplicații de descărcat • Powered by Loial.space</div>
       </div>
 
-      <div>
-        <button class="btn-primary" onclick="window.print()">🖨️ Printează afișul pentru tejghea</button>
-        <a id="testJoinLink" href="#" target="_blank" class="btn-secondary">📱 Vezi cum arată cardul pe telefonul clientului →</a>
-      </div>
+      <button class="btn-primary" onclick="window.print()">🖨️ Printează afișul pentru tejghea</button>
+      <a id="testJoinLink" href="#" target="_blank" class="btn-secondary">📱 Vezi cum arată cardul pe telefonul clientului →</a>
     </div>
 
-    <!-- PASUL 2 & 3: SCANARE LA CASĂ ȘI RECENZII GOOGLE -->
+    <!-- PASUL 2: PERSONALIZEAZĂ OFERTA & GOOGLE REVIEWS -->
     <div class="card">
-      <div>
-        <span class="step-tag">Pasul 2 • Acordă ștampile</span>
-        <h2>Scanează cardul clientului la plată</h2>
-        <div class="guide-box">
-          <p><strong>👉 Ce trebuie să faci:</strong> Deschide pagina de scanare pe telefonul de la casă și introdu codul tău secret (PIN) de mai jos.</p>
-          <p>✨ Ce obții: Acordă ștampile în 2 secunde. Aplicația vă reamintește automat să nu uitați nicio ștampilă.</p>
-        </div>
-
-        <div class="stat-row">
-          <div class="stat-box">
-            <div class="stat-num" id="custCount">0</div>
-            <div class="stat-lbl">Clienți înscriși</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-num" id="pinDisplay">1234</div>
-            <div class="stat-lbl">Cod secret casă (PIN)</div>
-          </div>
-        </div>
-
-        <a id="openScanLink" href="#" target="_blank" class="btn-primary">📷 Deschide pagina de scanare pentru casă →</a>
-
-        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border);">
-          <span class="step-tag">Pasul 3 • Crește pe Google</span>
-          <h3 style="font-size: 17px; font-weight: 800; margin-bottom: 6px;">Adună automat recenzii de 5 stele</h3>
-          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
-            Pune link-ul tău de recenzii Google Maps. Clienții mulțumiți vor fi direcționați automat să îți dea 5 stele după ce primesc ștampila.
-          </p>
-          
-          <label>Link-ul tău Google Reviews (opțional)</label>
-          <input type="url" id="googleUrlInput" placeholder="Ex: https://g.page">
-          
-          <label>Schimbă codul secret pentru angajați (4 cifre)</label>
-          <input type="text" id="pinInput" maxlength="4" placeholder="1234">
-
-          <button class="btn-secondary" style="background: #edf3ef; border-color: #b7d7c5; color: #2d6a4f; font-weight: 700;" onclick="saveSettings()">💾 Salvează modificările</button>
-        </div>
+      <span class="step-tag">Pasul 2 • Regulile tale</span>
+      <h2>Configurează oferta și premiul afacerii</h2>
+      <div class="guide-box">
+        <p><strong>👉 Ce faci:</strong> Scrii exact ce premiu sau reducere oferi clienților tăi și după câte vizite.</p>
+        <p>✨ Ce obții: Cardul clienților și afișul QR se actualizează automat cu oferta ta.</p>
       </div>
+
+      <label>Ce ofertă / premiu primesc clienții tăi?</label>
+      <input type="text" id="rewardInput" placeholder="Ex: La 5 produse cumpărate, al 6-lea este gratuit! / 15% reducere">
+
+      <label>După câte ștampile (vizite) primesc premiul?</label>
+      <select id="stampsInput">
+        <option value="3">3 vizite (3 ștampile)</option>
+        <option value="4">4 vizite (4 ștampile)</option>
+        <option value="5">5 vizite (5 ștampile)</option>
+        <option value="6" selected>6 vizite (6 ștampile)</option>
+        <option value="8">8 vizite (8 ștampile)</option>
+        <option value="10">10 vizite (10 ștampile)</option>
+      </select>
+
+      <label>Link Google Reviews (pentru recenzii de 5 stele)</label>
+      <input type="url" id="googleUrlInput" placeholder="Ex: https://g.page">
+
+      <button class="btn-primary" onclick="saveOfferSettings()">💾 Salvează oferta și setările</button>
+      <a id="openScanLink" href="#" target="_blank" class="btn-secondary" style="background:#edf3ef;border-color:#b7d7c5;color:#2d6a4f;font-weight:700;">📷 Deschide pagina de scanare pentru casă →</a>
     </div>
+  </div>
+
+  <!-- PASUL 3: ECHIPA DE ANGAJAȚI -->
+  <div class="card">
+    <span class="step-tag">Pasul 3 • Echipa ta</span>
+    <h2>Gestionează angajații care scanează la casă</h2>
+    <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 12px;">
+      Adaugă fiecare angajat cu un cod PIN unic de 4 cifre. Când scanează un client la casă, vei vedea exact cine a acordat ștampila și poți elimina oricând un angajat.
+    </p>
+
+    <div class="inline-form">
+      <div>
+        <label>Nume Angajat</label>
+        <input type="text" id="newStaffName" placeholder="Ex: Maria Popescu">
+      </div>
+      <div>
+        <label>Cod PIN (4 cifre)</label>
+        <input type="text" id="newStaffPin" maxlength="4" inputmode="numeric" placeholder="Ex: 2580">
+      </div>
+      <button class="btn-primary" style="margin-top:0;" onclick="addStaff()">+ Adaugă angajat</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>Nume Angajat</th><th>Cod PIN</th><th>Ștampile acordate</th><th>Acțiune</th></tr>
+      </thead>
+      <tbody id="staffTable">
+        <tr><td colspan="4" style="color: var(--text-muted);">Nu ai adăugat încă angajați. Poți scana și cu PIN-ul tău principal (1234).</td></tr>
+      </tbody>
+    </table>
   </div>
 
   <!-- LISTA CLIENȚILOR -->
   <div class="card">
     <h2>Clienții tăi fideli (Activitate recentă)</h2>
-    <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 10px;">Aici vezi în timp real fiecare client care și-a activat cardul și câte ștampile a strâns.</p>
     <table>
       <thead>
-        <tr><th>Nume Client</th><th>Ștampile adunate</th><th>Ultima vizită</th></tr>
-      </thead>
-
-            <tbody id="customersTable">
-        <tr><td colspan="3" style="color: var(--text-muted);">Nu ai încă niciun client înscris. Printează afișul de mai sus sau testează scanarea!</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<script src="https://jsdelivr.net"></script>
-<script>
-  const token = localStorage.getItem('token');
-  if (!token) {
-    location.href = '/login.html';
-  }
-
-  function renderBusinessUI(id, name, email, reward, plan, count, maxCust, pin, googleUrl, customers) {
-    document.getElementById('bizTitle').textContent = name;
-    document.getElementById('bizEmail').textContent = email || '';
-    document.getElementById('posterBizName').textContent = name;
-    document.getElementById('posterReward').textContent = '🎁 ' + (reward || 'Colectează ștampile!');
-    document.getElementById('planBadge').textContent = `Plan ${(plan || 'FREE').toUpperCase()}: ${count} / ${maxCust} clienți`;
-    document.getElementById('custCount').textContent = count;
-    document.getElementById('pinDisplay').textContent = pin || '1234';
-    document.getElementById('googleUrlInput').value = googleUrl || '';
-    document.getElementById('pinInput').value = pin || '1234';
-
-    const joinUrl = `${location.origin}/join/${id}`;
-    const scanUrl = `${location.origin}/scan/${id}`;
-    document.getElementById('testJoinLink').href = joinUrl;
-    document.getElementById('openScanLink').href = scanUrl;
-
-    const qrBox = document.getElementById('qrcode');
-    qrBox.innerHTML = '';
-    new QRCode(qrBox, { text: joinUrl, width: 160, height: 160 });
-
-    if (customers && customers.length > 0) {
-      const tbody = document.getElementById('customersTable');
-      tbody.innerHTML = customers.map(c => `
-        <tr>
-          <td><strong>${c.name}</strong></td>
-          <td>${c.stamps} / 6 ★</td>
-          <td style="color: var(--text-muted);">${(c.last_visit || '').split('T')[0]}</td>
-        </tr>
-      `).join('');
-    }
-  }
-
-  async function loadDashboard() {
-    const cachedId = localStorage.getItem('biz_id');
-    const cachedName = localStorage.getItem('biz_name');
-    const cachedReward = localStorage.getItem('biz_reward');
-    if (cachedId && cachedName) {
-      renderBusinessUI(cachedId, cachedName, '', cachedReward, 'free', 0, 50, '1234', '', []);
-    }
-
-    try {
-      const res = await fetch('/api/my-business', {
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem('biz_id', data.id);
-        localStorage.setItem('biz_name', data.name);
-        localStorage.setItem('biz_reward', data.reward_text || '');
-        renderBusinessUI(
-          data.id, data.name, data.email, data.reward_text,
-          data.plan, data.customers_count, data.max_customers,
-          data.staff_pin, data.google_review_url, data.customers
-        );
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  async function saveSettings() {
-    const res = await fetch('/api/my-business/settings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token
-      },
-      body: JSON.stringify({
-        google_review_url: document.getElementById('googleUrlInput').value,
-        staff_pin: document.getElementById('pinInput').value
-      })
-    });
-    if (res.ok) {
-      alert('✓ Setările au fost salvate cu succes!');
-      loadDashboard();
-    } else {
-      alert('Eroare la salvare. Verifică ca PIN-ul să aibă exact 4 cifre.');
-    }
-  }
-
-  function logout() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('biz_id');
-    localStorage.removeItem('biz_name');
-    localStorage.removeItem('biz_reward');
-    location.href = '/login.html';
-  }
-
-  loadDashboard();
-</script>
-</body>
-</html>
-
