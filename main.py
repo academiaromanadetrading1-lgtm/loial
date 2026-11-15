@@ -459,6 +459,23 @@ app.mount("/static", StaticFiles(directory="."), name="static")
 def login_page():
     return FileResponse("login.html")
 
+@app.get("/register.html")
+def register_page():
+    return FileResponse("register.html")
+
+@app.get("/join.html")
+def join_html_page():
+    return FileResponse("join.html")
+
+@app.get("/scan.html")
+def scan_html_page():
+    return FileResponse("scan.html")
+
+@app.get("/review.html")
+def review_html_page():
+    return FileResponse("review.html")
+
+
 @app.get("/platform.html")
 def platform_page():
     return FileResponse("platform.html")
