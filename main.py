@@ -76,7 +76,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 
 # Optimized SQLite with WAL mode and connection pooling
-DATABASE_URL = "sqlite:////tmp/loial.db"
+DATABASE_URL = "sqlite:////data/loial.db"
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False},
