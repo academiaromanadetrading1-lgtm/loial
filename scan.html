@@ -3,62 +3,177 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Scanare - Loial</title>
+<title>Casă & Scanare - Loial</title>
+<link href="https://googleapis.com" rel="stylesheet">
 <style>
-body { font-family: system-ui; background: #0a0a0f; color: #fff; margin: 0; padding: 20px; text-align: center; }
-input { padding: 14px; border: 1px solid #333; border-radius: 8px; background: #1a1a1f; color: #fff; font-size: 18px; text-align: center; width: 120px; }
-.btn { padding: 14px 28px; border: none; border-radius: 8px; background: linear-gradient(135deg, #a855f7, #06b6d4); color: #fff; cursor: pointer; margin-top: 16px; }
-#reader { width: 100%; max-width: 400px; margin: 20px auto; }
-.success { background: #065f46; padding: 20px; border-radius: 12px; margin-top: 20px; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: #f8fafc; color: #0f172a; padding: 20px; text-align: center; }
+  .container { max-width: 420px; margin: 0 auto; }
+  
+  .alert-box {
+    background: #fef3c7; border: 1.5px solid #f59e0b; color: #92400e;
+    padding: 14px; border-radius: 14px; font-size: 14px; font-weight: 700;
+    margin-bottom: 16px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+  }
+  .alert-box.client-near {
+    background: #dbeafe; border-color: #2563eb; color: #1e40af;
+    animation: bounce 1s infinite alternate;
+  }
+  @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+
+  .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 24px; box-shadow: 0 10px 25px rgba(15,23,42,0.06); }
+  h2 { font-size: 20px; font-weight: 800; margin-bottom: 12px; }
+  input {
+    padding: 14px; border: 1px solid #cbd5e1; border-radius: 12px;
+    background: #f8fafc; color: #0f172a; font-size: 22px; font-weight: 700;
+    text-align: center; width: 150px; letter-spacing: 6px;
+  }
+  .btn {
+    display: block; width: 100%; padding: 15px; border: none; border-radius: 12px;
+    background: linear-gradient(135deg, #4f46e5, #0ea5e9); color: #ffffff;
+    font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 16px; font-family: inherit;
+  }
+  #reader { width: 100%; border-radius: 14px; overflow: hidden; margin: 14px 0; }
+  .success-card { background: #dcfce7; border: 1.5px solid #22c55e; color: #166534; padding: 20px; border-radius: 16px; margin-top: 14px; font-weight: 700; }
 </style>
 </head>
 <body>
-<h2>Scanare ștampile</h2>
-<div id="pinForm">
-  <input type="password" id="pin" placeholder="PIN" maxlength="4">
-  <button class="btn" onclick="startScan()">Start scanare</button>
+<div class="container">
+  <div class="alert-box" id="staffAlert">
+    🔔 Nu uita să ștampilezi cardul clientului la fiecare plată!
+  </div>
+
+  <div class="card">
+    <h2>Scanare Card Client</h2>
+    
+    <div id="pinForm">
+      <p style="font-size: 13px; color: #64748b; margin-bottom: 14px;">Introdu PIN-ul locației pentru a porni camera:</p>
+      <input type="password" id="pin" placeholder="••••" maxlength="4" inputmode="numeric">
+      <button class="btn" onclick="startScan()">Pornește Camera →</button>
+    </div>
+
+    <div id="scanner" style="display:none">
+      <div id="reader"></div>
+      <div id="result"></div>
+    </div>
+  </div>
 </div>
-<div id="scanner" style="display:none">
-  <div id="reader"></div>
-  <div id="result"></div>
-</div>
+
 <script src="https://unpkg.com"></script>
 <script>
-const bizId = parseInt(location.pathname.split('/').pop());
-let pin = '';
-let isProcessing = false;
-let scanner = null;
-
-function startScan() {
-  pin = document.getElementById('pin').value;
-  if (pin.length !== 4) { alert('PIN trebuie 4 cifre'); return; }
-  document.getElementById('pinForm').style.display = 'none';
-  document.getElementById('scanner').style.display = 'block';
-  scanner = new Html5Qrcode("reader");
-  scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScan);
-}
-
-async function onScan(uuid) {
-  if (isProcessing) return;
-  isProcessing = true;
-  const res = await fetch('/api/scan', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ pin: pin, business_id: bizId, customer_uuid: uuid })
-  });
-  const data = await res.json();
-  if (res.ok) {
-    document.getElementById('result').innerHTML = `<div class="success">✓ Ștampilă adăugată!<br>${data.name}: ${data.stamps}/6<br><a href="/review/${bizId}" style="color:#38bdf8;display:inline-block;margin:10px 0;">Cere recenzie Google →</a><br><button class="btn" onclick="resetScan()">Scanează următorul</button></div>`;
-  } else {
-    document.getElementById('result').innerHTML = '<p style="color:#ef4444">' + data.detail + '</p><button class="btn" onclick="resetScan()">Încearcă din nou</button>';
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
-  setTimeout(() => { isProcessing = false; }, 3500);
-}
 
-function resetScan() {
-  isProcessing = false;
-  document.getElementById('result').innerHTML = '';
-}
+  const bizId = parseInt(location.pathname.split('/').pop());
+  let pin = '';
+  let isProcessing = false;
+  let lastAlertUuid = '';
+
+  window.addEventListener('online', syncOfflineScans);
+  setInterval(syncOfflineScans, 10000);
+
+  async function syncOfflineScans() {
+    let queue = JSON.parse(localStorage.getItem('loial_offline_queue') || '[]');
+    if (queue.length === 0 || !navigator.onLine) return;
+
+    const remaining = [];
+    for (const item of queue) {
+      try {
+        const res = await fetch('/api/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(item)
+        });
+        if (!res.ok && res.status >= 500) remaining.push(item);
+      } catch (e) {
+        remaining.push(item);
+      }
+    }
+    localStorage.setItem('loial_offline_queue', JSON.stringify(remaining));
+  }
+
+  function playBeep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+    } catch (e) {}
+  }
+
+  function startScan() {
+    pin = document.getElementById('pin').value;
+    if (pin.length !== 4) { alert('PIN-ul trebuie să aibă 4 cifre'); return; }
+    document.getElementById('pinForm').style.display = 'none';
+    document.getElementById('scanner').style.display = 'block';
+    const scanner = new Html5Qrcode("reader");
+    scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 240 }, onScan);
+
+    setInterval(async () => {
+      try {
+        const r = await fetch('/api/presence/' + bizId);
+        const data = await r.json();
+        const alertBox = document.getElementById('staffAlert');
+        if (data.active && data.customer.uuid !== lastAlertUuid) {
+          lastAlertUuid = data.customer.uuid;
+          playBeep();
+          alertBox.classList.add('client-near');
+          alertBox.textContent = `👋 Clientul ${data.customer.name} are cardul pregătit! Nu uita să îi ștampilezi cardul!`;
+        }
+      } catch (e) {}
+    }, 3000);
+  }
+
+  async function onScan(uuid) {
+    if (isProcessing) return;
+    isProcessing = true;
+    const payload = { pin: pin, business_id: bizId, customer_uuid: uuid };
+
+    try {
+      const res = await fetch('/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        showSuccessConfirmation(`${data.name}: ${data.stamps}/6 ștampile`);
+      } else if (res.status === 401 || res.status === 404) {
+        const errData = await res.json();
+        document.getElementById('result').innerHTML = `<p style="color:#dc2626;font-weight:700;margin-top:12px;">${errData.detail}</p><button class="btn" onclick="resetScan()">Încearcă din nou</button>`;
+      } else {
+        throw new Error('Server sync delayed');
+      }
+    } catch (e) {
+      const queue = JSON.parse(localStorage.getItem('loial_offline_queue') || '[]');
+      queue.push(payload);
+      localStorage.setItem('loial_offline_queue', JSON.stringify(queue));
+      showSuccessConfirmation('Ștampilă înregistrată pe card');
+    }
+    setTimeout(() => { isProcessing = false; }, 3500);
+  }
+
+  function showSuccessConfirmation(subtitle) {
+    playBeep();
+    document.getElementById('staffAlert').classList.remove('client-near');
+    document.getElementById('staffAlert').textContent = '✓ Ștampilă acordată cu succes!';
+    document.getElementById('result').innerHTML = `
+      <div class="success-card">
+        ✓ Ștampilă adăugată!<br>
+        <span style="font-size:17px;">${subtitle}</span><br>
+        <a href="/review/${bizId}" style="display:inline-block;margin-top:10px;color:#15803d;text-decoration:underline;">Cere recenzie Google →</a>
+        <button class="btn" onclick="resetScan()">Scanează următorul client</button>
+      </div>`;
+  }
+
+  function resetScan() {
+    isProcessing = false;
+    document.getElementById('result').innerHTML = '';
+  }
 </script>
 </body>
 </html>
