@@ -172,3 +172,111 @@
       <thead>
         <tr><th>Nume Client</th><th>Ștampile adunate</th><th>Ultima vizită</th></tr>
       </thead>
+
+            <tbody id="customersTable">
+        <tr><td colspan="3" style="color: var(--text-muted);">Nu ai încă niciun client înscris. Printează afișul de mai sus sau testează scanarea!</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://jsdelivr.net"></script>
+<script>
+  const token = localStorage.getItem('token');
+  if (!token) {
+    location.href = '/login.html';
+  }
+
+  function renderBusinessUI(id, name, email, reward, plan, count, maxCust, pin, googleUrl, customers) {
+    document.getElementById('bizTitle').textContent = name;
+    document.getElementById('bizEmail').textContent = email || '';
+    document.getElementById('posterBizName').textContent = name;
+    document.getElementById('posterReward').textContent = '🎁 ' + (reward || 'Colectează ștampile!');
+    document.getElementById('planBadge').textContent = `Plan ${(plan || 'FREE').toUpperCase()}: ${count} / ${maxCust} clienți`;
+    document.getElementById('custCount').textContent = count;
+    document.getElementById('pinDisplay').textContent = pin || '1234';
+    document.getElementById('googleUrlInput').value = googleUrl || '';
+    document.getElementById('pinInput').value = pin || '1234';
+
+    const joinUrl = `${location.origin}/join/${id}`;
+    const scanUrl = `${location.origin}/scan/${id}`;
+    document.getElementById('testJoinLink').href = joinUrl;
+    document.getElementById('openScanLink').href = scanUrl;
+
+    const qrBox = document.getElementById('qrcode');
+    qrBox.innerHTML = '';
+    new QRCode(qrBox, { text: joinUrl, width: 160, height: 160 });
+
+    if (customers && customers.length > 0) {
+      const tbody = document.getElementById('customersTable');
+      tbody.innerHTML = customers.map(c => `
+        <tr>
+          <td><strong>${c.name}</strong></td>
+          <td>${c.stamps} / 6 ★</td>
+          <td style="color: var(--text-muted);">${(c.last_visit || '').split('T')[0]}</td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  async function loadDashboard() {
+    const cachedId = localStorage.getItem('biz_id');
+    const cachedName = localStorage.getItem('biz_name');
+    const cachedReward = localStorage.getItem('biz_reward');
+    if (cachedId && cachedName) {
+      renderBusinessUI(cachedId, cachedName, '', cachedReward, 'free', 0, 50, '1234', '', []);
+    }
+
+    try {
+      const res = await fetch('/api/my-business', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('biz_id', data.id);
+        localStorage.setItem('biz_name', data.name);
+        localStorage.setItem('biz_reward', data.reward_text || '');
+        renderBusinessUI(
+          data.id, data.name, data.email, data.reward_text,
+          data.plan, data.customers_count, data.max_customers,
+          data.staff_pin, data.google_review_url, data.customers
+        );
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function saveSettings() {
+    const res = await fetch('/api/my-business/settings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({
+        google_review_url: document.getElementById('googleUrlInput').value,
+        staff_pin: document.getElementById('pinInput').value
+      })
+    });
+    if (res.ok) {
+      alert('✓ Setările au fost salvate cu succes!');
+      loadDashboard();
+    } else {
+      alert('Eroare la salvare. Verifică ca PIN-ul să aibă exact 4 cifre.');
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('biz_id');
+    localStorage.removeItem('biz_name');
+    localStorage.removeItem('biz_reward');
+    location.href = '/login.html';
+  }
+
+  loadDashboard();
+</script>
+</body>
+</html>
+
