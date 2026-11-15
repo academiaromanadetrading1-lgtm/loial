@@ -1,0 +1,19 @@
+const CACHE_NAME = 'loial-offline-v1';
+const ASSETS = [
+  '/',
+  '/join.html',
+  '/scan.html',
+  'https://jsdelivr.net',
+  'https://unpkg.com'
+];
+
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
+});
+
+self.addEventListener('fetch', (e) => {
+  if (e.request.method !== 'GET') return;
+  e.respondWith(
+    fetch(e.request).catch(() => caches.match(e.request))
+  );
+});
