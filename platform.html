@@ -45,14 +45,14 @@
   .poster-preview { border: 2px dashed #b7d7c5; background: #ffffff; border-radius: 18px; padding: 22px; text-align: center; margin-bottom: 16px; }
   .poster-biz { font-size: 21px; font-weight: 800; margin-bottom: 4px; }
   .poster-offer { font-size: 14.5px; font-weight: 700; color: #2d6a4f; margin-bottom: 14px; }
-  .qr-frame { background: #ffffff; padding: 10px; border-radius: 16px; display: inline-block; border: 1px solid var(--border); }
-  .qr-frame img { width: 170px; height: 170px; display: block; }
+  .qr-frame { background: #ffffff; padding: 10px; border-radius: 16px; display: inline-block; border: 1px solid var(--border); min-height: 180px; min-width: 180px; }
+  .qr-frame img { width: 170px; height: 170px; display: block; margin: auto; }
   .poster-cta { font-size: 13.5px; font-weight: 700; margin-top: 10px; }
   .poster-sub { font-size: 11.5px; color: #475d52; }
 
   label { display: block; font-size: 13px; font-weight: 700; margin-top: 12px; margin-bottom: 5px; }
-  input, select { width: 100%; padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px; background: #f6f9f7; font-size: 14px; font-family: inherit; color: #111f18; }
-  input:focus, select:focus { outline: none; border-color: var(--primary); background: #ffffff; }
+  input { width: 100%; padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px; background: #f6f9f7; font-size: 14px; font-family: inherit; color: #111f18; }
+  input:focus { outline: none; border-color: var(--primary); background: #ffffff; }
 
   .inline-form { display: grid; grid-template-columns: 1.5fr 1fr auto; gap: 10px; align-items: end; margin-top: 12px; }
   @media (max-width: 600px) { .inline-form { grid-template-columns: 1fr; } }
@@ -82,7 +82,7 @@
 <div class="container">
   <div class="welcome-bar">
     <div>
-      <h1 id="bizTitle">Patiseria Aby</h1>
+      <h1 id="bizTitle">Panou Afacere</h1>
       <p style="color: var(--text-muted); font-size: 14px;" id="bizEmail"></p>
     </div>
     <div class="plan-badge" id="planBadge">Plan Gratuit: 0 / 50 clienți</div>
@@ -102,14 +102,14 @@
         <div class="poster-biz" id="posterBizName">Afacerea Ta</div>
         <div class="poster-offer" id="posterReward">🎁 Oferta ta aici</div>
         <div class="qr-frame">
-          <img id="qrImage" src="" alt="Cod QR Client">
+          <img id="qrImage" src="" alt="Se generează QR...">
         </div>
         <div class="poster-cta">Scanează cu camera telefonului</div>
         <div class="poster-sub">Fără aplicații de descărcat • Powered by Loial.space</div>
       </div>
 
       <button class="btn-primary" onclick="window.print()">🖨️ Printează afișul pentru tejghea</button>
-      <a id="testJoinLink" href="#" target="_blank" class="btn-secondary">📱 Vezi cum arată cardul pe telefonul clientului →</a>
+      <a id="testJoinLink" href="/join/1" target="_blank" class="btn-secondary">📱 Vezi cum arată cardul pe telefonul clientului →</a>
     </div>
 
     <!-- PASUL 2: PERSONALIZEAZĂ OFERTA & GOOGLE REVIEWS -->
@@ -117,28 +117,21 @@
       <span class="step-tag">Pasul 2 • Regulile tale</span>
       <h2>Configurează oferta și premiul afacerii</h2>
       <div class="guide-box">
-        <p><strong>👉 Ce faci:</strong> Scrii exact ce premiu sau reducere oferi clienților tăi și după câte vizite.</p>
+        <p><strong>👉 Ce faci:</strong> Scrii premiul oferit și alegi numărul exact de ștampile dorit.</p>
         <p>✨ Ce obții: Cardul clienților și afișul QR se actualizează automat cu oferta ta.</p>
       </div>
 
       <label>Ce ofertă / premiu primesc clienții tăi?</label>
-      <input type="text" id="rewardInput" placeholder="Ex: La 5 produse cumpărate, al 6-lea este gratuit! / 15% reducere">
+      <input type="text" id="rewardInput" placeholder="Ex: La 10 produse cumpărate primești un tort cadou!">
 
-      <label>După câte ștampile (vizite) primesc premiul?</label>
-      <select id="stampsInput">
-        <option value="3">3 vizite (3 ștampile)</option>
-        <option value="4">4 vizite (4 ștampile)</option>
-        <option value="5">5 vizite (5 ștampile)</option>
-        <option value="6" selected>6 vizite (6 ștampile)</option>
-        <option value="8">8 vizite (8 ștampile)</option>
-        <option value="10">10 vizite (10 ștampile)</option>
-      </select>
+      <label>După câte ștampile (vizite) primesc premiul? (scrie orice număr)</label>
+      <input type="number" id="stampsInput" min="1" max="200" value="6" placeholder="Ex: 5, 10, 15...">
 
       <label>Link Google Reviews (pentru recenzii de 5 stele)</label>
       <input type="url" id="googleUrlInput" placeholder="Ex: https://g.page">
 
       <button class="btn-primary" onclick="saveOfferSettings()">💾 Salvează oferta și setările</button>
-      <a id="openScanLink" href="#" target="_blank" class="btn-secondary" style="background:#edf3ef;border-color:#b7d7c5;color:#2d6a4f;font-weight:700;">📷 Deschide pagina de scanare pentru casă →</a>
+      <a id="openScanLink" href="/scan/1" target="_blank" class="btn-secondary" style="background:#edf3ef;border-color:#b7d7c5;color:#2d6a4f;font-weight:700;">📷 Deschide pagina de scanare pentru casă →</a>
     </div>
   </div>
 
@@ -147,7 +140,7 @@
     <span class="step-tag">Pasul 3 • Echipa ta</span>
     <h2>Gestionează angajații care scanează la casă</h2>
     <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 12px;">
-      Adaugă fiecare angajat cu un cod PIN unic de 4 cifre. Când scanează un client la casă, vei vedea exact cine a acordat ștampila și poți elimina oricând un angajat.
+      Adaugă câți angajați dorești, fiecare cu un cod PIN unic de 4 cifre. Poți adăuga sau elimina oricând un angajat.
     </p>
 
     <div class="inline-form">
@@ -159,7 +152,7 @@
         <label>Cod PIN (4 cifre)</label>
         <input type="text" id="newStaffPin" maxlength="4" inputmode="numeric" placeholder="Ex: 2580">
       </div>
-      <button class="btn-primary" style="margin-top:0;" onclick="addStaff()">+ Adaugă angajat</button>
+      <button type="button" class="btn-primary" style="margin-top:0;" onclick="addStaff()">+ Adaugă angajat</button>
     </div>
 
     <table>
@@ -167,7 +160,7 @@
         <tr><th>Nume Angajat</th><th>Cod PIN</th><th>Ștampile acordate</th><th>Acțiune</th></tr>
       </thead>
       <tbody id="staffTable">
-        <tr><td colspan="4" style="color: var(--text-muted);">Nu ai adăugat încă angajați. Poți scana și cu PIN-ul tău principal (1234).</td></tr>
+        <tr><td colspan="4" style="color: var(--text-muted);">Nu ai adăugat încă angajați. Poți scana și cu PIN-ul principal (1234).</td></tr>
       </tbody>
     </table>
   </div>
@@ -177,3 +170,9 @@
     <h2>Clienții tăi fideli (Activitate recentă)</h2>
     <table>
       <thead>
+        <tr><th>Nume Client</th><th>Ștampile adunate</th><th>Ultima vizită</th></tr>
+      </thead>
+      <tbody id="customersTable">
+        <tr><td colspan="3" style="color: var(--text-muted);">Nu ai încă niciun client înscris. Printează afișul de mai sus sau testează scanarea!</td></tr>
+      </tbody>
+    </table>
