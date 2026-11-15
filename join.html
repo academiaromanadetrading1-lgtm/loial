@@ -3,71 +3,124 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Loial – Înregistrare Client</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>Loial - Cardul tău de fidelitate</title>
+<link href="https://googleapis.com" rel="stylesheet">
 <style>
-:root { --bg:#0a0b10; --surface:#14161f; --primary:#7c5cff; --text:#f8fafc; --dim:#94a3b8; --success:#10b981; }
-* { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; }
-.card { background:var(--surface); border-radius:20px; padding:32px; max-width:400px; width:90%; }
-.logo { font-size:1.4rem; font-weight:700; margin-bottom:8px; }
-h1 { font-size:1.3rem; margin-bottom:4px; }
-.business { color:var(--primary); font-weight:600; }
-p { color:var(--dim); margin-bottom:20px; font-size:0.95rem; }
-input { width:100%; padding:14px; margin:6px 0; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:#1a1d28; color:white; font-size:1rem; }
-.btn { width:100%; background:linear-gradient(135deg,#7c5cff,#6366f1); color:white; border:none; padding:16px; border-radius:12px; font-weight:600; cursor:pointer; margin-top:12px; }
-.success { text-align:center; }
-.success h2 { color:var(--success); }
-.hidden { display:none; }
-.stamps { display:flex; gap:8px; justify-content:center; margin:16px 0; }
-.stamp { width:36px; height:36px; border-radius:50%; border:2px solid rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; }
+  :root { --bg: #0a0a0f; --surface: #14161f; --primary: #7c5cff; --text: #f8fafc; --dim: #94a3b8; --success: #10b981; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .card { background: var(--surface); border-radius: 24px; padding: 32px; max-width: 400px; width: 100%; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 20px 40px rgba(0,0,0,0.4); text-align: center; }
+  .logo { font-size: 1.2rem; font-weight: 700; margin-bottom: 12px; letter-spacing: 1px; color: var(--dim); }
+  h1 { font-size: 1.4rem; margin-bottom: 8px; }
+  .business { color: #38bdf8; font-weight: 700; }
+  .reward-banner { padding: 16px; border-radius: 14px; margin: 16px 0; font-size: 0.95rem; font-weight: 500; border: 1px solid rgba(255,255,255,0.1); }
+  p { color: var(--dim); margin-bottom: 18px; font-size: 0.9rem; line-height: 1.4; }
+  input { width: 100%; padding: 14px; margin: 6px 0; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: #1a1d28; color: white; font-size: 1rem; }
+  input:focus { outline: none; border-color: #38bdf8; }
+  .btn { width: 100%; background: linear-gradient(135deg, #a855f7, #06b6d4); color: white; border: none; padding: 15px; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: 12px; transition: transform 0.2s; }
+  .btn:hover { transform: translateY(-2px); }
+  .hidden { display: none; }
+  .qr-wrapper { background: #ffffff; padding: 16px; border-radius: 16px; display: inline-block; margin: 16px 0; }
+  .footer-note { font-size: 0.75rem; color: var(--dim); margin-top: 16px; }
 </style>
 </head>
 <body>
-<div class="card" id="form-card">
-  <div class="logo">Loial</div>
-  <h1>Alătură-te <span class="business" id="biz-name">programului</span></h1>
-  <p>Completează datele pentru a primi oferte exclusive și recompense.</p>
-  <form id="register-form">
-    <input type="text" id="name" placeholder="Numele tău" required>
-    <input type="email" id="email" placeholder="Email" required>
-    <input type="tel" id="phone" placeholder="Telefon">
-    <input type="date" id="birthday" placeholder="Ziua de naștere">
-    <button type="submit" class="btn">Înregistrează-mă</button>
-  </form>
-</div>
 
-<div class="card success hidden" id="success-card">
-  <h2>✓ Ești înregistrat!</h2>
-  <p style="margin-top:12px;">Cardul tău de fidelitate este activ.</p>
-  <div class="stamps">
-    <div class="stamp">○</div><div class="stamp">○</div><div class="stamp">○</div>
-    <div class="stamp">○</div><div class="stamp">○</div><div class="stamp">○</div>
+<div class="card">
+  <div class="logo">LOIAL</div>
+  <h1>Alătură-te <span class="business" id="bizName">programului</span></h1>
+  
+  <div class="reward-banner" id="cardPreview" style="background: #1e293b;">
+    🎁 <span id="rewardText">Încărcare ofertă...</span>
   </div>
-  <p>6 ștampile = recompensă</p>
-  <p style="margin-top:16px; font-size:0.85rem;">Vei primi oferte pe email și notificări de ziua ta.</p>
+
+  <!-- Formular Înrolare -->
+  <div id="enrollSection">
+    <p>Introdu numele tău pentru a primi cardul digital instantaneu, fără să descarci nicio aplicație.</p>
+    <form id="enrollForm">
+      <input type="text" id="name" placeholder="Numele tău (ex: Andrei)" required>
+      <input type="tel" id="phone" placeholder="Telefon (opțional)">
+      <button type="submit" class="btn">Activează cardul gratuit →</button>
+    </form>
+  </div>
+
+  <!-- Cardul Activ cu Cod QR -->
+  <div id="qrSection" class="hidden">
+    <p style="color: var(--success); font-weight: 600; margin-bottom: 4px;">✓ Cardul tău este activ!</p>
+    <p style="margin-bottom: 8px;">Arată acest cod QR la casă la fiecare vizită:</p>
+    <div class="qr-wrapper">
+      <div id="qrcode"></div>
+    </div>
+    <p style="font-size: 0.85rem; color: #fff; font-weight: 600;" id="customerGreeting"></p>
+    <p class="footer-note">Salvează această pagină la Favorite sau fă un screenshot ca să ai cardul mereu la îndemână.</p>
+  </div>
 </div>
 
+<script src="https://jsdelivr.net"></script>
 <script>
-const API = 'http://localhost:8000';
-const params = new URLSearchParams(window.location.search);
-const businessId = params.get('b') || '1';
-const businessName = params.get('name') || 'Loial Partner';
-document.getElementById('biz-name').textContent = businessName;
+  const bizId = location.pathname.split('/').pop();
+  const storageKey = 'loial_card_' + bizId;
+  const savedData = JSON.parse(localStorage.getItem(storageKey) || 'null');
 
-document.getElementById('register-form').onsubmit = async (e) => {
-  e.preventDefault();
-  const data = {
-    name: document.getElementById('name').value,
-    email: document.getElementById('email').value,
-    phone: document.getElementById('phone').value,
-    birthday: document.getElementById('birthday').value,
-    business_id: businessId
+  // Încarcă detaliile afacerii
+  fetch('/api/business-public/' + bizId)
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('bizName').textContent = d.name || 'programului';
+      document.getElementById('rewardText').textContent = d.reward_text || 'Colectează ștampile și primești premii!';
+      if (d.card_color) {
+        document.getElementById('cardPreview').style.background = d.card_color;
+      }
+    })
+    .catch(() => {
+      document.getElementById('rewardText').textContent = 'Colectează ștampile și primești premii!';
+    });
+
+  // Dacă clientul și-a făcut deja cardul pe acest telefon, îl afișăm direct
+  if (savedData && savedData.uuid) {
+    showCard(savedData.uuid, savedData.name);
+  }
+
+  document.getElementById('enrollForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const nameVal = document.getElementById('name').value.trim();
+    const phoneVal = document.getElementById('phone').value.trim();
+
+    const res = await fetch('/api/enroll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        business_id: parseInt(bizId),
+        name: nameVal,
+        phone: phoneVal || null
+      })
+    });
+
+    if (res.status === 403) {
+      alert('Această locație a atins limita planului gratuit. Anunță personalul de la casă!');
+      return;
+    }
+
+    if (res.ok) {
+      const data = await res.json();
+      localStorage.setItem(storageKey, JSON.stringify({ uuid: data.uuid, name: data.name }));
+      showCard(data.uuid, data.name);
+    } else {
+      alert('A apărut o eroare. Te rugăm să încerci din nou.');
+    }
   };
-  localStorage.setItem('loial_customer', JSON.stringify(data));
-  document.getElementById('form-card').classList.add('hidden');
-  document.getElementById('success-card').classList.remove('hidden');
-};
+
+  function showCard(uuid, name) {
+    document.getElementById('enrollSection').classList.add('hidden');
+    document.getElementById('qrSection').classList.remove('hidden');
+    document.getElementById('customerGreeting').textContent = 'Titular: ' + name + ' (ID: ' + uuid + ')';
+    document.getElementById('qrcode').innerHTML = '';
+    new QRCode(document.getElementById('qrcode'), {
+      text: uuid,
+      width: 180,
+      height: 180
+    });
+  }
 </script>
 </body>
 </html>
