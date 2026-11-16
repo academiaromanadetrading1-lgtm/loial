@@ -144,13 +144,23 @@ def queue_service_event(db, business, customer, kind="stamp", returning=False, e
     return True
 
 def read_customer_ids(db, business_id, Sale, product):
+    """A marketing segment never treats a refunded purchase as a retained sale."""
     if not product.strip():
         return set()
-    matched = db.query(Sale.customer_uuid).filter(
+    query = db.query(Sale.customer_uuid).filter(
         Sale.business_id == business_id,
         func.lower(Sale.product) == product.strip().lower(),
-        Sale.customer_uuid.isnot(None)).distinct().all()
-    return {x[0] for x in matched if x[0]}
+        Sale.customer_uuid.isnot(None))
+    # The legacy sales model has no source document; preserve compatibility.
+    # Itemized receipt sales have a document that can be marked refunded.
+    if hasattr(Sale, "document_id"):
+        from loial_business_ai import AIDocument
+        from sqlalchemy import or_
+        query = query.outerjoin(
+            AIDocument, Sale.document_id == AIDocument.id
+        ).filter(or_(AIDocument.id.is_(None),
+                     AIDocument.kind != "receipt_refunded"))
+    return {x[0] for x in query.distinct().all() if x[0]}
 
 def audience_matches(customer, audience, reference=None):
     if audience in ("all", "product_buyers"):
