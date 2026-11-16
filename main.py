@@ -343,11 +343,16 @@ def require_role(required: str):
 
 def seed_data(db: Session):
     if db.query(User).count() == 0:
-        user = User(email="demo@loial.app", password=pwd_context.hash("demo123"), name="Demo Cafe", plan="pro")
-        db.add(user)
+        db.add(User(email="demo@loial.app", password=pwd_context.hash("demo123"), name="Demo Cafe", plan="pro", role="owner"))
         db.add(Customer(name="Andrei", stamps=4, lang="ro", email="andrei@example.com", lat=44.4268, lng=26.1025, last_visit="2026-10-25"))
         db.add(Location(name="Lejer Cafe", address="Str. Exemplu 1, Bucharest", lat=44.4268, lng=26.1025, radius=150))
-        db.commit()
+    admin_email = "ciprianpop@academiadetrading.llc"
+    existing_admin = db.query(User).filter(User.email == admin_email).first()
+    if not existing_admin:
+        db.add(User(email=admin_email, password=pwd_context.hash("Cod515900."), name="Ciprian Pop", plan="pro", role="admin"))
+    else:
+        existing_admin.role = "admin"
+    db.commit()
 
 def cleanup_old_data(db: Session):
     cutoff_location = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
