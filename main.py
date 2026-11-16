@@ -2707,23 +2707,9 @@ def get_universal_wallet_profile(wallet_uuid: str, db: Session = Depends(get_db)
                 "unlocked": (c.stamps or 0) >= target
             })
 
+    # Datele ambasadorului sunt disponibile numai dupa autentificare;
+    # simpla posesie a QR-ului universal nu dovedeste identitatea titularului.
     ambassador_data = None
-    if primary.email:
-        agent = db.query(SalesAgent).filter(SalesAgent.email == primary.email).first()
-        if agent:
-            qr_info = generate_agent_qr(agent.id, agent.name, agent.qr_code)
-            sales_list = db.query(Sale).filter(Sale.agent_id == agent.id, Sale.status == "completed").all()
-            tier = get_ambassador_tier(len(sales_list))
-            ambassador_data = {
-                "id": agent.id,
-                "ref_code": agent.qr_code,
-                "referral_url": qr_info["referral_url"],
-                "qr_image": qr_info["qr_image"],
-                "rank": tier["rank"],
-                "active_businesses": len(sales_list),
-                "monthly_rate": tier["monthly_rate"],
-                # Datele de plata nu se expun prin API-ul public al portofelului.
-            }
 
     return {
         "wallet_uuid": primary.wallet_uuid or primary.uuid,
