@@ -93,6 +93,26 @@ def install_wallet_recovery(app,engine,factory,BusinessAccount,Customer,
             raise HTTPException(status_code=410,detail="Codul de recuperare a expirat")
         return result
 
+    @router.get("/eligible")
+    def eligible_clients(q:str="",limit:int=50,biz=Depends(owner),
+                         db:Session=Depends(database)):
+        # Scoped lookup of legacy cards only. No emails, phone numbers or QR secrets.
+        result=db.query(Customer).filter(Customer.business_id==biz.id)
+        term=q.strip()[:60]
+        if term:
+            result=result.filter(Customer.name.ilike("%"+term.replace("%","\\%").replace("_","\\_")+"%",
+                                                   escape="\\"))
+        cards=result.order_by(Customer.id.desc()).limit(min(max(limit,1),100)).all()
+        items=[]
+        for c in cards:
+            old_uuid=c.wallet_uuid or c.uuid
+            if not old_uuid or verified_wallet(db,old_uuid):
+                continue
+            items.append({"id":c.id,"name":c.name,"stamps":c.stamps or 0,
+                          "last_visit":c.last_visit,
+                          "recovery_available":True})
+        return {"items":items,"business_id":biz.id}
+
     @router.post("/request")
     def request_recovery(req:RecoveryRequest,biz=Depends(owner),
                          db:Session=Depends(database)):
