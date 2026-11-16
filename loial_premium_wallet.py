@@ -48,6 +48,9 @@ def premium_card(holder,role,entity,qr_value,card_id,stamps=0,target=0,status=No
         result["target"]=int(target)
     return result
 
+def apple_pilot_enabled():
+    return os.getenv("LOIAL_APPLE_PILOT_ENABLED","0")=="1"
+
 def apple_ready():
     names=("LOIAL_APPLE_PASS_TYPE_ID","LOIAL_APPLE_TEAM_ID",
            "LOIAL_APPLE_PASS_CERT_PEM","LOIAL_APPLE_PASS_KEY_PEM",
@@ -321,8 +324,8 @@ def install_premium_wallet(app,engine,session_factory,BusinessAccount,Customer,
     def customer_apple_ticket(business_id:int,wallet_record=Depends(wallet),
                               db:Session=Depends(session)):
         customer_card(wallet_record,business_id,db)
-        if not apple_ready():
-            raise HTTPException(status_code=503,detail="Apple Wallet nu este inca configurat")
+        if not (apple_pilot_enabled() and apple_ready()):
+            raise HTTPException(status_code=503,detail="Apple Wallet este amanat pana dupa pilotul Google")
         return apple_download_ticket("customer",wallet_record.wallet_uuid,business_id)
 
     @router.post("/ambassador/apple-ticket")
@@ -339,6 +342,8 @@ def install_premium_wallet(app,engine,session_factory,BusinessAccount,Customer,
             raise HTTPException(status_code=401,detail="Linkul de Wallet a expirat")
         if claims.get("purpose")!="loial_apple_pass":
             raise HTTPException(status_code=403,detail="Link invalid")
+        if not apple_pilot_enabled():
+            raise HTTPException(status_code=503,detail="Apple Wallet este amanat in pilotul Google")
         if claims.get("role")=="customer":
             wallet_record=db.query(WalletInboxAccess).filter(
                 WalletInboxAccess.wallet_uuid==claims.get("sub")).first()
@@ -389,6 +394,8 @@ def install_premium_wallet(app,engine,session_factory,BusinessAccount,Customer,
 
     @router.get("/customer/{business_id}/apple")
     def customer_apple(business_id:int,wallet_record=Depends(wallet),db:Session=Depends(session)):
+        if not apple_pilot_enabled():
+            raise HTTPException(status_code=503,detail="Apple Wallet este amanat in pilotul Google")
         card=customer_card(wallet_record,business_id,db)
         try:
             binary=signed_apple_pkpass(card)
@@ -422,6 +429,8 @@ def install_premium_wallet(app,engine,session_factory,BusinessAccount,Customer,
 
     @router.get("/ambassador/apple")
     def ambassador_apple(agent=Depends(ambassador),db:Session=Depends(session)):
+        if not apple_pilot_enabled():
+            raise HTTPException(status_code=503,detail="Apple Wallet este amanat in pilotul Google")
         card=ambassador_card(agent,db)
         try:
             binary=signed_apple_pkpass(card)
