@@ -305,8 +305,8 @@
 
   function updateQrUrl(uuid) {
     const cleanColor = encodeURIComponent(currentBrandColor);
-    const initial = encodeURIComponent(currentBizName.charAt(0) || 'L');
-    document.getElementById('qrImg').src = `/api/qr-raw/${uuid}?color=${cleanColor}&initial=${initial}`;
+      const scanUrl = encodeURIComponent(`${location.origin}/c/${uuid}`);
+  document.getElementById('qrImg').src = `/api/qr-raw/${scanUrl}?color=${cleanColor}&initial=${initial}`;
   }
 
   if (savedProfile && savedProfile.name) {
