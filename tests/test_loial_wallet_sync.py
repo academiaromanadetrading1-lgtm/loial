@@ -67,7 +67,8 @@ def test_google_unsaved_object_is_not_created_unintentionally(monkeypatch):
             return httpx.Response(200,json={"access_token":"T"})
         return httpx.Response(404,json={"error":{"message":"Not found"}})
     card={"id":"client:1:w","role":"customer","holder":"A",
-          "qr_value":"QR","stamps":1,"target":6}
+          "qr_value":"QR","stamps":1,"target":6,
+          "status":"MEMBRU LOIAL","entity":"Test"}
     assert request_google_refresh(card,transport=httpx.MockTransport(mock))=="not_saved"
     assert calls==["POST","GET"]
 
