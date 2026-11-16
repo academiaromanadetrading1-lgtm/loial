@@ -202,14 +202,15 @@ async function init(){
       document.getElementById('messagesSection').scrollIntoView({behavior:'smooth',block:'start'});
     }
     const weekly=await api('/weekly');
-    const weekKey=new Date().toISOString().slice(0,10);
-    const promptKey='loial_weekly_prompt_'+c.business;
-    const previous=localStorage.getItem(promptKey);
-    const daysAgo=weekly.last_document ? (Date.now()-new Date(weekly.last_document).getTime())/86400000 : Infinity;
-    if((!previous||Date.now()-Number(previous)>7*86400000) && daysAgo>=7){
-      bubble('assistant',weekly.message);
-      localStorage.setItem(promptKey,String(Date.now()));
+    $('weekly').title=weekly.automated_delivery
+      ?'Loial pregătește săptămânal solicitarea în această conversație.'
+      :'Generare la cerere. Automatizarea serverului nu este activă.';
+    if(weekly.last_weekly_request_at){
+      $('report').textContent='Ultima solicitare săptămânală: '+
+        new Date(weekly.last_weekly_request_at).toLocaleString('ro-RO')+
+        '. Vezi mesajul din conversație.';
     }
+
   }catch(e){status(e.message,true);}
 }
 async function send(){
