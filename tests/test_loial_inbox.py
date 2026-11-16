@@ -248,3 +248,20 @@ def test_private_wallet_token_cannot_be_replaced_by_public_qr_uuid(env):
     assert spoof.status_code == 401
     valid = client.get("/api/loial-inbox/me", headers=wallet(tokens[0]))
     assert valid.status_code == 200
+
+
+def test_same_device_secret_recovers_after_network_retry(env):
+    client, session, _, _, _, tokens, boss, wallet = env
+    # QR alone never grants access, but the same device can prove its original claim.
+    with session() as db:
+        device_secret = "S" * 48
+        issued = issue_wallet_access(db,"brand-new-wallet",is_new_wallet=True,
+                                     proposed_token=device_secret)
+        db.commit()
+        assert issued==device_secret
+        assert issue_wallet_access(db,"brand-new-wallet",False,device_secret)==device_secret
+        assert issue_wallet_access(db,"brand-new-wallet",False,"X"*48) is None
+        assert issue_wallet_access(db,"brand-new-wallet",False) is None
+    owner = client.get("/api/loial-inbox/me",
+                       headers={"X-Loial-Wallet-Token":device_secret})
+    assert owner.status_code==200
