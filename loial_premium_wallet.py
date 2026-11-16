@@ -11,7 +11,7 @@ import os
 import re
 import time
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -277,6 +277,62 @@ def install_premium_wallet(app,engine,session_factory,BusinessAccount,Customer,
                                           (Customer.uuid==wallet_record.wallet_uuid)).all()
         ids=sorted({c.business_id for c in records if c.business_id})
         return {"cards":[customer_card(wallet_record,biz_id,db) for biz_id in ids]}
+
+    def apple_download_ticket(role,subject,business_id=None):
+        expires=datetime.now(timezone.utc)+timedelta(seconds=90)
+        token=jwt.encode({"purpose":"loial_apple_pass","role":role,
+                          "sub":str(subject),"business_id":business_id,
+                          "exp":expires},secret,algorithm=algorithm)
+        return {"url":"/api/premium-wallet/apple/claim?ticket="+token,
+                "expires_in_seconds":90}
+
+    @router.post("/customer/{business_id}/apple-ticket")
+    def customer_apple_ticket(business_id:int,wallet_record=Depends(wallet),
+                              db:Session=Depends(session)):
+        customer_card(wallet_record,business_id,db)
+        if not apple_ready():
+            raise HTTPException(status_code=503,detail="Apple Wallet nu este inca configurat")
+        return apple_download_ticket("customer",wallet_record.wallet_uuid,business_id)
+
+    @router.post("/ambassador/apple-ticket")
+    def ambassador_apple_ticket(agent=Depends(ambassador),db:Session=Depends(session)):
+        if not apple_ready():
+            raise HTTPException(status_code=503,detail="Apple Wallet nu este inca configurat")
+        return apple_download_ticket("ambassador",agent.id)
+
+    @router.get("/apple/claim")
+    def claim_apple(ticket:str,db:Session=Depends(session)):
+        try:
+            claims=jwt.decode(ticket,secret,algorithms=[algorithm])
+        except JWTError:
+            raise HTTPException(status_code=401,detail="Linkul de Wallet a expirat")
+        if claims.get("purpose")!="loial_apple_pass":
+            raise HTTPException(status_code=403,detail="Link invalid")
+        if claims.get("role")=="customer":
+            wallet_record=db.query(WalletInboxAccess).filter(
+                WalletInboxAccess.wallet_uuid==claims.get("sub")).first()
+            if not wallet_record:
+                raise HTTPException(status_code=404,detail="Portofel indisponibil")
+            card=customer_card(wallet_record,int(claims["business_id"]),db)
+        elif claims.get("role")=="ambassador":
+            agent=db.query(SalesAgent).filter(
+                SalesAgent.id==int(claims["sub"]),
+                SalesAgent.active.is_(True)).first()
+            if not agent:
+                raise HTTPException(status_code=404,detail="Ambasador inactiv")
+            card=ambassador_card(agent,db)
+        else:
+            raise HTTPException(status_code=403,detail="Tip de card invalid")
+        try:
+            binary=signed_apple_pkpass(card)
+        except ValueError as e:
+            raise HTTPException(status_code=503,detail=str(e))
+        filename="loial-ambassador.pkpass" if card["role"]=="ambassador" else "loial-black-metal.pkpass"
+        return Response(content=binary,media_type="application/vnd.apple.pkpass",
+                        headers={"Content-Disposition":'attachment; filename="'+filename+'"',
+                                 "Cache-Control":"private, no-store",
+                                 "Referrer-Policy":"no-referrer",
+                                 "X-Content-Type-Options":"nosniff"})
 
     @router.get("/customer/{business_id}/google")
     def customer_google(business_id:int,wallet_record=Depends(wallet),db:Session=Depends(session)):
