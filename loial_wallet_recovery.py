@@ -15,7 +15,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
-from sqlalchemy import Column, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, UniqueConstraint, update
 from sqlalchemy.orm import declarative_base, Session
 
 from loial_inbox import WalletInboxAccess, access_hash, now
@@ -199,6 +199,16 @@ def install_wallet_recovery(app,engine,factory,BusinessAccount,Customer,
         if existing_card and existing_card.id!=customer.id:
             raise HTTPException(status_code=409,detail="Exista deja un card pentru aceasta firma pe portofelul ales")
         current=now_utc()
+        # One-time atomic claim to prevent concurrent transfers to two devices.
+        claimed=db.execute(
+            update(RecoveryTicket).where(
+                RecoveryTicket.id==ticket.id,
+                RecoveryTicket.status=="pending").values(
+                    status="used",used_at=current.isoformat())
+        ).rowcount
+        if claimed!=1:
+            db.rollback()
+            raise HTTPException(status_code=409,detail="Codul a fost deja folosit")
         old_wallet=prior_wallet
         # New independent card identity, so the old public QR cannot be scanned.
         old_card_uuid=customer.uuid
@@ -214,8 +224,6 @@ def install_wallet_recovery(app,engine,factory,BusinessAccount,Customer,
             AISale.business_id==ticket.business_id,
             AISale.customer_uuid.in_([old_wallet,old_card_uuid])).all():
             row.customer_uuid=req.new_wallet_uuid
-        ticket.status="used"
-        ticket.used_at=current.isoformat()
         db.commit()
         return {"status":"recovered","wallet_uuid":req.new_wallet_uuid,
                 "wallet_private_token":req.new_private_token,
