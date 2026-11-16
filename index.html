@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Loial - Carduri digitale de loialitate fără aplicații</title>
-<meta name="description" content="Creează carduri digitale de loialitate în Apple și Google Wallet în 3 minute. Gratuit până la 50 de clienți.">
+<meta name="description" content="Creează carduri digitale de loialitate fără aplicații în 3 minute. Gratuit până la 50 de clienți.">
 <link href="https://googleapis.com" rel="stylesheet">
 <style>
   :root {
@@ -13,9 +13,10 @@
     --text-main: #111f18;
     --text-muted: #475d52;
     --border: #dce6e0;
-    --primary: #3b7a57;
+    --primary: #2d6a4f;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
   body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text-main); line-height: 1.6; }
   .gradient-text { background: linear-gradient(135deg, #2d6a4f 0%, #52b788 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
@@ -27,8 +28,9 @@
   .logo-icon { width: 34px; height: 34px; background: linear-gradient(135deg, #2d6a4f, #52b788); color: #fff; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-weight: 800; }
 
   nav { display: flex; gap: 14px; align-items: center; }
-  .nav-link { color: var(--text-muted); text-decoration: none; font-size: 14px; font-weight: 500; }
-  @media (max-width: 768px) { .hide-mobile { display: none; } }
+  .nav-link { color: var(--text-muted); text-decoration: none; font-size: 14px; font-weight: 600; transition: color 0.2s; }
+  .nav-link:hover { color: var(--primary); }
+  @media (max-width: 900px) { .hide-mobile { display: none; } }
 
   .dropdown { position: relative; display: inline-block; }
   .dropdown-btn { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 8px; background: #edf3ef; border: 1px solid var(--border); color: var(--text-main); font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
@@ -38,9 +40,10 @@
   .dropdown-menu a:hover { background: #edf3ef; color: var(--primary); }
 
   .lang-select { background: #ffffff; border: 1px solid var(--border); color: var(--text-main); padding: 7px 8px; border-radius: 8px; font-size: 12px; font-weight: 600; }
-  .btn-outline { padding: 8px 16px; border: 1px solid var(--border); border-radius: 10px; background: #ffffff; color: var(--text-main); cursor: pointer; font-weight: 600; font-size: 13.5px; font-family: inherit; }
-  .btn-outline:hover { background: #edf3ef; }
-  .btn-primary { padding: 9px 18px; border: none; border-radius: 10px; background: linear-gradient(135deg, #2d6a4f, #40916c); color: #fff; cursor: pointer; font-weight: 600; font-size: 13.5px; font-family: inherit; box-shadow: 0 4px 12px rgba(45, 106, 79, 0.25); }
+  .btn-outline { padding: 8px 16px; border: 1px solid var(--border); border-radius: 10px; background: #ffffff; color: var(--text-main); cursor: pointer; font-weight: 600; font-size: 13.5px; font-family: inherit; transition: 0.2s; }
+  .btn-outline:hover { background: #edf3ef; border-color: var(--primary); }
+  .btn-primary { padding: 9px 18px; border: none; border-radius: 10px; background: linear-gradient(135deg, #2d6a4f, #40916c); color: #fff; cursor: pointer; font-weight: 600; font-size: 13.5px; font-family: inherit; box-shadow: 0 4px 12px rgba(45, 106, 79, 0.25); transition: 0.2s; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(45, 106, 79, 0.32); }
 
   .hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 50px; padding: 60px 32px; align-items: center; max-width: 1240px; margin: 0 auto; }
   @media (max-width: 960px) { .hero { grid-template-columns: 1fr; padding: 36px 20px; gap: 36px; } }
@@ -53,233 +56,77 @@
   .micro { font-size: 13px; color: #64748b; margin-top: 12px; font-weight: 500; }
   
   .stats { display: flex; gap: 36px; margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--border); }
-  .stat-value { font-size: 22px; font-weight: 800; }
+  .stat-value { font-size: 22px; font-weight: 800; color: var(--text-main); }
   .stat-label { font-size: 12.5px; color: var(--text-muted); }
 
-  .simulator { background: #ffffff; border: 1px solid var(--border); border-radius: 24px; padding: 26px; box-shadow: 0 20px 40px -12px rgba(15, 23, 42, 0.08); }
-  .sim-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; text-align: center; }
+  /* Simulator Premium */
+  .simulator { background: #ffffff; border: 1px solid var(--border); border-radius: 26px; padding: 26px; box-shadow: 0 24px 50px -12px rgba(17, 31, 24, 0.1); }
+  .sim-title { font-size: 16px; font-weight: 800; margin-bottom: 12px; text-align: center; }
   .sim-controls label { display: block; font-size: 12.5px; color: var(--text-muted); margin-bottom: 4px; margin-top: 10px; font-weight: 600; }
   .sim-controls input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: #f8fafc; color: #0f172a; font-size: 14px; font-family: inherit; }
   .colors { display: flex; gap: 10px; margin-top: 8px; }
-  .color-btn { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 0 1px #cbd5e1; cursor: pointer; }
-  .color-btn.active { box-shadow: 0 0 0 2.5px var(--primary); transform: scale(1.1); }
+  .color-btn { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 0 1px #cbd5e1; cursor: pointer; transition: 0.2s; }
+  .color-btn.active { box-shadow: 0 0 0 2.5px var(--primary); transform: scale(1.12); }
 
-  .wallet-card { width: 285px; margin: 20px auto; border-radius: 18px; padding: 18px; color: #ffffff; transition: background 0.3s ease; box-shadow: 0 18px 30px -10px rgba(15, 23, 42, 0.35); }
-  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-weight: 700; font-size: 15px; }
-  .stamps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; background: rgba(255, 255, 255, 0.15); padding: 12px; border-radius: 12px; }
-  .stamp { height: 38px; border-radius: 50%; border: 1.5px dashed rgba(255,255,255,0.45); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; }
-  .stamp.filled { background: #ffffff; color: #0f172a; border: none; font-weight: 800; }
-  .card-qr { background: #ffffff; border-radius: 12px; padding: 10px; margin-top: 12px; text-align: center; }
+  .wallet-card {
+    position: relative;
+    width: 100%;
+    max-width: 320px;
+    margin: 22px auto;
+    border-radius: 22px;
+    padding: 20px;
+    color: #ffffff;
+    background: linear-gradient(135deg, #2d6a4f 0%, #111f18 100%);
+    transition: all 0.35s ease;
+    box-shadow: 0 20px 35px -10px rgba(17, 31, 24, 0.35), inset 0 1px 1px rgba(255,255,255,0.25);
+    overflow: hidden;
+  }
+  .wallet-card::before {
+    content: "";
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.16) 0%, transparent 50%);
+    pointer-events: none;
+  }
+  .wallet-card.unlocked {
+    box-shadow: 0 22px 40px -10px rgba(245, 158, 11, 0.45), 0 0 0 2.5px #f59e0b;
+  }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-weight: 700; font-size: 15px; position: relative; z-index: 1; }
+  .card-brand-left { display: flex; align-items: center; gap: 9px; }
+  .card-avatar { width: 30px; height: 30px; border-radius: 9px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; }
+  .stamp-pill { background: rgba(255,255,255,0.18); padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .wallet-card.unlocked .stamp-pill { background: #f59e0b; color: #111f18; }
+
+  .stamps-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; margin-bottom: 14px; background: rgba(0, 0, 0, 0.18); padding: 10px; border-radius: 14px; position: relative; z-index: 1; }
+  .stamp { aspect-ratio: 1; border-radius: 50%; border: 1.5px dashed rgba(255,255,255,0.4); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; transition: all 0.3s ease; }
+  .stamp.filled { background: #ffffff; color: #111f18; border: none; font-weight: 800; transform: scale(1.05); }
+  .stamp.reward-slot { border-color: #fbbf24; }
+  .stamp.reward-slot.filled { background: #fbbf24; color: #111f18; }
+
+  .card-qr { background: #ffffff; border-radius: 14px; padding: 10px; margin-top: 14px; text-align: center; position: relative; z-index: 1; }
   .card-qr span { display: block; color: #475569; font-size: 10.5px; font-weight: 600; margin-top: 4px; }
 
-  .industries-section { max-width: 1240px; margin: 10px auto 70px auto; padding: 0 32px; }
-  @media (max-width: 768px) { .industries-section { padding: 0 20px; } }
-  .section-header { text-align: center; max-width: 640px; margin: 0 auto 32px auto; }
-  .section-header h2 { font-size: 30px; font-weight: 800; margin-bottom: 8px; }
-  .section-header p { color: var(--text-muted); font-size: 15.5px; }
+  /* Secțiuni Generale */
+  .section-wrap { max-width: 1240px; margin: 0 auto 80px auto; padding: 0 32px; }
+  @media (max-width: 768px) { .section-wrap { padding: 0 20px; margin-bottom: 60px; } }
+  .section-header { text-align: center; max-width: 680px; margin: 0 auto 38px auto; }
+  .section-header h2 { font-size: 32px; font-weight: 800; margin-bottom: 10px; letter-spacing: -0.02em; }
+  .section-header p { color: var(--text-muted); font-size: 16px; }
 
+  /* Cum funcționează */
+  .steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+  @media (max-width: 820px) { .steps-grid { grid-template-columns: 1fr; } }
+  .step-card { background: #ffffff; border: 1px solid var(--border); border-radius: 20px; padding: 26px; }
+  .step-num { width: 36px; height: 36px; border-radius: 10px; background: #e8f3ed; color: #2d6a4f; font-weight: 800; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; font-size: 15px; }
+  .step-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .step-card p { font-size: 14px; color: var(--text-muted); }
+
+  /* Industrii */
   .bento-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
   @media (max-width: 960px) { .bento-grid { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 540px) { .bento-grid { grid-template-columns: 1fr; } }
-
   .bento-card { background: #ffffff; border: 1px solid var(--border); border-radius: 18px; padding: 22px; text-decoration: none; color: inherit; display: flex; flex-direction: column; justify-content: space-between; transition: 0.2s; }
   .bento-card:hover { border-color: var(--primary); transform: translateY(-3px); box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06); }
-  .bento-card h3 { font-size: 16.5px; font-weight: 700; margin-bottom: 8px; }
-  .bento-card p { font-size: 13.5px; color: var(--text-muted); margin-bottom: 12px; }
-  .card-link { font-size: 13px; font-weight: 600; color: var(--primary); }
-
-  .extra-industry { display: none; }
-  .bento-grid.expanded .extra-industry { display: flex; }
-  .toggle-wrapper { text-align: center; margin-top: 28px; }
-</style>
-</head>
-<body>
-
-<header>
-  <div class="nav-container">
-    <a href="/" class="logo"><div class="logo-icon">L</div> LOIAL</a>
-    <nav>
-      <div class="dropdown">
-        <button type="button" class="dropdown-btn" id="industriesMenuBtn">Afaceri & Industrii ▾</button>
-        <div class="dropdown-menu" id="industriesDropdown">
-          <a href="/solutii/cafenele">☕ Cafenele & Brutării</a>
-          <a href="/solutii/restaurante">🍽️ Restaurante</a>
-          <a href="/solutii/pizzerii">🍕 Pizzerii & Fast-Food</a>
-          <a href="/solutii/frizerii">💈 Frizerii & Barber Shop</a>
-          <a href="/solutii/saloane">💅 Saloane de Înfrumusețare</a>
-          <a href="/solutii/florarii">💐 Florării & Cadouri</a>
-          <a href="/solutii/spalatorii-auto">🚿 Spălătorii Auto</a>
-          <a href="/solutii/service-auto">🔧 Service Auto & Vulcanizări</a>
-          <a href="/solutii/clinici-stomatologice">🦷 Clinici & Cabinete</a>
-          <a href="/solutii/pet-shop">🐾 Pet Shop & Cabinete Vet</a>
-        </div>
-      </div>
-      <a href="#industriile-noastre" class="nav-link hide-mobile">Cum funcționează</a>
-      <select class="lang-select" id="langSelect">
-        <option value="ro">RO</option><option value="en">EN</option><option value="de">DE</option>
-        <option value="fr">FR</option><option value="it">IT</option><option value="es">ES</option>
-        <option value="nl">NL</option><option value="pl">PL</option><option value="hu">HU</option>
-      </select>
-      <button class="btn-outline" onclick="location.href='/login.html'">Login</button>
-      <button class="btn-primary" onclick="goRegister()">Creează card</button>
-    </nav>
-  </div>
-</header>
-
-<section class="hero">
-  <div>
-    <span class="badge">✨ Fără aplicații de descărcat. Direct prin cod QR & Wallet.</span>
-    <h1>Transformă clienții<br><span class="gradient-text">ocazionali în fideli.</span></h1>
-    <p class="subtitle">Creează carduri digitale cu ștampile, puncte sau cashback în 3 minute. Clienții le salvează în telefon printr-o simplă scanare QR, iar tu îi aduci înapoi și crești recenziile pe Google.</p>
-    <button class="btn-primary cta-big" onclick="goRegister()">Creează-ți primul card gratuit →</button>
-    <p class="micro">Gratuit până la primii 50 de clienți • Fără card bancar • Gata în 3 minute</p>
-    <div class="stats">
-      <div><div class="stat-value">2 sec</div><div class="stat-label">Timp scanare la casă</div></div>
-      <div><div class="stat-value">+34%</div><div class="stat-label">Clienți care revin</div></div>
-      <div><div class="stat-value">0 RON</div><div class="stat-label">Cost de pornire</div></div>
-    </div>
-  </div>
-
-   <div class="simulator">
-    <div class="sim-title">🎨 Personalizează-ți cardul live</div>
-    <div class="sim-controls">
-      <label>Numele afacerii tale</label>
-      <input type="text" id="bizName" value="Numele Afacerii Tale" maxlength="24">
-      <label>Oferta / Premiul oferit clienților</label>
-      <input type="text" id="rewardText" value="La 5 vizite primești un premiu din partea noastră!" maxlength="50">
-      <label>Culoarea cardului</label>
-      <div class="colors">
-        <button type="button" class="color-btn active" data-bg="#2d6a4f" style="background:#2d6a4f"></button>
-        <button type="button" class="color-btn" data-bg="#1e293b" style="background:#1e293b"></button>
-        <button type="button" class="color-btn" data-bg="#065f46" style="background:#065f46"></button>
-        <button type="button" class="color-btn" data-bg="#9f1239" style="background:#9f1239"></button>
-        <button type="button" class="color-btn" data-bg="#78350f" style="background:#78350f"></button>
-      </div>
-    </div>
-
-    <div class="wallet-card" id="walletCard" style="background:#2d6a4f">
-      <div class="card-header">
-        <span id="previewName">Numele Afacerii Tale</span>
-        <span id="stampCount">4/6</span>
-      </div>
-      <div class="stamps-grid" id="stampsGrid"></div>
-      <p id="previewReward" style="font-size:13px;opacity:0.95">La 5 vizite primești un premiu din partea noastră!</p>
-      <div class="card-qr">
-        <svg viewBox="0 0 100 100" width="48" height="48">
-          <path d="M10,10 h30 v30 h-30 z M16,16 v18 h18 v-18 z M22,22 h6 v6 h-6 z M60,10 h30 v30 h-30 z M66,16 v18 h18 v-18 z M72,22 h6 v6 h-6 z M10,60 h30 v30 h-30 z M16,66 v18 h18 v-18 z M22,72 h6 v6 h-6 z M48,15 h6 v20 h-6 z M45,45 h15 v10 h-15 z M65,50 h25 v6 h-25 z M52,65 h10 v25 h-10 z M72,70 h18 v20 h-18 z" fill="#0f172a"/>
-        </svg>
-        <span>Scanează la casă • Powered by Loial.space</span>
-      </div>
-    </div>
-
-    <button type="button" class="btn-outline" id="addStamp" style="width:100%">+ Simulează o ștampilă la casă</button>
-  </div>
-
-</section>
-
-<section class="industries-section" id="industriile-noastre">
-  <div class="section-header">
-    <h2>Construit pentru afaceri locale care vor clienți recurenți</h2>
-    <p>Alege domeniul tău de activitate și vezi cum poți transforma cumpărătorii ocazionali în clienți fideli.</p>
-  </div>
-
-  <div class="bento-grid" id="industriesGrid">
-    <a href="/solutii/cafenele" class="bento-card">
-      <div><h3>☕ Cafenele & Brutării</h3><p>Înlocuiește cartonașele de carton. Ștampile digitale scanate în 2 secunde la casă.</p></div>
-      <span class="card-link">Vezi soluția pentru cafenele →</span>
-    </a>
-    <a href="/solutii/restaurante" class="bento-card">
-      <div><h3>🍽️ Restaurante & Pizzerii</h3><p>Adu clienții înapoi în zilele liniștite și crește automat nota pe Google Reviews.</p></div>
-      <span class="card-link">Vezi soluția pentru restaurante →</span>
-    </a>
-    <a href="/solutii/frizerii" class="bento-card">
-      <div><h3>💈 Frizerii & Saloane</h3><p>Fidelizează clienții între tunsori și oferă bonusuri când își aduc prietenii.</p></div>
-      <span class="card-link">Vezi soluția pentru saloane →</span>
-    </a>
-    <a href="/solutii/florarii" class="bento-card">
-      <div><h3>💐 Florării & Cadouri</h3><p>Păstrează legătura cu fiecare cumpărător și transformă o vizită unică într-un abonat.</p></div>
-      <span class="card-link">Vezi soluția pentru florării →</span>
-    </a>
-    <a href="/solutii/pizzerii" class="bento-card extra-industry">
-      <div><h3>🍕 Pizzerii & Fast-Food</h3><p>Oferă a 5-a pizza gratuită sau puncte la fiecare comandă ridicată din locație.</p></div>
-      <span class="card-link">Vezi soluția pentru pizzerii →</span>
-    </a>
-    <a href="/solutii/spalatorii-auto" class="bento-card extra-industry">
-      <div><h3>🚿 Spălătorii Auto</h3><p>Fidelizează șoferii cu spălări bonus și notificări în zilele însorite.</p></div>
-      <span class="card-link">Vezi soluția pentru spălătorii →</span>
-    </a>
-    <a href="/solutii/service-auto" class="bento-card extra-industry">
-      <div><h3>🔧 Service Auto & Vulcanizări</h3><p>Păstrează șoferii aproape pentru schimbul de anvelope și reviziile periodice.</p></div>
-      <span class="card-link">Vezi soluția pentru service auto →</span>
-    </a>
-    <a href="/solutii/clinici-stomatologice" class="bento-card extra-industry">
-      <div><h3>🦷 Clinici & Cabinete</h3><p>Crește încrederea pacienților și adună recenzii excelente pe Google Maps.</p></div>
-      <span class="card-link">Vezi soluția pentru clinici →</span>
-    </a>
-    <a href="/solutii/pet-shop" class="bento-card extra-industry">
-      <div><h3>🐾 Pet Shop & Cabinete Vet</h3><p>Recompensează stăpânii de animale la fiecare achiziție de hrană și accesorii.</p></div>
-      <span class="card-link">Vezi soluția pentru pet shop →</span>
-    </a>
-    <a href="/register.html" class="bento-card extra-industry">
-      <div><h3>🏪 Magazine & Retail Local</h3><p>Orice magazin de cartier, băcănie sau boutique își poate crea propriul club VIP.</p></div>
-      <span class="card-link">Creează card personalizat →</span>
-    </a>
-  </div>
-
-  <div class="toggle-wrapper">
-    <button type="button" class="btn-outline" id="toggleIndustriesBtn">Vezi toate cele 10 industrii la care ne adresăm ↓</button>
-  </div>
-</section>
-
-<script>
-  const menuBtn = document.getElementById('industriesMenuBtn');
-  const dropdown = document.getElementById('industriesDropdown');
-  menuBtn.addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.toggle('show'); });
-  document.addEventListener('click', () => dropdown.classList.remove('show'));
-
-  const toggleBtn = document.getElementById('toggleIndustriesBtn');
-  const grid = document.getElementById('industriesGrid');
-  toggleBtn.addEventListener('click', () => {
-    const isExpanded = grid.classList.toggle('expanded');
-    toggleBtn.textContent = isExpanded ? 'Restrânge lista de industrii ↑' : 'Vezi toate cele 10 industrii la care ne adresăm ↓';
-  });
-
-  let stamps = 4;
-  const total = 6;
-  let selectedColor = '#2d6a4f';
-
-  function renderStamps() {
-    const stampsGrid = document.getElementById('stampsGrid');
-    stampsGrid.innerHTML = '';
-    for (let i = 1; i <= total; i++) {
-      const s = document.createElement('div');
-      s.className = 'stamp' + (i <= stamps ? ' filled' : '');
-      s.textContent = i <= stamps ? '★' : i;
-      stampsGrid.appendChild(s);
-    }
-    document.getElementById('stampCount').textContent = stamps + '/' + total;
-  }
-
-  document.getElementById('bizName').oninput = e => { document.getElementById('previewName').textContent = e.target.value || 'Nume Afacere'; };
-  document.getElementById('rewardText').oninput = e => { document.getElementById('previewReward').textContent = e.target.value || 'Recompensa ta'; };
-  document.querySelectorAll('.color-btn').forEach(btn => {
-    btn.onclick = () => {
-      document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      selectedColor = btn.dataset.bg;
-      document.getElementById('walletCard').style.background = selectedColor;
-    };
-  });
-  document.getElementById('addStamp').onclick = () => { stamps = stamps < total ? stamps + 1 : 1; renderStamps(); };
-
-  function goRegister() {
-    localStorage.setItem('draft_biz', document.getElementById('bizName').value);
-    localStorage.setItem('draft_reward', document.getElementById('rewardText').value);
-    localStorage.setItem('draft_color', selectedColor);
-    location.href = '/register.html';
-  }
-
-  renderStamps();
-</script>
-</body>
-</html>
