@@ -1004,6 +1004,7 @@ def mark_read(notif_id: int, current_user: User = Depends(get_current_user), db:
 
 @app.post("/sales/onboard")
 def onboard_business(qr_code: str, business_name: str, business_email: str, business_type: str = "cafe", plan: str = "pro", db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
     agent = db.query(SalesAgent).filter(SalesAgent.qr_code == qr_code).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Invalid QR code")
@@ -1102,12 +1103,14 @@ def add_to_team(team_id: int, agent_id: int, current_user: User = Depends(get_cu
 
 @app.post("/sales/commissions/calculate")
 def calc_commissions(month: str = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     return {"results": calculate_commissions(db, Sale, Commission, SalesAgent, month)}
 
 @app.post("/sales/commissions/pay/{agent_id}")
 def pay_commission(agent_id: int, month: str = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     if not month:
@@ -1122,6 +1125,7 @@ def pay_commission(agent_id: int, month: str = None, current_user: User = Depend
 
 @app.put("/sales/agent/{agent_id}/commission")
 def set_commission(agent_id: int, own: float = 20.0, team: float = 5.0, bonus: float = 5.0, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Comisioanele sunt fixe conform planului publicat, calculate exclusiv din incasari verificate")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
@@ -1376,6 +1380,7 @@ def set_payout_method(agent_id: int, method: str, details: str, current_user: Us
 
 @app.get("/admin/payouts/pending")
 def pending_payouts(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     month = datetime.now().strftime("%Y-%m")
@@ -1421,6 +1426,7 @@ def pending_payouts(current_user: User = Depends(get_current_user), db: Session 
 
 @app.post("/admin/payouts/pay/{agent_id}")
 def pay_agent(agent_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
@@ -1511,6 +1517,7 @@ def list_invoices(current_user: User = Depends(get_current_user), db: Session = 
 
 @app.post("/invoices/{invoice_id}/paid")
 def mark_invoice_paid(invoice_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
@@ -1523,6 +1530,7 @@ def mark_invoice_paid(invoice_id: int, current_user: User = Depends(get_current_
 
 @app.post("/payouts/wise")
 def create_wise_payout(agent_id: int, amount: float, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
@@ -2777,6 +2785,7 @@ def get_universal_wallet_profile(wallet_uuid: str, request: Request, db: Session
 class AmbassadorEnrollRequest(BaseModel):
     name: str
     email: str
+    sponsor_code: Optional[str] = None
     phone: Optional[str] = ""
     password: str
     payout_method: str = "wise"
@@ -2810,8 +2819,14 @@ def enroll_ambassador(req: AmbassadorEnrollRequest, db: Session = Depends(get_db
             created_at=datetime.now().isoformat()
         )
         db.add(agent)
+        db.flush()
+        from loial_revenue_commissions import sponsor_new_ambassador
+        sponsor_new_ambassador(db,agent,req.sponsor_code,SalesAgent)
         db.commit()
         db.refresh(agent)
+    from loial_revenue_commissions import SponsorRelationship
+    sponsor_link=db.query(SponsorRelationship).filter(
+        SponsorRelationship.ambassador_id==agent.id).first()
     qr_info = generate_agent_qr(agent.id, agent.name, agent.qr_code)
     sales_list = db.query(Sale).filter(Sale.agent_id == agent.id, Sale.status == "completed").all()
     tier = get_ambassador_tier(len(sales_list))
@@ -2825,6 +2840,8 @@ def enroll_ambassador(req: AmbassadorEnrollRequest, db: Session = Depends(get_db
         "rank": tier["rank"],
         "active_businesses": len(sales_list),
         "monthly_rate": tier["monthly_rate"],
+        "sponsored_by_another_ambassador":bool(sponsor_link),
+        "ambassador_invite_url":"https://loial.space/join.html?ambref="+agent.qr_code,
         "message": "Contul a fost creat. Pastreaza parola in siguranta."
     }
 
@@ -2833,7 +2850,8 @@ def enroll_ambassador(req: AmbassadorEnrollRequest, db: Session = Depends(get_db
 def admin_super_overview(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     require_platform_admin(credentials, db)
     current_month = datetime.now().strftime("%Y-%m")
-    ambassador_stats = calculate_commissions(db, Sale, Commission, SalesAgent, current_month)
+    from loial_revenue_commissions import verified_ambassador_overview
+    ambassador_stats = verified_ambassador_overview(db,SalesAgent,current_month)
 
     businesses = db.query(BusinessAccount).order_by(BusinessAccount.id.desc()).all()
     biz_list = []
@@ -3096,6 +3114,11 @@ def loial_install_script():
 # Recomandari client-catre-client, distincte de comisioanele ambasadorilor.
 from loial_friend_referrals import install_friend_referrals
 install_friend_referrals(app,engine,SessionLocal)
+
+# Contabilizarea incasarilor Stripe verificate si comisioanelor a doi beneficiari:
+# 20 EUR pentru ambasadorul vanzator, 10 EUR unic pentru sponsorul direct.
+from loial_revenue_commissions import install_revenue
+install_revenue(app,engine,SessionLocal,SalesAgent,BusinessAccount,User,SECRET_KEY,ALGORITHM)
 
 
 
