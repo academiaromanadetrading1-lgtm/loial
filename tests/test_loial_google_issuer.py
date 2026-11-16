@@ -98,7 +98,11 @@ def test_google_save_signed_jwt_shows_person_status_and_business(google_config):
     assert len(link)<1800
     token=link.rsplit("/",1)[-1]
     account=google_config
-    data=jwt.decode(token,account["private_key"],algorithms=["RS256"],
+    from cryptography.hazmat.primitives.serialization import load_pem_private_key
+    signer=load_pem_private_key(account["private_key"].encode(),password=None)
+    public_pem=signer.public_key().public_bytes(
+       serialization.Encoding.PEM,serialization.PublicFormat.SubjectPublicKeyInfo)
+    data=jwt.decode(token,public_pem,algorithms=["RS256"],
                     audience="google",options={"verify_iss":False})
     obj=data["payload"]["loyaltyObjects"][0]
     assert obj["classId"]==class_id
