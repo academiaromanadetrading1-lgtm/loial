@@ -2401,3 +2401,391 @@ def change_any_password(req: ChangePasswordRequest, db: Session = Depends(get_db
         raise HTTPException(status_code=401, detail="Email sau parolă actuală incorectă")
     db.commit()
     return {"status": "password_updated", "message": "Parola a fost schimbată cu succes!"}
+
+from sqlalchemy import text
+from sales import get_ambassador_tier
+
+def _ensure_ecosystem_columns():
+    alter_statements = [
+        "ALTER TABLE customers ADD COLUMN wallet_uuid TEXT",
+        "ALTER TABLE customers ADD COLUMN phone TEXT",
+        "ALTER TABLE customers ADD COLUMN network_bonus_text TEXT",
+        "ALTER TABLE business_accounts ADD COLUMN ref_code TEXT",
+        "ALTER TABLE business_accounts ADD COLUMN stamps_required INTEGER DEFAULT 6",
+        "ALTER TABLE sales_agents ADD COLUMN rank TEXT DEFAULT 'Ambasador'",
+        "ALTER TABLE sales ADD COLUMN business_id INTEGER",
+        "ALTER TABLE sales ADD COLUMN activated_month TEXT",
+    ]
+    with engine.begin() as conn:
+        for stmt in alter_statements:
+            try:
+                conn.execute(text(stmt))
+            except Exception:
+                pass
+
+_ensure_ecosystem_columns()
+
+class NetworkRule(Base):
+    __tablename__ = "network_rules"
+    id = Column(Integer, primary_key=True, index=True)
+    min_businesses = Column(Integer, default=10)
+    min_visits_per_business = Column(Integer, default=3)
+    bonus_title = Column(String, default="Bonus VIP Rețeaua Loial")
+    bonus_message = Column(String, default="Felicitări! Ai vizitat peste 10 afaceri partenere Loial. Ai câștigat un voucher cadou!")
+    auto_enabled = Column(Integer, default=1)
+
+Base.metadata.create_all(bind=engine)
+
+
+class UniversalScanRequest(BaseModel):
+    pin: str
+    business_id: int
+    customer_uuid: str
+
+
+@app.post("/api/scan-universal")
+def scan_universal_card(req: UniversalScanRequest, db: Session = Depends(get_db)):
+    biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Afacere negăsită")
+
+    staff = db.query(StaffMember).filter(
+        StaffMember.business_id == biz.id,
+        StaffMember.pin == req.pin,
+        StaffMember.active == 1
+    ).first()
+    if not staff and req.pin != (biz.staff_pin or "1234"):
+        raise HTTPException(status_code=401, detail="PIN angajat incorect")
+
+    code = req.customer_uuid.strip()
+    customer = db.query(Customer).filter(
+        Customer.business_id == biz.id,
+        (Customer.uuid == code) | (Customer.wallet_uuid == code)
+    ).first()
+
+    if not customer:
+        existing_profile = db.query(Customer).filter(
+            (Customer.uuid == code) | (Customer.wallet_uuid == code)
+        ).first()
+        if not existing_profile:
+            raise HTTPException(status_code=404, detail="Cardul nu a fost găsit")
+
+        wallet_id = existing_profile.wallet_uuid or existing_profile.uuid
+        customer = Customer(
+            uuid=wallet_id,
+            wallet_uuid=wallet_id,
+            name=existing_profile.name,
+            email=existing_profile.email,
+            phone=existing_profile.phone,
+            business_id=biz.id,
+            stamps=0,
+            last_visit=datetime.now().isoformat()
+        )
+        db.add(customer)
+        db.flush()
+
+    target = getattr(biz, "stamps_required", None) or 6
+    customer.stamps = (customer.stamps or 0) + 1
+    customer.last_visit = datetime.now().isoformat()
+    if staff:
+        staff.scans_count = (staff.scans_count or 0) + 1
+
+    # Verificăm regula automată de bonus de rețea
+    wallet_id = customer.wallet_uuid or customer.uuid
+    all_cards = db.query(Customer).filter(
+        (Customer.wallet_uuid == wallet_id) | (Customer.uuid == wallet_id)
+    ).all()
+    rule = db.query(NetworkRule).first()
+    if rule and rule.auto_enabled:
+        qualified_biz = [c for c in all_cards if (c.stamps or 0) >= rule.min_visits_per_business]
+        if len(qualified_biz) >= rule.min_businesses and not customer.network_bonus_text:
+            for c in all_cards:
+                c.network_bonus_text = f"{rule.bonus_title}: {rule.bonus_message}"
+
+    db.commit()
+    return {
+        "name": customer.name,
+        "stamps": customer.stamps,
+        "target": target,
+        "staff_name": staff.name if staff else "Administrator",
+        "reward_unlocked": customer.stamps >= target
+    }
+
+
+@app.get("/api/wallet-profile/{wallet_uuid}")
+def get_universal_wallet_profile(wallet_uuid: str, db: Session = Depends(get_db)):
+    cards = db.query(Customer).filter(
+        (Customer.wallet_uuid == wallet_uuid) | (Customer.uuid == wallet_uuid)
+    ).all()
+    if not cards:
+        raise HTTPException(status_code=404, detail="Portofel negăsit")
+
+    primary = cards
+    card_items = []
+    bonus_text = None
+    for c in cards:
+        if c.network_bonus_text:
+            bonus_text = c.network_bonus_text
+        biz = db.query(BusinessAccount).filter(BusinessAccount.id == c.business_id).first()
+        if biz:
+            target = getattr(biz, "stamps_required", None) or 6
+            card_items.append({
+                "business_id": biz.id,
+                "business_name": biz.name,
+                "reward_text": biz.reward_text or "Premiu fidelitate",
+                "card_color": biz.card_color or "#2d6a4f",
+                "stamps": c.stamps or 0,
+                "target": target,
+                "unlocked": (c.stamps or 0) >= target
+            })
+
+    ambassador_data = None
+    if primary.email:
+        agent = db.query(SalesAgent).filter(SalesAgent.email == primary.email).first()
+        if agent:
+            qr_info = generate_agent_qr(agent.id, agent.name, agent.qr_code)
+            sales_list = db.query(Sale).filter(Sale.agent_id == agent.id, Sale.status == "completed").all()
+            tier = get_ambassador_tier(len(sales_list))
+            ambassador_data = {
+                "id": agent.id,
+                "ref_code": agent.qr_code,
+                "referral_url": qr_info["referral_url"],
+                "qr_image": qr_info["qr_image"],
+                "rank": tier["rank"],
+                "active_businesses": len(sales_list),
+                "monthly_rate": tier["monthly_rate"],
+                "payout_method": agent.payout_method or "wise",
+                "payout_details": agent.payout_details or ""
+            }
+
+    return {
+        "wallet_uuid": primary.wallet_uuid or primary.uuid,
+        "name": primary.name,
+        "email": primary.email or "",
+        "phone": primary.phone or "",
+        "businesses_count": len(card_items),
+        "total_stamps": sum(item["stamps"] for item in card_items),
+        "cards": card_items,
+        "network_bonus": bonus_text,
+        "ambassador": ambassador_data
+    }
+
+
+class AmbassadorEnrollRequest(BaseModel):
+    name: str
+    email: str
+    phone: Optional[str] = ""
+    password: Optional[str] = "loial2026"
+    payout_method: str = "wise"
+    payout_details: str = ""
+
+
+@app.post("/api/ambassador/join")
+def enroll_ambassador(req: AmbassadorEnrollRequest, db: Session = Depends(get_db)):
+    email = sanitize_input(req.email, 100).lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email obligatoriu pentru contul de Ambasador")
+    agent = db.query(SalesAgent).filter(SalesAgent.email == email).first()
+    if not agent:
+        ref_code = f"LOIAL-{uuid.uuid4().hex[:6].upper()}"
+        agent = SalesAgent(
+            name=sanitize_input(req.name, 100) or "Ambasador Loial",
+            email=email,
+            phone=sanitize_input(req.phone or "", 40),
+            password=pwd_context.hash(req.password or "loial2026"),
+            role="ambassador",
+            rank="Ambasador",
+            qr_code=ref_code,
+            status="active",
+            active=True,
+            payout_method=req.payout_method,
+            payout_details=sanitize_input(req.payout_details, 150),
+            created_at=datetime.now().isoformat()
+        )
+        db.add(agent)
+        db.commit()
+        db.refresh(agent)
+    else:
+        if req.payout_details:
+            agent.payout_method = req.payout_method
+            agent.payout_details = sanitize_input(req.payout_details, 150)
+            db.commit()
+
+    qr_info = generate_agent_qr(agent.id, agent.name, agent.qr_code)
+    sales_list = db.query(Sale).filter(Sale.agent_id == agent.id, Sale.status == "completed").all()
+    tier = get_ambassador_tier(len(sales_list))
+    return {
+        "id": agent.id,
+        "name": agent.name,
+        "email": agent.email,
+        "ref_code": agent.qr_code,
+        "referral_url": qr_info["referral_url"],
+        "qr_image": qr_info["qr_image"],
+        "rank": tier["rank"],
+        "active_businesses": len(sales_list),
+        "monthly_rate": tier["monthly_rate"],
+        "payout_method": agent.payout_method,
+        "payout_details": agent.payout_details or ""
+    }
+
+
+@app.get("/api/admin/overview")
+def admin_super_overview(db: Session = Depends(get_db)):
+    current_month = datetime.now().strftime("%Y-%m")
+    ambassador_stats = calculate_commissions(db, Sale, Commission, SalesAgent, current_month)
+
+    businesses = db.query(BusinessAccount).order_by(BusinessAccount.id.desc()).all()
+    biz_list = []
+    for b in businesses:
+        c_count = db.query(Customer).filter(Customer.business_id == b.id).count()
+        agent = db.query(SalesAgent).filter(SalesAgent.id == b.agent_id).first() if b.agent_id else None
+        biz_list.append({
+            "id": b.id,
+            "name": b.name,
+            "email": b.email,
+            "plan": b.plan or "free",
+            "customers_count": c_count,
+            "ref_code": getattr(b, "ref_code", "") or "",
+            "ambassador_name": agent.name if agent else "Direct",
+            "created_at": (b.created_at or "")[:10]
+        })
+
+    # Top clienți din rețeaua Loial
+    all_cust = db.query(Customer).all()
+    grouped = {}
+    for c in all_cust:
+        wid = c.wallet_uuid or c.uuid or f"id-{c.id}"
+        if wid not in grouped:
+            grouped[wid] = {
+                "wallet_uuid": wid,
+                "name": c.name,
+                "email": c.email or "",
+                "businesses": set(),
+                "total_stamps": 0,
+                "bonus": c.network_bonus_text or ""
+            }
+        if c.business_id:
+            grouped[wid]["businesses"].add(c.business_id)
+        grouped[wid]["total_stamps"] += (c.stamps or 0)
+        if c.network_bonus_text:
+            grouped[wid]["bonus"] = c.network_bonus_text
+
+
+    top_customers = sorted(
+        [
+            {
+                "wallet_uuid": v["wallet_uuid"],
+                "name": v["name"],
+                "email": v["email"],
+                "businesses_count": len(v["businesses"]),
+                "total_stamps": v["total_stamps"],
+                "bonus": v["bonus"]
+            }
+            for v in grouped.values()
+        ],
+        key=lambda x: (x["businesses_count"], x["total_stamps"]),
+        reverse=True
+    )[:30]
+
+    rule = db.query(NetworkRule).first()
+    if not rule:
+        rule = NetworkRule()
+        db.add(rule)
+        db.commit()
+        db.refresh(rule)
+
+    return {
+        "month": current_month,
+        "businesses": biz_list,
+        "ambassadors": ambassador_stats,
+        "top_customers": top_customers,
+        "network_rule": {
+            "min_businesses": rule.min_businesses,
+            "min_visits_per_business": rule.min_visits_per_business,
+            "bonus_title": rule.bonus_title,
+            "bonus_message": rule.bonus_message,
+            "auto_enabled": bool(rule.auto_enabled)
+        }
+    }
+
+
+@app.post("/api/admin/business/{biz_id}/toggle-pro")
+def admin_toggle_business_pro(biz_id: int, db: Session = Depends(get_db)):
+    biz = db.query(BusinessAccount).filter(BusinessAccount.id == biz_id).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Afacere negăsită")
+
+    current_month = datetime.now().strftime("%Y-%m")
+    if biz.plan == "probusiness":
+        biz.plan = "free"
+        biz.max_customers = 50
+        sale = db.query(Sale).filter(Sale.business_id == biz.id).first()
+        if sale:
+            sale.status = "cancelled"
+    else:
+        biz.plan = "probusiness"
+        biz.max_customers = 999999
+        if biz.agent_id:
+            sale = db.query(Sale).filter(Sale.business_id == biz.id).first()
+            if not sale:
+                db.add(Sale(
+                    agent_id=biz.agent_id,
+                    business_id=biz.id,
+                    business_name=biz.name,
+                    business_email=biz.email,
+                    plan="probusiness",
+                    amount=65.0,
+                    commission=20.0,
+                    status="completed",
+                    activated_month=current_month,
+                    completed_at=datetime.now().isoformat(),
+                    month=current_month
+                ))
+            else:
+                sale.status = "completed"
+                if not sale.activated_month:
+                    sale.activated_month = current_month
+
+    db.commit()
+    return {"status": "updated", "plan": biz.plan}
+
+
+class NetworkBonusManualRequest(BaseModel):
+    wallet_uuid: str
+    bonus_text: str
+
+
+@app.post("/api/admin/network-bonus/manual")
+def admin_send_manual_bonus(req: NetworkBonusManualRequest, db: Session = Depends(get_db)):
+    cards = db.query(Customer).filter(
+        (Customer.wallet_uuid == req.wallet_uuid) | (Customer.uuid == req.wallet_uuid)
+    ).all()
+    if not cards:
+        raise HTTPException(status_code=404, detail="Client negăsit")
+    for c in cards:
+        c.network_bonus_text = sanitize_input(req.bonus_text, 250)
+    db.commit()
+    return {"status": "sent"}
+
+
+class NetworkRuleUpdateRequest(BaseModel):
+    min_businesses: int
+    min_visits_per_business: int
+    bonus_title: str
+    bonus_message: str
+    auto_enabled: bool
+
+
+@app.post("/api/admin/network-rule")
+def admin_update_network_rule(req: NetworkRuleUpdateRequest, db: Session = Depends(get_db)):
+    rule = db.query(NetworkRule).first()
+    if not rule:
+        rule = NetworkRule()
+        db.add(rule)
+    rule.min_businesses = max(1, req.min_businesses)
+    rule.min_visits_per_business = max(1, req.min_visits_per_business)
+    rule.bonus_title = sanitize_input(req.bonus_title, 100)
+    rule.bonus_message = sanitize_input(req.bonus_message, 250)
+    rule.auto_enabled = 1 if req.auto_enabled else 0
+    db.commit()
+    return {"status": "updated"}
