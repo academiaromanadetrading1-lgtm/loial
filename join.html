@@ -304,9 +304,10 @@
     .catch(() => {});
 
   function updateCardQr(uuid) {
-  const cleanColor = (currentBrandColor || '#2d6a4f').replace('#', '');
+  const cleanColor = encodeURIComponent(currentBrandColor || '#2d6a4f');
+  const initial = encodeURIComponent(currentBizName.charAt(0) || 'L');
   const scanUrl = encodeURIComponent(`${location.origin}/c/${uuid}`);
-  document.getElementById('qrImg').src = `https://qrserver.com{cleanColor}&data=${scanUrl}`;
+  document.getElementById('qrImg').src = `/api/qr-link?url=${scanUrl}&color=${cleanColor}&initial=${initial}`;
 }
 
   if (savedProfile && savedProfile.name) {
