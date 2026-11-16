@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>Recuperare card Loial</title><style>
+*{box-sizing:border-box}body{margin:0;background:#f2f5f2;color:#1a3324;font:15px system-ui,Arial}
+main{max-width:470px;margin:7vh auto;padding:16px}
+.card{border-radius:21px;background:#fff;padding:25px;box-shadow:0 16px 44px #0d271418}
+.brand{background:linear-gradient(115deg,#0b0d12,#35363a,#121318);border-radius:16px;
+ border:1px solid #ccaf73;padding:25px;color:#f1dba9;min-height:150px}
+.brand strong{font-size:25px;letter-spacing:.15em}.brand small{display:block;letter-spacing:.12em;margin-top:5px}
+h1{font-size:22px;margin:20px 0 8px}p{line-height:1.6;color:#526a5d}button{font:inherit;
+ border:0;background:#2d6a4f;color:white;padding:13px;border-radius:10px;
+ cursor:pointer;width:100%;font-weight:750;margin-top:16px}
+button:disabled{opacity:.55;cursor:not-allowed}.notice{font-size:12px;background:#f3f7f2;
+ padding:13px;border-radius:10px;border:1px solid #dce8dc}
+#state{font-size:13px;margin:15px 0;font-weight:750}#state.bad{color:#a33625}
+#state.good{color:#27724e}a{color:#226444;text-decoration:underline}
+</style></head><body><main><section class="card">
+<div class="brand"><strong>LOIAL</strong><small>BLACK METAL · RECUPERARE CARD</small></div>
+<h1>Recuperează cardul tău Loial</h1>
+<p id="shop">Se verifică solicitarea de recuperare...</p>
+<p class="notice">Recuperarea se face doar după verificarea ta de către administratorul firmei.
+Codul este valabil 15 minute și poate fi folosit o singură dată. Transferăm
+doar cardul firmei respective, nu istoricul altor afaceri.</p>
+<div id="state" role="status"></div>
+<button id="claim" type="button" disabled>Recuperează cardul pe acest dispozitiv</button>
+<a id="openCard" href="/join.html" hidden>Deschide cardul meu Black Metal</a>
+</section></main>
+<script>
+const code=new URLSearchParams(location.search).get('code')||'';
+const $=id=>document.getElementById(id);
+let previewData=null;
+function status(text,bad=false){
+  $('state').textContent=text;$('state').className=bad?'bad':'good';
+}
+async function preview(){
+  if(code.length<32||code.length>180){status('Link de recuperare invalid.',true);return;}
+  try{
+    const res=await fetch('/api/loial-wallet-recovery/preview?'+
+      new URLSearchParams({code}),{headers:{'Cache-Control':'no-store'}});
+    const data=await res.json();
+    if(!res.ok)throw Error(data.detail||'Cod invalid sau expirat');
+    previewData=data;
+    $('shop').textContent='Cardul tău de la '+data.business;
+    $('claim').disabled=false;status('Cod verificat. Poți recupera cardul pe acest dispozitiv.');
+  }catch(e){status(e.message,true);}
+}
+function freshSecret(){
+  const bytes=crypto.getRandomValues(new Uint8Array(36));
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function destination(){
+  const existingUuid=localStorage.getItem('loial_universal_uuid');
+  const existingSecret=localStorage.getItem('loial_wallet_inbox_token');
+  if(existingUuid&&existingSecret&&existingUuid.startsWith('W-')){
+    return {new_wallet_uuid:existingUuid,new_private_token:existingSecret};
+  }
+  let pending;
+  try{pending=JSON.parse(localStorage.getItem('loial_recovery_pending')||'null');}
+  catch(e){pending=null;}
+  if(!pending||pending.code!==code){
+    const uuidBytes=crypto.getRandomValues(new Uint8Array(16));
+    pending={code,new_wallet_uuid:'W-'+[...uuidBytes].map(b=>b.toString(16).padStart(2,'0')).join(''),
+      new_private_token:freshSecret()};
+    localStorage.setItem('loial_recovery_pending',JSON.stringify(pending));
+  }
+  return pending;
+}
+$('claim').onclick=async()=>{
+  if(!previewData)return;
+  $('claim').disabled=true;status('Se verifică și se transferă cardul...');
+  try{
+    const data=destination();
+    const response=await fetch('/api/loial-wallet-recovery/claim',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({code,new_wallet_uuid:data.new_wallet_uuid,
+                           new_private_token:data.new_private_token})});
+    const result=await response.json();
+    if(!response.ok)throw Error(result.detail||'Recuperarea nu a reușit.');
+    localStorage.setItem('loial_universal_uuid',result.wallet_uuid);
+    localStorage.setItem('loial_wallet_inbox_token',result.wallet_private_token);
+    localStorage.setItem('loial_universal_profile',JSON.stringify({
+      uuid:result.wallet_uuid,name:result.name,email:''}));
+    localStorage.removeItem('loial_recovery_pending');
+    status('Card recuperat: '+result.stamps+' ștampile. Poți deschide portofelul Loial.');
+    const link=$('openCard');
+    link.href='/join/'+Number(result.business_id);
+    link.hidden=false;
+    $('claim').textContent='Card recuperat';
+  }catch(e){status(e.message,true);$('claim').disabled=false;}
+};
+preview();
+</script></body></html>
