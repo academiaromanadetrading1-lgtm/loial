@@ -2006,10 +2006,32 @@ def check_business_presence(business_id: int):
     return {"active": False}
 
 @app.get("/api/customer-status/{customer_uuid}")
-def get_customer_status(customer_uuid: str, db: Session = Depends(get_db)):
-    cust = db.query(Customer).filter(Customer.uuid == customer_uuid).first()
+def get_customer_status(
+    customer_uuid: str,
+    business_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    # business_id este opțional pentru compatibilitatea cu apelurile vechi.
+    # Clientul poate avea un portofel universal cu mai multe carduri per afacere.
+    if business_id is not None:
+        cust = db.query(Customer).filter(
+            Customer.business_id == business_id,
+            (Customer.uuid == customer_uuid) | (Customer.wallet_uuid == customer_uuid),
+        ).first()
+        if cust:
+            return {"stamps": cust.stamps or 0, "name": cust.name}
+        existing = db.query(Customer).filter(
+            (Customer.uuid == customer_uuid) | (Customer.wallet_uuid == customer_uuid)
+        ).first()
+        if existing:
+            return {"stamps": 0, "name": existing.name}
+        raise HTTPException(status_code=404, detail="Cardul nu a fost găsit")
+
+    cust = db.query(Customer).filter(
+        (Customer.uuid == customer_uuid) | (Customer.wallet_uuid == customer_uuid)
+    ).first()
     if not cust:
-        raise HTTPException(status_code=404, detail="Not found")
+        raise HTTPException(status_code=404, detail="Cardul nu a fost găsit")
     return {"stamps": cust.stamps or 0, "name": cust.name}
 
 # ==========================================
@@ -2376,9 +2398,12 @@ def redeem_customer_reward(req: RedeemRequest, db: Session = Depends(get_db)):
     staff = db.query(StaffMember).filter(StaffMember.business_id == biz.id, StaffMember.pin == req.pin, StaffMember.active == 1).first()
     if not staff and req.pin != (biz.staff_pin or "1234"):
         raise HTTPException(status_code=401, detail="PIN incorect")
-    customer = db.query(Customer).filter(Customer.uuid == req.customer_uuid, Customer.business_id == biz.id).first()
+    customer = db.query(Customer).filter(
+        Customer.business_id == biz.id,
+        (Customer.uuid == req.customer_uuid) | (Customer.wallet_uuid == req.customer_uuid)
+    ).first()
     if not customer:
-        raise HTTPException(status_code=404, detail="Client negăsit")
+        raise HTTPException(status_code=404, detail="Cardul clientului nu există la această afacere")
     customer.stamps = 0
     customer.last_visit = datetime.now().isoformat()
     db.commit()
@@ -2390,16 +2415,45 @@ class InstantEnrollRequest(BaseModel):
 
 @app.post("/api/enroll-sync")
 def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db)):
-    existing = db.query(Customer).filter(Customer.uuid == req.uuid).first()
-    if existing:
+    biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Afacere negăsită")
+
+    wallet_id = req.uuid.strip()
+    if not wallet_id:
+        raise HTTPException(status_code=400, detail="Codul portofelului lipsește")
+
+    existing = db.query(Customer).filter(
+        (Customer.uuid == wallet_id) | (Customer.wallet_uuid == wallet_id)
+    ).first()
+    card_at_business = db.query(Customer).filter(
+        Customer.business_id == req.business_id,
+        (Customer.uuid == wallet_id) | (Customer.wallet_uuid == wallet_id),
+    ).first()
+    if card_at_business:
         return {"status": "exists"}
-    customer = Customer(
-        uuid=req.uuid,
-        name=sanitize_input(req.name, 80),
-        stamps=0,
-        business_id=req.business_id,
-        last_visit=datetime.now().isoformat()
-    )
+
+    if existing:
+        # Un portofel universal, mai multe carduri cu progres independent.
+        customer = Customer(
+            uuid=str(uuid.uuid4()),
+            wallet_uuid=existing.wallet_uuid or existing.uuid,
+            name=existing.name,
+            email=existing.email,
+            phone=existing.phone,
+            stamps=0,
+            business_id=req.business_id,
+            last_visit=datetime.now().isoformat()
+        )
+    else:
+        customer = Customer(
+            uuid=wallet_id,
+            wallet_uuid=wallet_id,
+            name=sanitize_input(req.name, 80),
+            stamps=0,
+            business_id=req.business_id,
+            last_visit=datetime.now().isoformat()
+        )
     db.add(customer)
     db.commit()
     return {"status": "saved"}
@@ -2499,8 +2553,8 @@ def scan_universal_card(req: UniversalScanRequest, db: Session = Depends(get_db)
 
         wallet_id = existing_profile.wallet_uuid or existing_profile.uuid
         customer = Customer(
-            uuid=wallet_id,
-            wallet_uuid=wallet_id,
+            uuid=str(uuid.uuid4()),  # Identificator UNIC per card de afacere
+            wallet_uuid=wallet_id,   # Același portofel pentru toate afacerile
             name=existing_profile.name,
             email=existing_profile.email,
             phone=existing_profile.phone,
