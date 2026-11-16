@@ -86,6 +86,42 @@ Ex.: Revizie auto;1;220;65"></textarea>
 <button id="upload" style="width:100%;margin-top:10px">Încarcă și prelucrează</button>
 <div class="file-list" id="files"></div>
 </section>
+<section class="card panel" id="expensesPanel">
+<h2>Facturi și cheltuieli confirmate</h2>
+<p>Introdu valorile de pe factură sau selectează o fotografie/PDF încărcat. Loial le folosește numai după confirmarea ta.</p>
+<label for="expenseDoc">Document asociat (opțional)</label>
+<select id="expenseDoc"><option value="">Factură introdusă manual</option></select>
+<label for="expenseRef">Numărul facturii</label>
+<input id="expenseRef" maxlength="100" placeholder="Ex.: F-1024">
+<label for="expenseSupplier">Furnizor</label>
+<input id="expenseSupplier" maxlength="160" placeholder="Ex.: Furnizor piese auto">
+<label for="expenseDate">Data facturii</label>
+<input id="expenseDate" type="date">
+<label for="expenseCategory">Tip cheltuială</label>
+<select id="expenseCategory">
+<option value="supplies">Materiale și piese</option>
+<option value="rent">Chirie</option>
+<option value="utilities">Utilități</option>
+<option value="personnel">Personal</option>
+<option value="marketing">Marketing</option>
+<option value="transport">Transport</option>
+<option value="services">Servicii externe</option>
+<option value="taxes">Taxe și contribuții</option>
+<option value="other">Altele</option>
+</select>
+<label for="expenseAmount">Valoarea din factură</label>
+<input id="expenseAmount" type="number" min="0.01" step="0.01" placeholder="Ex.: 119.00">
+<label for="expenseVatBasis">Valoarea introdusă este</label>
+<select id="expenseVatBasis"><option value="gross">Cu TVA inclus</option><option value="net">Fără TVA</option></select>
+<label style="font-size:12px;display:flex;gap:8px;align-items:flex-start;margin-top:10px">
+<input type="checkbox" id="expenseConfirmed" style="width:17px;min-width:17px;height:17px">
+Am verificat factura, valoarea, data și baza TVA. Confirm că informațiile sunt reale.
+</label>
+<button id="expenseSave" style="margin-top:10px;width:100%">Înregistrează cheltuiala verificată</button>
+<div class="report" id="expenseOutput" role="status"></div>
+<button type="button" class="ghost" id="expenseReport" style="width:100%;margin-top:9px">Vezi cheltuielile confirmate</button>
+<p class="tiny">Loial nu transformă automat o fotografie în înregistrare contabilă și nu deduce profitul net din cheltuieli incomplete.</p>
+</section>
 <section class="card panel">
 <h2>Raport și solicitare săptămânală</h2>
 <div class="actions">
@@ -266,6 +302,17 @@ $('saveProfile').addEventListener('click',async()=>{
 });
 async function loadFiles(){
   const files=await api('/documents');$('files').replaceChildren();
+  const select=$('expenseDoc');
+  select.replaceChildren();
+  const unlinked=document.createElement('option');unlinked.value='';
+  unlinked.textContent='Factură introdusă manual';select.appendChild(unlinked);
+  for(const file of files){
+    if(['pdf_text','photo_preview','invoice_preview','expense_preview'].includes(file.type)){
+      const option=document.createElement('option');
+      option.value=file.id;option.textContent=file.name+' • verifică valorile';
+      select.appendChild(option);
+    }
+  }
   for(const x of files){
     const div=document.createElement('div');div.className='file-row';
     const name=document.createElement('span');name.textContent=x.name+' • '+(x.confirmed?'confirmat':'neconfirmat');div.appendChild(name);
@@ -291,6 +338,53 @@ $('upload').onclick=async()=>{
     $('attachment').value='';await loadFiles();status('Document prelucrat. Confirmă valorile înainte de utilizare.');
   }catch(e){status(e.message,true);}finally{$('upload').disabled=false;}
 };
+async function expenseApi(path,options={}){
+  const res=await fetch('/api/loial-expenses'+path,{...options,headers:{
+    Authorization:'Bearer '+token,
+    ...(options.body?{'Content-Type':'application/json'}:{})
+  }});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok)throw Error(data.detail||'Eroare de prelucrare a facturii');
+  return data;
+}
+$('expenseSave').onclick=async()=>{
+  const output=$('expenseOutput');
+  if(!$('expenseConfirmed').checked){
+    output.textContent='Confirmă că ai verificat datele de pe factură.';return;
+  }
+  const payload={
+    document_id:$('expenseDoc').value?Number($('expenseDoc').value):null,
+    invoice_ref:$('expenseRef').value.trim(),
+    supplier:$('expenseSupplier').value.trim(),
+    incurred_on:$('expenseDate').value,
+    category:$('expenseCategory').value,
+    amount:Number($('expenseAmount').value),
+    vat_basis:$('expenseVatBasis').value,
+    currency:$('currency').value,
+    owner_confirmed:true
+  };
+  $('expenseSave').disabled=true;
+  try{
+    const result=await expenseApi('/confirm',{method:'POST',body:JSON.stringify(payload)});
+    output.textContent='Factură confirmată: '+result.amount.toFixed(2)+' '+
+      result.currency+' ('+(result.vat_basis==='net'?'fără TVA':'cu TVA')+
+      '). Loial o va include în raport; nu este o înregistrare contabilă.';
+    $('expenseConfirmed').checked=false;
+  }catch(e){output.textContent=e.message;}
+  finally{$('expenseSave').disabled=false;}
+};
+$('expenseReport').onclick=async()=>{
+  try{
+    const data=await expenseApi('/summary');
+    const lines=['Cheltuieli confirmate: '+data.items+' înregistrări.'];
+    for(const row of data.totals){
+      lines.push('• '+row.category_label+': '+row.total.toFixed(2)+' '+row.currency+
+        ' ('+(row.vat_basis==='net'?'fără TVA':'cu TVA')+')');
+    }
+    lines.push('',...data.limitations.map(x=>'• '+x));
+    $('expenseOutput').textContent=lines.join('\n');
+  }catch(e){$('expenseOutput').textContent=e.message;}
+};
 $('weekly').onclick=async()=>{try{const r=await api('/weekly');bubble('assistant',r.message);}catch(e){status(e.message,true);}};
 $('reportBtn').onclick=async()=>{
   try{
@@ -306,6 +400,14 @@ $('reportBtn').onclick=async()=>{
     if((r.findings||[]).length){
       lines.push('','Ce observă Loial:');
       r.findings.forEach(x=>lines.push('• '+x.text));
+    }
+    if(r.verified_expenses){
+      lines.push('','Cheltuieli verificate de administrator: '+
+        r.verified_expenses.confirmed_rows+' documente.');
+      for(const e of r.verified_expenses.totals_by_currency_vat_basis_and_category){
+        lines.push('• '+e.category_label+': '+e.total+' '+e.currency+
+          ' ('+(e.vat_basis==='net'?'fără TVA':'cu TVA')+')');
+      }
     }
     lines.push('','Limitări:',...r.limitations.map(x=>'• '+x));
     $('report').textContent=lines.join('\n');
