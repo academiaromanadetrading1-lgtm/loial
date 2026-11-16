@@ -89,6 +89,7 @@
 </header>
 
 <div class="container">
+  <div id="businessOwnerSection">
   <div class="welcome-bar">
     <div>
       <h1 id="bizTitle">Panou Afacere</h1>
@@ -193,9 +194,9 @@
       </tbody>
     </table>
   </div>
+ </div> 
   <!-- CENTRU DE COMANDĂ SUPER-ADMIN (DOAR PENTRU ciprianpop@academiadetrading.llc) -->
   <div id="superAdminSection" style="display:none;margin-top:32px;border-top:2px dashed #b7d7c5;padding-top:28px;">
-   </div> 
     <div class="welcome-bar">
       <div>
         <span class="step-tag">Super-Admin Loial.space</span>
@@ -255,10 +256,31 @@
     </div>
   </div>
 
+ <script>
+  const token = localStorage.getItem('token');
+  const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+  let bizId = localStorage.getItem('biz_id');
 
-<script>
-  let bizId = localStorage.getItem('biz_id') || '1';
-  const cacheKey = 'loial_admin_cache_' + bizId;
+  if (!token && !currentUser) {
+    location.href = '/login.html';
+  }
+
+  const isSuperAdmin = currentUser && (currentUser.email === 'ciprianpop@academiadetrading.llc' || currentUser.role === 'admin');
+
+  if (isSuperAdmin) {
+    document.getElementById('businessOwnerSection').style.display = 'none';
+    document.getElementById('superAdminSection').style.display = 'block';
+    loadSuperAdmin();
+  } else {
+    if (!bizId) {
+      logout();
+    } else {
+      const cacheKey = 'loial_admin_cache_' + bizId;
+      const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+      if (cached) renderDashboardData(cached);
+      loadDashboard();
+    }
+  }
 
   function renderDashboardData(data) {
     const brandColor = data.card_color || '#2d6a4f';
@@ -305,14 +327,11 @@
     }
   }
 
-  const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
-  if (cached) renderDashboardData(cached);
-
   async function loadDashboard() {
     const res = await fetch(`/api/biz-full/${bizId}`);
     if (!res.ok) return;
     const data = await res.json();
-    localStorage.setItem(cacheKey, JSON.stringify(data));
+    localStorage.setItem('loial_admin_cache_' + bizId, JSON.stringify(data));
     renderDashboardData(data);
   }
 
@@ -380,18 +399,6 @@
     } else {
       btn.textContent = '💾 Salvează oferta și setările';
     }
-  }
-
-  function logout() {
-    localStorage.clear();
-    location.href = '/login.html';
-  }
-
-  loadDashboard();
-    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-  if (currentUser.email === 'ciprianpop@academiadetrading.llc' || currentUser.role === 'admin') {
-    document.getElementById('superAdminSection').style.display = 'block';
-    loadSuperAdmin();
   }
 
   async function loadSuperAdmin() {
@@ -482,6 +489,13 @@
     loadSuperAdmin();
   }
 
+  async function logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('biz_id');
+    try { await fetch('/auth/logout', { method: 'POST' }); } catch (e) {}
+    location.href = '/login.html';
+  }
 </script>
 </body>
 </html>
