@@ -345,6 +345,7 @@
         <p style="font-size:12px;color:#475d52;margin-bottom:8px;">Arată acest QR patronilor sau trimite link-ul tău:</p>
         <input type="text" id="ambRefUrl" readonly style="font-size:12px;text-align:center;">
         <button type="button" class="btn-save" id="copyAmbBtn" onclick="copyAmbLink()">📋 Copiază link-ul meu de Ambasador</button>
+        <button type="button" class="btn-save" onclick="saveAmbassadorCardImage()">📥 Salvează cardul meu Black Metal</button>
       </div>
     </div>
   </div>
@@ -885,6 +886,48 @@
       document.getElementById('ambWalletAvailability').textContent=
         'Cardul premium este vizibil în Loial. Conectează-te pentru a-l emite în Apple/Google Wallet.';
     }
+  }
+
+  function saveAmbassadorCardImage() {
+    const image=document.getElementById('ambQrImg');
+    if(!image.complete||!image.naturalWidth){
+      alert('Codul de recomandare nu este încă încărcat.');
+      return;
+    }
+    const canvas=document.createElement('canvas');canvas.width=800;canvas.height=1050;
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#eff1ee';ctx.fillRect(0,0,800,1050);
+    ctx.save();ctx.beginPath();ctx.roundRect(48,52,704,450,36);ctx.clip();
+    const gradient=ctx.createLinearGradient(48,52,752,502);
+    gradient.addColorStop(0,'#040507');gradient.addColorStop(.3,'#303239');
+    gradient.addColorStop(.53,'#0b0d12');gradient.addColorStop(.7,'#34353c');
+    gradient.addColorStop(1,'#050609');
+    ctx.fillStyle=gradient;ctx.fillRect(48,52,704,450);
+    for(let i=0;i<160;i++){
+      ctx.strokeStyle='rgba(255,255,255,'+(i%5===0?.04:.012)+')';
+      ctx.beginPath();ctx.moveTo(48,52+i*2.9);ctx.lineTo(752,52+i*2.9);ctx.stroke();
+    }
+    ctx.restore();
+    ctx.strokeStyle='#ccb785';ctx.lineWidth=2;
+    ctx.beginPath();ctx.roundRect(48,52,704,450,36);ctx.stroke();
+    ctx.textAlign='left';ctx.fillStyle='#eddba9';
+    ctx.font='bold 52px sans-serif';ctx.fillText('LOIAL',90,137);
+    ctx.font='bold 15px sans-serif';ctx.fillText('BLACK METAL • AMBASSADOR',92,172);
+    ctx.fillStyle='#ccb88e';ctx.font='bold 18px sans-serif';
+    ctx.fillText(document.getElementById('premiumAmbStatus').textContent.slice(0,32),90,329);
+    ctx.font='14px sans-serif';ctx.fillText('TITULAR',90,382);
+    ctx.fillStyle='#f3e3c0';ctx.font='bold 32px sans-serif';
+    ctx.fillText(document.getElementById('premiumAmbName').textContent.slice(0,29),90,423);
+    ctx.font='bold 16px sans-serif';
+    ctx.fillText(document.getElementById('premiumAmbCode').textContent.slice(0,36),90,465);
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.roundRect(205,538,390,390,22);ctx.fill();
+    ctx.drawImage(image,226,558,348,348);
+    ctx.fillStyle='#172b22';ctx.textAlign='center';
+    ctx.font='bold 22px sans-serif';ctx.fillText('Scanează pentru recomandare',400,966);
+    ctx.font='16px sans-serif';ctx.fillText('Partener Loial • loial.space',400,1000);
+    const link=document.createElement('a');
+    link.download='Loial-Ambasador-Black-Metal.png';
+    link.href=canvas.toDataURL('image/png');link.click();
   }
 
   function copyAmbLink() {
