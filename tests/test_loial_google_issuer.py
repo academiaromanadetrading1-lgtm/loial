@@ -104,6 +104,7 @@ def test_google_save_signed_jwt_shows_person_status_and_business(google_config):
        serialization.Encoding.PEM,serialization.PublicFormat.SubjectPublicKeyInfo)
     data=jwt.decode(token,public_pem,algorithms=["RS256"],
                     audience="google",options={"verify_iss":False})
+    assert data["exp"]-data["iat"]==900
     obj=data["payload"]["loyaltyObjects"][0]
     assert obj["classId"]==class_id
     assert obj["accountName"]=="Alex Test"
