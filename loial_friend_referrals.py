@@ -113,10 +113,11 @@ def credit_after_valid_stamp(db, invitee_wallet, business_id, operation):
                 qualified_business_id=business_id,
                 qualified_operation=str(operation)[:140]))
     if claimed.rowcount!=1:return "already_qualified"
+    grant_id=str(invitation.id)+":"+sha256(str(operation).encode()).hexdigest()[:18]
     for owner,suffix in ((invitation.referrer_wallet,"inviter"),
                          (invitee_wallet,"friend")):
         db.add(FriendPoints(wallet_uuid=owner,points=POINTS_PER_PERSON,
-            event_key=f"qualified:{invitation.id}:{suffix}",reason="friend_visit",
+            event_key=f"qualified:{grant_id}:{suffix}",reason="friend_visit",
             created_at=now))
     db.flush()
     return "qualified"
@@ -128,11 +129,17 @@ def reverse_referral_for_refunded_receipt(db, invitee_wallet, operation):
         FriendInvitation.status=="qualified",
         FriendInvitation.qualified_operation==operation).first()
     if not invitation:return False
-    invitation.status="reversed"
+    # A refunded first purchase does not permanently invalidate the friend:
+    # next legitimate verified visit may qualify again with a distinct event key.
+    grant_id=str(invitation.id)+":"+sha256(str(operation).encode()).hexdigest()[:18]
+    invitation.status="pending"
+    invitation.qualified_at=None
+    invitation.qualified_operation=None
+    invitation.qualified_business_id=None
     for owner,suffix in ((invitation.referrer_wallet,"inviter"),
                          (invitee_wallet,"friend")):
         db.add(FriendPoints(wallet_uuid=owner,points=-POINTS_PER_PERSON,
-            event_key=f"reversed:{invitation.id}:{suffix}",
+            event_key=f"reversed:{grant_id}:{suffix}",
             reason="refunded_first_visit",created_at=utc()))
     db.flush()
     return True
