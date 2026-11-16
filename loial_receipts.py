@@ -243,6 +243,9 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
                 pass
         queue_service_event(db,biz,customer,kind="stamp",returning=away,
                             event_key="receipt-"+str(receipt.id))
+        from loial_scans import record_award
+        record_award(db,biz.id,customer.id,"receipt:"+str(receipt.id),
+                     "receipt",customer.stamps)
         from loial_wallet_sync import queue_google_refresh
         queue_google_refresh(db,biz.id,access.wallet_uuid)
         from loial_apple_updates import mark_customer_pass_changed
@@ -261,15 +264,53 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
         if r.status=="refunded":
             return {"status":"already_refunded"}
         previously_claimed=r.status=="claimed"
+        reversed_stamp=False
+        if previously_claimed and r.claimed_wallet:
+            from loial_scans import StampAward, record_award
+            award=db.query(StampAward).filter(
+                StampAward.business_id==biz.id,
+                StampAward.operation_key=="receipt:"+str(r.id),
+                StampAward.source=="receipt").first()
+            if award:
+                customer=db.query(Customer).filter(
+                    Customer.id==award.customer_id,
+                    Customer.business_id==biz.id).first()
+                latest=db.query(StampAward).filter(
+                    StampAward.business_id==biz.id,
+                    StampAward.customer_id==award.customer_id
+                ).order_by(StampAward.id.desc()).first()
+                # Safe rollback only when the refunded receipt is the latest
+                # loyalty event; never retract a reward already redeemed.
+                if (customer and latest and latest.id==award.id and
+                    (customer.stamps or 0)==award.stamps_after and
+                    award.stamps_after>0):
+                    customer.stamps-=1
+                    record_award(db,biz.id,customer.id,
+                                 "refund:"+str(r.id),"refund",customer.stamps)
+                    queue_service_event(db,biz,customer,kind="reversal",
+                                        event_key=str(r.id))
+                    from loial_wallet_sync import queue_google_refresh
+                    from loial_apple_updates import mark_customer_pass_changed
+                    queue_google_refresh(db,biz.id,r.claimed_wallet)
+                    mark_customer_pass_changed(db,biz.id,r.claimed_wallet)
+                    reversed_stamp=True
         r.status="refunded"
         doc=db.query(AIDocument).filter(AIDocument.id==r.document_id,
                                         AIDocument.business_id==biz.id).first()
         if doc:
             doc.kind="receipt_refunded"
+            extracted=json.loads(doc.data_json or "{}")
+            notes=extracted.setdefault("notes",[])
+            notes.append("Bon returnat de comerciant. Motiv: "+req.reason.strip()[:200])
+            doc.data_json=json.dumps(extracted,ensure_ascii=False)
         db.commit()
+        manual_review=previously_claimed and not reversed_stamp
         return {"status":"refunded","financial_data_excluded":True,
-                "loyalty_review_required":previously_claimed,
-                "notice":"Bonul a fost exclus din analiza vanzarilor. Daca a generat o stampila, administratorul trebuie sa revizuiasca recompensa."}
+                "stamp_reversed":reversed_stamp,
+                "loyalty_review_required":manual_review,
+                "notice":("Bonul si stampila aferenta au fost anulate."
+                           if reversed_stamp else
+                          "Bonul a fost exclus din vanzari; verifica manual recompensa daca a fost folosita.")}
 
     @router.get("/recent")
     def recent(biz=Depends(owner),db:Session=Depends(database)):
