@@ -29,7 +29,7 @@ jobs:
         run: |
           node - <<'NODE'
           const fs = require('fs');
-          for(const file of ['join.html','loial-ai.html','loial-receipt.html','wallet-recovery.html','platform.html','scan.html','loial-wallet.html','loial-offline.html']){
+          for(const file of ['join.html','loial-ai.html','loial-receipt.html','wallet-recovery.html','platform.html','scan.html','loial-wallet.html']){
             const html=fs.readFileSync(file,'utf8');
             let n=0;
             for(const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)){
