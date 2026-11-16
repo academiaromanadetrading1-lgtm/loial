@@ -284,3 +284,35 @@ Documentatie Google:
 - https://developers.google.com/wallet/retail/loyalty-cards/resources/template
 - https://developers.google.com/wallet/reference/rest/v1/loyaltyclass
 - https://developers.google.com/wallet/retail/loyalty-cards/use-cases/updates
+
+
+## Etapa Google Wallet first 100, audit de lansare si facturi
+- Apple Wallet este oprit explicit in API si in interfata cat timp
+  LOIAL_APPLE_PILOT_ENABLED=0. Nu este necesar cont Apple pentru pilot.
+- Clasele Google folosesc reviewStatus UNDER_REVIEW la creare si sunt respinse
+  daca sunt DRAFT/REJECTED/necunoscute. Accesul de publicare aprobat trebuie
+  verificat separat in Google Pay & Wallet Console.
+- Linkurile semnate pentru adaugarea cardului Google expira dupa 15 minute.
+- API privat GET /api/admin/google-wallet-pilot arata progresul catre 100 firme:
+  inscrise, cu clienti si active (cu cel putin o stampila acordata).
+  Panoul platformei arata si configurarea emitentului, fara chei sau parole.
+- Endpointurile demonstrative /wallet/google/{id} si /wallet/{id} raspund 410.
+  Nu se mai expun linkuri false sau carduri Apple nesemnate drept reale.
+- Exportul, stergerea si consimtamantul din API-ul GDPR legacy sunt limitate
+  la administratorul platformei: ID-ul de client nu demonstreaza proprietatea.
+- Verificare offline: python loial_preflight.py; cu LOIAL_DEPLOY_STAGE=staging
+  ruleaza verificari pregatitoare fara cont oficial. Sunt controlate JWT,
+  origine HTTPS, baza persistenta, dezactivarea Apple, configurarea Google si
+  absenta conturilor demo. Secretelor nu li se afiseaza valorile in rezultat.
+  Rotația cheilor, aprobarea Google si testul de backup raman pasi manuali.
+- Facturile/cheltuielile pot fi confirmate explicit cu furnizor, numar, data,
+  categorie, suma, moneda si baza TVA (net/gross). Documentul PDF/fotografia
+  incarcata poate fi asociata prin identificator dupa verificarea valorilor.
+  Nu se aduna lei cu euro si nu se combina sume brute cu sume nete.
+  Documentele anulate raman auditate dar sunt excluse din rapoarte.
+  Nu se deduce profitul net din informatii contabile incomplete.
+- API facturi: POST /api/loial-expenses/confirm,
+  GET /api/loial-expenses/summary, GET /api/loial-expenses/recent,
+  POST /api/loial-expenses/{id}/void. Calcule fara cost AI.
+- Nu s-au activat abonamente Apple sau servicii AI platite si nu s-a
+  schimbat versiunea publica a platformei Loial.
