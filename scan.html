@@ -189,22 +189,37 @@
       }
 
       playBeep();
+      box.replaceChildren();
+      function addLine(text, fontSize, color) {
+        const element=document.createElement('div');
+        element.style.fontSize=fontSize;
+        if(color)element.style.color=color;
+        element.textContent=text;
+        box.appendChild(element);
+        return element;
+      }
+      const count=Number(data.stamps)||0, target=Number(data.target)||6;
       if (data.reward_unlocked) {
-        box.className = 'status-box reward';
-        box.innerHTML = `
-          <div style="font-size:19px;font-weight:800;margin-bottom:6px;">🏆 PREMIU DEBLOCAT!</div>
-          <div style="font-size:14px;margin-bottom:8px;">Client: <strong>${data.name}</strong> (${data.stamps}/${data.target})</div>
-          <div style="font-size:14px;font-weight:700;color:#92400e;">🎁 ${currentRewardText}</div>
-          <button type="button" class="btn-reward" onclick="redeemDirect('${walletUuid}')">🎁 Acordă premiul și resetează cardul (0)</button>
-        `;
+        box.className='status-box reward';
+        const title=addLine('🏆 PREMIU DEBLOCAT!', '19px');
+        title.style.fontWeight='800';title.style.marginBottom='7px';
+        addLine('Client: '+(data.name||'Client')+' ('+count+'/'+target+')','14px');
+        const reward=addLine('🎁 '+currentRewardText,'14px','#92400e');
+        reward.style.fontWeight='700';reward.style.margin='10px 0';
+        const button=document.createElement('button');
+        button.type='button';button.className='btn-reward';
+        button.textContent='🎁 Acordă premiul și resetează cardul (0)';
+        button.onclick=()=>redeemDirect(walletUuid);
+        box.appendChild(button);
       } else {
-        box.className = 'status-box';
-        box.innerHTML = `
-          <div style="font-size:18px;font-weight:800;color:var(--primary);margin-bottom:4px;">✓ Ștampilă adăugată!</div>
-          <div style="font-size:15px;">Client: <strong>${data.name}</strong></div>
-          <div style="font-size:17px;font-weight:800;margin-top:6px;">Progres: ${data.stamps} / ${data.target} ★</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:10px;">Poți închide fereastra sau scana următorul client cu Camera telefonului.</div>
-        `;
+        box.className='status-box';
+        const title=addLine('✓ Ștampilă adăugată!', '18px','var(--primary)');
+        title.style.fontWeight='800';title.style.marginBottom='5px';
+        addLine('Client: '+(data.name||'Client'),'15px');
+        const progress=addLine('Progres: '+count+' / '+target+' ★','17px');
+        progress.style.fontWeight='800';progress.style.marginTop='8px';
+        const note=addLine('Poți închide fereastra sau scana următorul client cu Camera telefonului.','12px','var(--muted)');
+        note.style.marginTop='11px';
       }
     } catch (e) {
       box.className = 'status-box error';
