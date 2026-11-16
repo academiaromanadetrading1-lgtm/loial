@@ -1,4 +1,4 @@
-const CACHE_NAME = 'loial-offline-v1';
+const CACHE_NAME = 'loial-cache-v20';
 const ASSETS = [
   '/',
   '/join.html',
