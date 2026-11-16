@@ -2439,7 +2439,6 @@ def _ensure_ecosystem_columns():
 
 _ensure_ecosystem_columns()
 Customer.wallet_uuid = Column(String, nullable=True)
-Customer.phone = Column(String, nullable=True)
 Customer.network_bonus_text = Column(String, nullable=True)
 BusinessAccount.ref_code = Column(String, nullable=True)
 
