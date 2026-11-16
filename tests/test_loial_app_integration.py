@@ -175,6 +175,24 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert other_history.status_code==200
             assert other_history.json()["items"]==[]
 
+            # Only the platform administrator can monitor the first-100 Google pilot.
+            assert client.get("/api/admin/google-wallet-pilot").status_code==401
+            assert client.get("/api/admin/google-wallet-pilot",headers=bearer).status_code in (401,403)
+            with main.SessionLocal() as db:
+                db.add(main.User(email="supervisor@loial.test",
+                    password=main.pwd_context.hash("test-admin-password-not-used"),
+                    name="Administrator Test",role="admin",plan="pro"))
+                db.commit()
+            admin_token=main.create_access_token({"sub":"supervisor@loial.test","role":"admin"})
+            pilot=client.get("/api/admin/google-wallet-pilot",
+                headers={"Authorization":"Bearer "+admin_token})
+            assert pilot.status_code==200,pilot.text
+            state=pilot.json()
+            assert state["goal_active_businesses"]==100
+            assert state["businesses_with_recorded_stamp_awards"]==1
+            assert state["businesses_registered"]==2
+            assert state["google_wallet"]["publishing_approved"]=="not_verified"
+            assert state["apple_wallet"]["in_pilot"] is False
             # No external provider or recipient data is needed for this scenario.
     finally:
         main.engine.dispose()
