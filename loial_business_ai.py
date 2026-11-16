@@ -19,7 +19,7 @@ from sqlalchemy import Column, Float, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Session, declarative_base
 
 from loial_industries import PROFILES, canonical, profile, weekly_request
-from loial_analytics import customer_segments, sector_summary, abc_products, money
+from loial_analytics import customer_segments, sector_summary, abc_products, money, manager_findings
 from loial_knowledge import guidance
 from loial_marketing import TEMPLATES, render as render_template, eligible_segment
 from loial_email import email_enabled, send_text_email, unsubscribe_url, parse_unsubscribe_token
@@ -365,6 +365,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         calculated = sector_summary(p.sector, rows(db, biz), operational)
         return {"industry": profile(p.sector)["label"], "currency": p.currency,
                 "sales": calculated, "abc": abc_products(calculated["products"]),
+                "findings": manager_findings(calculated, p.sector),
                 "customers": customer_segments(customers),
                 "manual_metrics": [{"name": x.name, "value": x.value, "period": x.period} for x in manual],
                 "limitations": calculated["missing"] + [
