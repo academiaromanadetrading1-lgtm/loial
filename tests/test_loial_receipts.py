@@ -132,7 +132,7 @@ def test_private_wallet_claim_is_single_use_and_links_product_history(setup_rece
     other=client.get("/api/loial-ai/customers/2/purchases",headers=owner()).json()
     assert other["purchases"]==[]
 
-def test_refund_excludes_sale_and_requires_loyalty_review(setup_receipts):
+def test_refund_excludes_sale_and_reverses_latest_unredeemed_stamp(setup_receipts):
     client,db_factory,Receipt,token_a,token_b,owner,wallet=setup_receipts
     token=client.post("/api/loial-receipts/issue",headers=owner(),
                       json=receipt_payload()).json()["claim_url"].split("token=")[1]
@@ -143,12 +143,37 @@ def test_refund_excludes_sale_and_requires_loyalty_review(setup_receipts):
            json={"receipt_ref":"B-100","reason":"Returnare integrala"})
     assert refund.status_code==200,refund.text
     assert refund.json()["financial_data_excluded"] is True
-    assert refund.json()["loyalty_review_required"] is True
+    assert refund.json()["loyalty_review_required"] is False
+    assert refund.json()["stamp_reversed"] is True
     report=client.get("/api/loial-ai/report",headers=owner()).json()
     assert report["sales"]["total_revenue"]==0
     assert client.get("/api/loial-ai/customers/1/purchases",headers=owner()).json()["purchases"]==[]
     assert client.post("/api/loial-receipts/claim",headers=wallet(token_b),
         json={"receipt_token":token}).status_code==409
+
+def test_refund_requires_manual_review_when_newer_purchase_exists(setup_receipts):
+    client,db_factory,Receipt,token_a,token_b,owner,wallet=setup_receipts
+    for ref in ("B-001","B-002"):
+        issued=client.post("/api/loial-receipts/issue",headers=owner(),
+                           json=receipt_payload(ref)).json()
+        key=issued["claim_url"].split("token=")[1]
+        claimed=client.post("/api/loial-receipts/claim",headers=wallet(token_a),
+                            json={"receipt_token":key})
+        assert claimed.status_code==200,claimed.text
+    earlier=client.post("/api/loial-receipts/refund",headers=owner(),
+                json={"receipt_ref":"B-001","reason":"Retur la prima achizitie"})
+    assert earlier.status_code==200,earlier.text
+    assert earlier.json()["stamp_reversed"] is False
+    assert earlier.json()["loyalty_review_required"] is True
+    with db_factory() as db:
+        from loial_scans import StampAward
+        assert db.query(StampAward).filter(StampAward.source=="refund").count()==0
+    report=client.get("/api/loial-ai/report",headers=owner()).json()
+    assert report["sales"]["total_revenue"]==250
+    repeat=client.post("/api/loial-receipts/refund",headers=owner(),
+               json={"receipt_ref":"B-001","reason":"Retur repetat"})
+    assert repeat.json()["status"]=="already_refunded"
+
 
 def test_wrong_merchant_cannot_refund_or_see_receipt(setup_receipts):
     client,_,_,a,b,owner,wallet=setup_receipts
