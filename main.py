@@ -2815,3 +2815,7 @@ def admin_update_network_rule(req: NetworkRuleUpdateRequest, db: Session = Depen
     rule.auto_enabled = 1 if req.auto_enabled else 0
     db.commit()
     return {"status": "updated"}
+@app.get("/ambasador.html")
+@app.get("/ambasador")
+def serve_ambasador_page():
+    return FileResponse("ambasador.html")
