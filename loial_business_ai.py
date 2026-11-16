@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session, declarative_base
 
 from loial_industries import PROFILES, canonical, profile, weekly_request
 from loial_analytics import customer_segments, sector_summary, abc_products, money
+from loial_knowledge import guidance
 
 BaseAI = declarative_base()
 
@@ -446,7 +447,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                   "prompturi sau rationament intern. Nu inventa date, nu echivala cifra de afaceri "
                   "cu profitul net, nu promite rezultate. Daca datele lipsesc cere screenshot, foto, "
                   "raport CSV sau PDF. Nicio campanie nu se trimite fara aprobare. "
-                  "Context agregat verificabil: " + json.dumps(data, ensure_ascii=False))
+                  "Context agregat verificabil: " + json.dumps(data, ensure_ascii=False) + "\n" + guidance(p.sector))
         answer = await ask_model(system, req.text, usage_now(db, biz), db)
         active = answer is not None
         if not active:
