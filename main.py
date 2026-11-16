@@ -2977,6 +2977,10 @@ def generate_qr_from_query(url: str, color: str = "#2d6a4f", initial: str = "L")
 from loial_business_ai import install_loial_ai
 install_loial_ai(app, engine, SessionLocal, BusinessAccount, Customer, Consent, SECRET_KEY, ALGORITHM)
 
+@app.get("/unsubscribe.html")
+def loial_unsubscribe_page():
+    return FileResponse("unsubscribe.html")
+
 @app.get("/loial-ai.html")
 @app.get("/loial-ai")
 def loial_ai_page():
