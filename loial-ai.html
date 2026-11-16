@@ -250,6 +250,10 @@ $('reportBtn').onclick=async()=>{
     const specific=Object.entries(s.sector_metrics||{});
     if(specific.length){lines.push('','Indicatori specifici activității:');
       specific.forEach(([k,v])=>lines.push('• '+k.replaceAll('_',' ')+': '+v));}
+    if((r.findings||[]).length){
+      lines.push('','Ce observă Loial:');
+      r.findings.forEach(x=>lines.push('• '+x.text));
+    }
     lines.push('','Limitări:',...r.limitations.map(x=>'• '+x));
     $('report').textContent=lines.join('\n');
     bubble('meta','Raportul a fost actualizat în panoul din dreapta.');
@@ -297,7 +301,7 @@ $('draftCampaign').onclick=async()=>{
     const r=await api('/campaigns',{method:'POST',body:JSON.stringify({
       objective:$('objective').value||'Informarea clientilor',audience:$('audience').value,offer:$('offer').value})});
     currentCampaignId=r.id;
-    $('campaignPreview').textContent='Campanie '+r.id+' • NEEXPEDIATĂ\nSubiect: '+r.subject+'\n\n'+r.text;
+    $('campaignPreview').textContent='Campanie '+r.id+' • NEEXPEDIATĂ'+(r.generated_by_ai?' • redactată cu AI':' • șablon standard')+'\nSubiect: '+r.subject+'\n\n'+r.text;
     $('approveDraft').style.display='block';$('sendCampaign').style.display='none';
   }catch(e){status(e.message,true);}
 };
