@@ -23,6 +23,7 @@ import re
 import os
 import json
 import uuid
+import secrets
 from sales import create_sales_models, generate_agent_qr, calculate_commissions
 from dotenv import load_dotenv
 
@@ -198,7 +199,7 @@ class BusinessAccount(Base):
     google_review_url = Column(String, nullable=True)
     reward_text = Column(String, default="A 6-a e din partea casei!")
     card_color = Column(String, default="#1e293b")
-    staff_pin = Column(String, default="1234")
+    staff_pin = Column(String, default=None)
     agent_id = Column(Integer, index=True, nullable=True)
     created_at = Column(String)
     birthday = Column(String, nullable=True)
@@ -1829,7 +1830,7 @@ def quick_register(req: QuickRegisterRequest, db: Session = Depends(get_db)):
         max_customers=50,
         reward_text=req.reward,
         card_color=req.color,
-        staff_pin="1234",
+        staff_pin=str(1000 + secrets.randbelow(9000)),
         agent_id=agent.id if agent else None,
         ref_code=clean_ref,
         created_at=datetime.now().isoformat()
@@ -2084,12 +2085,38 @@ def get_my_business(credentials: HTTPAuthorizationCredentials = Depends(security
         "max_customers": biz.max_customers or 50,
         "reward_text": biz.reward_text,
         "card_color": biz.card_color,
-        "staff_pin": biz.staff_pin or "1234",
+        "staff_pin": biz.staff_pin or "",
         "google_review_url": biz.google_review_url or "",
         "customers_count": len(customers),
         "customers": [{"name": c.name, "stamps": c.stamps or 0, "last_visit": c.last_visit} for c in customers[:20]],
         "feedbacks": [{"rating": f.rating, "message": f.message, "date": f.created_at} for f in feedbacks[:10]]
     }
+
+@app.post("/api/my-business/rotate-pin")
+def rotate_business_staff_pin(credentials: HTTPAuthorizationCredentials = Depends(security),
+                              db: Session = Depends(get_db)):
+    if not credentials:
+        raise HTTPException(status_code=401,detail="Autentificare obligatorie")
+    try:
+        claims=jwt.decode(credentials.credentials,SECRET_KEY,algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401,detail="Sesiune invalida")
+    if claims.get("role")!="business":
+        raise HTTPException(status_code=403,detail="Doar administratorul firmei poate schimba PIN-ul")
+    biz=db.query(BusinessAccount).filter(
+        BusinessAccount.email==claims.get("sub")).first()
+    if not biz:
+        raise HTTPException(status_code=403,detail="Firma nu a fost gasita")
+    staff_pins={p.pin for p in db.query(StaffMember).filter(
+        StaffMember.business_id==biz.id,StaffMember.active==1).all()}
+    for _ in range(100):
+        new_pin=str(1000+secrets.randbelow(9000))
+        if new_pin not in staff_pins and new_pin!=biz.staff_pin and new_pin!="1234":
+            biz.staff_pin=new_pin
+            db.commit()
+            return {"status":"rotated","staff_pin":new_pin,
+                    "notice":"Comunica PIN-ul doar persoanelor autorizate. PIN-ul vechi nu mai functioneaza."}
+    raise HTTPException(status_code=503,detail="Nu a putut fi generat un PIN disponibil")
 
 @app.post("/api/my-business/settings")
 def update_my_business_settings(req: BusinessSettingsUpdate, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
@@ -2101,8 +2128,11 @@ def update_my_business_settings(req: BusinessSettingsUpdate, credentials: HTTPAu
         raise HTTPException(status_code=404, detail="Afacere negăsită")
     if req.google_review_url is not None:
         biz.google_review_url = req.google_review_url.strip()
-    if req.staff_pin and len(req.staff_pin) == 4:
-        biz.staff_pin = req.staff_pin.strip()
+    if req.staff_pin is not None:
+        pin=req.staff_pin.strip()
+        if not re.fullmatch(r"\d{4}",pin) or pin=="1234":
+            raise HTTPException(status_code=422,detail="Alege un PIN diferit de 1234, format din 4 cifre")
+        biz.staff_pin=pin
     if req.reward_text:
         biz.reward_text = req.reward_text.strip()
     db.commit()
@@ -2271,7 +2301,8 @@ def update_business_offer(req: FullBusinessSettings, credentials: HTTPAuthorizat
     return {"status": "updated"}
 
 @app.post("/api/scan-v2")
-def qr_scan_with_staff(req: QRScanRequest, db: Session = Depends(get_db)):
+@limiter.limit("30/minute")
+def qr_scan_with_staff(request: Request, req: QRScanRequest, db: Session = Depends(get_db)):
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
@@ -2455,12 +2486,13 @@ class RedeemRequest(BaseModel):
     customer_uuid: str
 
 @app.post("/api/redeem-reward")
-def redeem_customer_reward(req: RedeemRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def redeem_customer_reward(request: Request, req: RedeemRequest, db: Session = Depends(get_db)):
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
     staff = db.query(StaffMember).filter(StaffMember.business_id == biz.id, StaffMember.pin == req.pin, StaffMember.active == 1).first()
-    if not staff and req.pin != (biz.staff_pin or "1234"):
+    if not staff and (not biz.staff_pin or biz.staff_pin=="1234" or req.pin != biz.staff_pin):
         raise HTTPException(status_code=401, detail="PIN incorect")
     customer = db.query(Customer).filter(
         Customer.business_id == biz.id,
@@ -2628,7 +2660,8 @@ class UniversalScanRequest(BaseModel):
 
 
 @app.post("/api/scan-universal")
-def scan_universal_card(req: UniversalScanRequest, db: Session = Depends(get_db)):
+@limiter.limit("30/minute")
+def scan_universal_card(request: Request, req: UniversalScanRequest, db: Session = Depends(get_db)):
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
