@@ -263,6 +263,20 @@
   </div>
 
   <div class="card">
+    <span class="step-tag">AUDIT DE FIDELIZARE</span>
+    <h2>Ștampile, recompense și retururi</h2>
+    <p style="font-size:13px;color:var(--text-muted)">
+      Vezi cine a primit ștampile, când au fost acordate și dacă o recompensă sau un bon a fost corectat.
+    </p>
+    <button type="button" class="btn-secondary" onclick="loadStampAudit()">
+      Actualizează jurnalul
+    </button>
+    <div id="stampAudit" role="status" style="margin-top:12px;font-size:13px">
+      Se încarcă istoricul...
+    </div>
+  </div>
+
+  <div class="card">
     <h2>Clienții tăi fideli (Activitate recentă)</h2>
     <table>
       <thead>
@@ -559,6 +573,44 @@
     }catch(error){document.getElementById('primaryPinStatus').textContent=error.message;}
   }
 
+  async function loadStampAudit() {
+    const box=document.getElementById('stampAudit');
+    if(!box)return;
+    box.replaceChildren();
+    try {
+      const res=await authorizedFetch('/api/loial-scans/history?limit=40');
+      const data=await res.json();
+      if(!res.ok)throw Error(data.detail||'Jurnalul nu poate fi încărcat.');
+      if(!data.items.length){
+        box.textContent='Încă nu există operațiuni de fidelizare înregistrate.';
+        return;
+      }
+      const sourceNames={
+        manual:'Ștampilă manuală',receipt:'Bon QR revendicat',
+        redeem:'Recompensă utilizată',refund:'Retur și corecție'
+      };
+      const list=document.createElement('div');
+      for(const event of data.items) {
+        const item=document.createElement('div');
+        item.style.cssText='display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 0;border-bottom:1px solid #e2ebe4;';
+        const label=document.createElement('div');
+        const strong=document.createElement('strong');
+        strong.textContent=event.customer||'Client';
+        const note=document.createElement('div');
+        note.textContent=(sourceNames[event.source]||event.source)+
+          ' · '+new Date(event.at).toLocaleString('ro-RO');
+        note.style.color='#607468';note.style.fontSize='12px';
+        label.append(strong,note);
+        const count=document.createElement('strong');
+        count.textContent=event.stamps_after+' ștampile';
+        item.append(label,count);list.appendChild(item);
+      }
+      box.appendChild(list);
+    } catch(error) {
+      box.textContent=error.message;
+    }
+  }
+
   async function loadDashboard() {
     const res = await authorizedFetch(`/api/biz-full/${bizId}`);
     if (!res.ok) return;
@@ -566,6 +618,7 @@
     // Nu pastram date despre clienti sau PIN-uri in localStorage.
     renderDashboardData(data);
     await loadPrimaryPin();
+    await loadStampAudit();
   }
 
   function copyJoinLink() {
