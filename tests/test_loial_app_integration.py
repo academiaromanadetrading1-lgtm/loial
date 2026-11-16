@@ -193,6 +193,25 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert state["businesses_registered"]==2
             assert state["google_wallet"]["publishing_approved"]=="not_verified"
             assert state["apple_wallet"]["in_pilot"] is False
+            # Legacy wallet demo links must not impersonate official signed Google passes.
+            assert client.get("/wallet/google/1").status_code==410
+            assert client.get("/wallet/1").status_code==410
+            # The old User-token API has no mapped customer ownership. Reject
+            # export, delete and consent mutations from ordinary accounts.
+            with main.SessionLocal() as db:
+                db.add(main.User(email="other-user@loial.test",
+                    password=main.pwd_context.hash("test-client-password-unused"),
+                    name="Other User",role="owner",plan="starter"))
+                db.commit()
+            ordinary=main.create_access_token({"sub":"other-user@loial.test","role":"owner"})
+            user_headers={"Authorization":"Bearer "+ordinary}
+            with main.SessionLocal() as db:
+                sensitive_customer=db.query(main.Customer).first()
+                target=sensitive_customer.id
+            assert client.get("/gdpr/export/"+str(target),headers=user_headers).status_code==403
+            assert client.delete("/gdpr/delete/"+str(target),headers=user_headers).status_code==403
+            assert client.post("/gdpr/consent",headers=user_headers,
+                params={"customer_id":target,"purpose":"marketing","granted":True}).status_code==403
             # No external provider or recipient data is needed for this scenario.
     finally:
         main.engine.dispose()
