@@ -70,6 +70,22 @@
   th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--border); }
   th { color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
 
+  .metal-profile-card{position:relative;overflow:hidden;max-width:355px;min-height:205px;
+    border-radius:20px;padding:24px;color:#e8d5a8;border:1px solid rgba(213,188,133,.5);
+    background:repeating-linear-gradient(0deg,transparent,rgba(255,255,255,.025) 2px,transparent 3px),
+      linear-gradient(116deg,#050607 0%,#26292f 27%,#121318 47%,#37383d 66%,#07080c 100%);
+    box-shadow:0 16px 30px rgba(0,0,0,.18),inset 0 1px 0 rgba(245,219,169,.28);}
+  .metal-profile-card::after{content:"";position:absolute;right:-40px;top:-75px;
+    width:220px;height:240px;border:1px solid rgba(223,197,135,.12);border-radius:50%;
+    box-shadow:0 0 0 25px rgba(227,196,132,.025),0 0 0 55px rgba(227,196,132,.02);}
+  .metal-profile-card .brand{font-size:23px;font-weight:900;letter-spacing:.19em;color:#f0ddaa}
+  .metal-profile-card .edition{font-size:9px;letter-spacing:.17em;color:#bca875;font-weight:800}
+  .metal-profile-card .status{font-size:10px;letter-spacing:.1em;color:#dac493;margin-top:35px;font-weight:800}
+  .metal-profile-card .holder{font-size:19px;font-weight:750;margin-top:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .profile-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:355px}
+  .profile-actions button{margin-top:0}
+  .role-caption{font-size:12px;color:#607367;line-height:1.5;margin-top:8px}
+  .roles-password{display:none}
   @media print {
     body * { visibility: hidden; }
     #printablePoster, #printablePoster * { visibility: visible; }
@@ -103,6 +119,49 @@
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       <a href="/loial-ai.html#messages" style="background:#2d6a4f;color:#fff;border-radius:11px;padding:11px 18px;text-decoration:none;font-weight:750;">Trimite mesaje Loial</a>
       <a href="/loial-ai.html" style="border:1px solid #2d6a4f;color:#2d6a4f;border-radius:11px;padding:11px 18px;text-decoration:none;font-weight:750;">Deschide consultantul AI</a>
+    </div>
+  </div>
+  <div class="card" id="loialRolesSection">
+    <span class="step-tag">IDENTITĂȚILE TALE LOIAL</span>
+    <h2>Administrator, ambasador și client</h2>
+    <p class="role-caption">Aceeași persoană poate avea toate cele trei roluri, fără conturi separate pentru administrarea firmei. Cardul de client rămâne independent de cardul de ambasador.</p>
+    <div class="grid-2" style="margin-top:16px;">
+      <div>
+        <div class="metal-profile-card" aria-label="Card premium Black Metal de ambasador">
+          <div class="brand">LOIAL</div>
+          <div class="edition">BLACK METAL · AMBASSADOR</div>
+          <div class="status" id="metalAmbassadorRank">STATUT: NEACTIVAT</div>
+          <div class="holder" id="metalAmbassadorHolder">Ambasador Loial</div>
+          <div class="edition">CARD DE PARTENER · NU ESTE CARD BANCAR</div>
+        </div>
+        <p id="rolesStatus" class="role-caption">Se verifică identitățile disponibile...</p>
+        <div class="profile-actions">
+          <button id="rolesAppleWallet" class="btn-secondary" onclick="saveAmbassadorWallet('apple')" disabled>Apple Wallet</button>
+          <button id="rolesGoogleWallet" class="btn-secondary" onclick="saveAmbassadorWallet('google')" disabled>Google Wallet</button>
+        </div>
+      </div>
+      <div>
+        <label for="ambassadorDisplayName">Numele tău pe cardul Black Metal</label>
+        <input id="ambassadorDisplayName" maxlength="100" placeholder="Numele persoanei, nu neapărat al firmei">
+        <button class="btn-primary" id="rolesActivate" onclick="activateBusinessAmbassador()">Activează rolul de ambasador</button>
+        <div id="rolesExistingBox" style="display:none;">
+          <label for="existingAmbassadorPassword">Parola contului de ambasador existent</label>
+          <input id="existingAmbassadorPassword" type="password" autocomplete="current-password">
+          <button class="btn-secondary" onclick="linkExistingAmbassador()">Asociază contul existent, fără să-l înlocuiești</button>
+        </div>
+        <div id="ambassadorLinkRow" style="display:none;margin-top:12px;">
+          <label for="ambassadorDirectLink">Linkul tău de recomandare</label>
+          <input id="ambassadorDirectLink" readonly>
+          <button class="btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('ambassadorDirectLink').value)">Copiază linkul de ambasador</button>
+          <button class="btn-secondary" onclick="saveAmbassadorName()">Actualizează numele de pe card</button>
+        </div>
+        <div style="border-top:1px solid #dce6e0;margin-top:18px;padding-top:12px;">
+          <strong>Poți fi și client Loial</strong>
+          <p class="role-caption" id="rolesCustomerStatus">Activează cardul tău de client în portofelul Loial.</p>
+          <a class="btn-secondary" id="rolesJoinClient" href="/join/1">Deschide cardul meu de client</a>
+          <button class="btn-secondary" id="rolesLinkClient" onclick="linkBusinessCustomer()">Asociază portofelul meu verificat</button>
+        </div>
+      </div>
     </div>
   </div>
   <div class="grid-2">
@@ -268,6 +327,112 @@
   function authorizedFetch(url, options = {}) {
     return fetch(url, { ...options, headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token } });
   }
+  let premiumWalletReady = null;
+  let verifiedAmbassador = null;
+
+  async function roleApi(path,opts={}){
+    const response=await authorizedFetch('/api/loial-identity'+path,{
+      ...opts,headers:{...(opts.body?{'Content-Type':'application/json'}:{}),...(opts.headers||{})}
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw Error(data.detail||'Nu s-a putut procesa cererea.');
+    return data;
+  }
+  async function loadBusinessRoles(){
+    try{
+      const [identity,ready]=await Promise.all([
+        roleApi('/me'),fetch('/api/premium-wallet/availability').then(r=>r.json())]);
+      premiumWalletReady=ready;
+      verifiedAmbassador=identity.ambassador||null;
+      document.getElementById('rolesCustomerStatus').textContent=identity.customer_wallet_linked
+        ?'Portofelul tău de client este verificat și asociat cu această identitate.'
+        :'Poți folosi cardul de client Loial; asocierea cere accesul privat la portofel.';
+      const clientLink=document.getElementById('rolesJoinClient');
+      if(identity.business)clientLink.href='/join/'+identity.business.id;
+      document.getElementById('rolesExistingBox').style.display=
+        identity.ambassador_needs_verification?'block':'none';
+      if(identity.ambassador){
+        document.getElementById('metalAmbassadorHolder').textContent=identity.ambassador.name;
+        document.getElementById('metalAmbassadorRank').textContent=identity.ambassador.rank;
+        document.getElementById('ambassadorDisplayName').value=identity.ambassador.name;
+        document.getElementById('ambassadorDirectLink').value=identity.ambassador.referral_url;
+        document.getElementById('ambassadorLinkRow').style.display='block';
+        document.getElementById('rolesActivate').style.display='none';
+        document.getElementById('rolesStatus').textContent='Rol activ: administrator și ambasador Loial.';
+      }else{
+        document.getElementById('ambassadorLinkRow').style.display='none';
+        document.getElementById('rolesActivate').style.display=
+          identity.ambassador_needs_verification?'none':'block';
+        document.getElementById('rolesStatus').textContent=
+          identity.ambassador_needs_verification?'Verifică întâi contul de ambasador existent.':
+          'Rolul de ambasador poate fi activat din acest panou, fără pierderea accesului Business.';
+      }
+      document.getElementById('rolesAppleWallet').disabled=
+        !(verifiedAmbassador&&premiumWalletReady.apple_ready);
+      document.getElementById('rolesGoogleWallet').disabled=
+        !(verifiedAmbassador&&premiumWalletReady.google_ambassador_ready);
+      if(!premiumWalletReady.apple_ready&&!premiumWalletReady.google_ambassador_ready)
+        document.getElementById('rolesStatus').textContent+=' Emiterea Apple/Google Wallet va fi disponibilă după configurarea certificatelor.';
+    }catch(e){document.getElementById('rolesStatus').textContent=e.message;}
+  }
+
+  async function activateBusinessAmbassador(){
+    const button=document.getElementById('rolesActivate');button.disabled=true;
+    try{
+      await roleApi('/ambassador/activate',{method:'POST',body:JSON.stringify({
+        display_name:document.getElementById('ambassadorDisplayName').value.trim()})});
+      await loadBusinessRoles();
+    }catch(e){
+      document.getElementById('rolesStatus').textContent=e.message;
+      if(e.message.includes('Exista deja cont'))document.getElementById('rolesExistingBox').style.display='block';
+    }finally{button.disabled=false;}
+  }
+  async function linkExistingAmbassador(){
+    const password=document.getElementById('existingAmbassadorPassword').value;
+    if(!password)return;
+    try{
+      await roleApi('/ambassador/link',{method:'POST',body:JSON.stringify({password})});
+      document.getElementById('existingAmbassadorPassword').value='';
+      await loadBusinessRoles();
+    }catch(e){document.getElementById('rolesStatus').textContent=e.message;}
+  }
+  async function saveAmbassadorName(){
+    const display_name=document.getElementById('ambassadorDisplayName').value.trim();
+    if(display_name.length<2)return;
+    try{
+      await roleApi('/ambassador/name',{method:'PUT',body:JSON.stringify({display_name})});
+      await loadBusinessRoles();
+    }catch(e){document.getElementById('rolesStatus').textContent=e.message;}
+  }
+  async function linkBusinessCustomer(){
+    const wallet_private_token=localStorage.getItem('loial_wallet_inbox_token')||'';
+    if(!wallet_private_token){
+      document.getElementById('rolesCustomerStatus').textContent=
+        'Deschide portofelul pe dispozitivul pe care ai activat cardul. Asocierea nu se poate face numai pe baza QR-ului.';
+      return;
+    }
+    try{
+      await roleApi('/customer/link',{method:'POST',body:JSON.stringify({wallet_private_token})});
+      await loadBusinessRoles();
+    }catch(e){document.getElementById('rolesCustomerStatus').textContent=e.message;}
+  }
+  async function saveAmbassadorWallet(kind){
+    if(!verifiedAmbassador)return;
+    try{
+      const response=await authorizedFetch('/api/premium-wallet/ambassador/'+kind);
+      if(!response.ok){const e=await response.json().catch(()=>({}));
+        throw Error(e.detail||'Wallet nu este configurat.');}
+      if(kind==='google'){
+        const data=await response.json();
+        if(!data.url||!data.url.startsWith('https://pay.google.com/gp/v/save/'))throw Error('Link invalid');
+        location.href=data.url;return;
+      }
+      const blob=await response.blob();const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download='loial-ambassador.pkpass';
+      a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);
+    }catch(e){document.getElementById('rolesStatus').textContent=e.message;}
+  }
+
   const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
   let bizId = localStorage.getItem('biz_id');
 
@@ -288,6 +453,7 @@
       // Evitam persistenta locala a datelor comerciale private si a PIN-urilor.
       localStorage.removeItem('loial_admin_cache_' + bizId);
       loadDashboard();
+      loadBusinessRoles();
     }
   }
 
