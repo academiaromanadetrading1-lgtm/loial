@@ -245,6 +245,8 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
                             event_key="receipt-"+str(receipt.id))
         from loial_wallet_sync import queue_google_refresh
         queue_google_refresh(db,biz.id,access.wallet_uuid)
+        from loial_apple_updates import mark_customer_pass_changed
+        mark_customer_pass_changed(db,biz.id,access.wallet_uuid)
         db.commit()
         return {"status":"claimed","stamps":customer.stamps,"target":target,
                 "reward_unlocked":customer.stamps>=target,
