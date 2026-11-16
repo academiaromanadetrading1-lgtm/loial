@@ -94,6 +94,21 @@ Ex.: Revizie auto;1;220;65"></textarea>
 </div>
 <div class="report" id="report"></div>
 </section>
+<section class="card panel" id="breakEvenPanel">
+<h2>Pragul de rentabilitate</h2>
+<p>Verifică aproximativ ce vânzări ar trebui să realizeze firma pentru a acoperi costurile fixe. Loial calculează numai din datele confirmate, fără estimări inventate.</p>
+<label for="bePeriod">Luna analizată</label>
+<input id="bePeriod" type="month" required>
+<label for="beFixed">Costuri fixe ale acelei luni</label>
+<input id="beFixed" type="number" min="0" step="0.01" placeholder="Ex.: 12000">
+<label class="tiny" style="display:flex;align-items:flex-start;gap:8px;margin:12px 0;">
+<input id="beVatConfirmed" type="checkbox" style="flex:none;width:17px;height:17px;margin:1px 0;">
+<span>Confirm că toate prețurile de vânzare și costurile variabile introduse sunt pe baze comparabile, fără TVA, pentru aceeași lună.</span>
+</label>
+<button class="ghost" id="runBreakEven" style="width:100%">Analizează pragul</button>
+<div id="beResult" class="report" role="status"></div>
+<p class="tiny">Acesta este un indicator de gestiune, nu un calcul automat al profitului net sau o înregistrare contabilă.</p>
+</section>
 <section class="card panel">
 <h2>Clienți și cumpărături</h2>
 <button class="ghost" id="showClients" style="width:100%">Vezi clienții firmei</button>
@@ -296,6 +311,43 @@ $('reportBtn').onclick=async()=>{
     $('report').textContent=lines.join('\n');
     bubble('meta','Raportul a fost actualizat în panoul din dreapta.');
   }catch(e){status(e.message,true);}
+};
+$('runBreakEven').onclick=async()=>{
+  const month=$('bePeriod').value;
+  const fixed_costs=Number($('beFixed').value);
+  const output=$('beResult');output.textContent='';
+  if(!/^\d{4}-\d{2}$/.test(month)||!$('beFixed').value||
+     !Number.isFinite(fixed_costs)||fixed_costs<0){
+    output.textContent='Completează luna și costurile fixe reale pentru perioada respectivă.';
+    return;
+  }
+  $('runBreakEven').disabled=true;
+  try{
+    const x=await api('/break-even',{method:'POST',body:JSON.stringify({
+      period:month,fixed_costs,vat_basis_confirmed:$('beVatConfirmed').checked})});
+    const currency=x.currency||'RON';
+    const lines=['Luna: '+x.period,
+      'Vânzări înregistrate și folosite: '+x.sales_lines_used+' poziții.'];
+    if(x.status==='estimated'){
+      lines.push('Pentru acoperirea costurilor fixe, la mixul și costurile observate, valoarea aproximativă a vânzărilor necesare este: '+
+        x.estimated_break_even_revenue.toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+currency+'.');
+      if(x.estimated_break_even_units!==null){
+        lines.push('Pentru serviciul sau produsul unic din date, volumul orientativ este de '+
+          x.estimated_break_even_units+' unități.');
+      }
+      lines.push(x.sales_gap_to_break_even>0
+        ?'Comparativ cu vânzările înregistrate, până la acest nivel lipsesc aproximativ '+
+            x.sales_gap_to_break_even.toLocaleString('ro-RO')+' '+currency+'.'
+        :'Vânzările înregistrate sunt peste pragul estimat pentru perioada analizată.');
+    }else if(x.status==='negative_contribution'){
+      lines.push('Vânzările înregistrate nu au contribuție pozitivă suficientă pentru acest calcul. Verifică prețurile și costurile.');
+    }else{
+      lines.push('Loial nu poate calcula un prag verificabil cu datele disponibile.');
+    }
+    lines.push('',...x.caveats.map(text=>'• '+text));
+    output.textContent=lines.join('\n');
+  }catch(e){output.textContent=e.message;}
+  finally{$('runBreakEven').disabled=false;}
 };
 $('showClients').onclick=async()=>{
   try{
