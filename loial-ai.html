@@ -87,7 +87,7 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 <label for="metricPeriod">Perioada (ex.: 2026-W47)</label><input id="metricPeriod" maxlength="30" placeholder="2026-W47">
 <button class="ghost" id="saveMetric" style="width:100%;margin-top:9px">Salvează indicatorul</button>
 </section>
-<section class="card panel">
+<section class="card panel" id="messagesSection">
 <h2>Mesaje directe în Loial</h2>
 <p>Trimite o ofertă sau o noutate în portofelul Loial. Fără email, SMS, cote lunare sau contracte externe.</p>
 <label for="template">Mesaje predefinite</label><select id="template"><option value="">Selectează un mesaj...</option></select>
@@ -198,6 +198,9 @@ async function init(){
     await loadFiles();
     await loadMessageRecipients();
     await refreshSent();
+    if(location.hash==='#messages'){
+      document.getElementById('messagesSection').scrollIntoView({behavior:'smooth',block:'start'});
+    }
     const weekly=await api('/weekly');
     const weekKey=new Date().toISOString().slice(0,10);
     const promptKey='loial_weekly_prompt_'+c.business;
