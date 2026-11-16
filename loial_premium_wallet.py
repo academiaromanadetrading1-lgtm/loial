@@ -94,8 +94,9 @@ def google_pass_payload(card,issuer,class_id):
                        "subheader":localized(card["status"]),
                        "textModulesData":[{"id":"role","header":"Statut","body":card["status"]}]})
         payload={"genericObjects":[common]}
+    issued=int(time.time())
     return {"iss":issuer,"aud":"google","typ":"savetowallet",
-            "iat":int(time.time()),"origins":[],"payload":payload}
+            "iat":issued,"exp":issued+900,"origins":[],"payload":payload}
 
 def google_save_url(card,class_id_override=None):
     try:
