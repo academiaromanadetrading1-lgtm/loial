@@ -274,6 +274,8 @@ async def ask_model(system, question, usage, db, picture=None, advanced=False):
 def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                      Consent, secret_key, algorithm):
     BaseAI.metadata.create_all(bind=engine)
+    from loial_expenses import ExpenseBase
+    ExpenseBase.metadata.create_all(bind=engine)
     r = APIRouter(prefix="/api/loial-ai", tags=["Loial AI Business"])
     def db_session():
         session = session_factory()
