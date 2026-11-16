@@ -20,6 +20,24 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
     main = importlib.import_module("main")
     try:
         with TestClient(main.app) as client:
+            # Installable universal wallet, public icons, and cache-safe PWA shell.
+            manifest=client.get("/manifest.json")
+            assert manifest.status_code==200
+            assert manifest.json()["start_url"].startswith("/wallet")
+            assert manifest.json()["display"]=="standalone"
+            assert len(manifest.json()["icons"])>=2
+            app_page=client.get("/wallet")
+            assert app_page.status_code==200,app_page.text
+            assert "id=\"walletQr\"" in app_page.text
+            assert "loial-pwa-install.js" in app_page.text
+            for size in (192,512):
+                icon=client.get(f"/pwa-icon-{size}.png")
+                assert icon.status_code==200
+                assert icon.headers["content-type"]=="image/png"
+                assert icon.content.startswith(b"\x89PNG\r\n\x1a\n")
+            assert client.get("/sw.js").status_code==200
+            assert client.get("/loial-pwa-install.js").status_code==200
+            assert client.get("/loial-offline.html").status_code==200
             available = client.get("/api/premium-wallet/availability")
             assert available.status_code == 200
             assert available.json()["apple_ready"] is False
@@ -212,6 +230,28 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert client.delete("/gdpr/delete/"+str(target),headers=user_headers).status_code==403
             assert client.post("/gdpr/consent",headers=user_headers,
                 params={"customer_id":target,"purpose":"marketing","granted":True}).status_code==403
+            # A normal client can invite a friend without becoming ambassador.
+            client_headers={"X-Loial-Wallet-Token":"T"*48}
+            referral=client.get("/api/loial-friends/me",headers=client_headers)
+            assert referral.status_code==200,referral.text
+            personal_code=referral.json()["code"]
+            friend=client.post("/api/enroll-sync",json={
+                "business_id":business_id,"name":"Prieten Loial",
+                "uuid":"W-NEW-FRIEND-INTEGRATION",
+                "wallet_claim_token":"F"*48,
+                "friend_referral_code":personal_code
+            })
+            assert friend.status_code==200,friend.text
+            assert friend.json()["friend_invitation_status"]=="pending_first_verified_visit"
+            assert client.get("/api/loial-friends/me",headers=client_headers).json()["points"]==0
+            first_visit=client.post("/api/scan-universal",json={
+                "business_id":business_id,"customer_uuid":"W-NEW-FRIEND-INTEGRATION",
+                "pin":new_pin,"idempotency_key":"first-verified-friend-visit"
+            })
+            assert first_visit.status_code==200,first_visit.text
+            assert client.get("/api/loial-friends/me",headers=client_headers).json()["points"]==10
+            assert client.get("/api/loial-friends/me",headers={
+                "X-Loial-Wallet-Token":"F"*48}).json()["points"]==10
             # No external provider or recipient data is needed for this scenario.
     finally:
         main.engine.dispose()
