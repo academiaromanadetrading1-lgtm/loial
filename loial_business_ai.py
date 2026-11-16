@@ -335,7 +335,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                 "description": p.description, "currency": p.currency,
                 "sectors": [{"key": k, "label": v["label"]} for k, v in PROFILES.items()],
                 "topics": [{"key": k, "label": v} for k, v in TOPICS],
-                "ai_connected": bool(model_settings()), "cost_eur": round(u.cost_eur, 4),
+                "ai_connected": bool(model_settings()), "email_connected": bool(email_enabled()), "cost_eur": round(u.cost_eur, 4),
                 "budget_eur": min(15, max(0, float(os.getenv("LOIAL_AI_MONTHLY_BUDGET_EUR", "5"))))}
     @r.put("/profile")
     def update_profile(req: ProfileRequest, biz=Depends(owner), db: Session = Depends(db_session)):
