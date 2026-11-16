@@ -37,7 +37,7 @@ def test_google_refresh_uses_get_before_patch_and_minimal_patch(monkeypatch):
     fake_google_issuer(monkeypatch)
     card={"id":"client:5:wallet-a","role":"customer","holder":"Alex",
           "qr_value":"https://loial.space/scan.html?wallet_uuid=wallet-a",
-          "stamps":4,"target":6,"status":"MEMBRU LOIAL"}
+          "stamps":4,"target":6,"status":"MEMBRU LOIAL","entity":"Atelier"}
     captured=[]
     def mock(request):
         captured.append((request.method,request.url.path))
@@ -49,7 +49,9 @@ def test_google_refresh_uses_get_before_patch_and_minimal_patch(monkeypatch):
             return httpx.Response(200,json={"loyaltyPoints":{"balance":{"int":3}}})
         assert request.method=="PATCH"
         data=json.loads(request.content)
-        assert data=={"loyaltyPoints":{"label":"Ștampile","balance":{"int":4}}}
+        assert data==google_patch_body(card)
+        assert data["secondaryLoyaltyPoints"]["balance"]["int"]==2
+        assert data["textModulesData"][1]["body"]=="Atelier"
         return httpx.Response(200,json=data)
     transport=httpx.MockTransport(mock)
     assert request_google_refresh(card,transport=transport)=="updated"
