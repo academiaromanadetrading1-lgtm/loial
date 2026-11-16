@@ -3010,10 +3010,6 @@ from loial_inbox import install_loial_inbox
 install_loial_inbox(app, engine, SessionLocal, BusinessAccount, Customer, Consent,
                     AISale, SECRET_KEY, ALGORITHM)
 
-@app.get("/unsubscribe.html")
-def loial_unsubscribe_page():
-    return FileResponse("unsubscribe.html")
-
 @app.get("/loial-ai.html")
 @app.get("/loial-ai")
 def loial_ai_page():
