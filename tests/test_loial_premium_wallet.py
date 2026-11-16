@@ -16,7 +16,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from loial_identity import install_loial_identity
-from loial_inbox import WalletInboxAccess, issue_wallet_access, access_hash
+from loial_inbox import WalletInboxAccess, InboxBase, issue_wallet_access, access_hash
 from loial_premium_wallet import (
     install_premium_wallet, premium_card, member_status, google_pass_payload,
     apple_pass_json, signed_apple_pkpass, _image_assets
@@ -92,6 +92,7 @@ def app_env(monkeypatch):
     engine=create_engine("sqlite://",connect_args={"check_same_thread":False},
                          poolclass=StaticPool)
     DB.metadata.create_all(engine)
+    InboxBase.metadata.create_all(engine)
     Session=sessionmaker(bind=engine)
     ctx=CryptContext(schemes=["bcrypt"],deprecated="auto")
     secret="test-only-identity-secret-strong-enough"
