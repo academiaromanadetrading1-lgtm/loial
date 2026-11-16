@@ -386,10 +386,14 @@ def trigger_cleanup(current_user: User = Depends(get_current_user), db: Session 
     return {"status": "completed", **result}
 
 def seed_pricing(db):
-    if db.query(Pricing).count() == 0:
+    pro_plan = db.query(Pricing).filter(Pricing.plan == "pro").first()
+    if not pro_plan:
         db.add(Pricing(plan="starter", base_price=0, updated_at=datetime.now().isoformat()))
-        db.add(Pricing(plan="pro", base_price=49, updated_at=datetime.now().isoformat()))
+        db.add(Pricing(plan="pro", base_price=65, updated_at=datetime.now().isoformat()))
         db.add(Pricing(plan="network", base_price=199, updated_at=datetime.now().isoformat()))
+    else:
+        pro_plan.base_price = 65
+        pro_plan.updated_at = datetime.now().isoformat()
     if db.query(VATRate).count() == 0:
         vat_rates = [
             ("RO", "Romania", 19), ("DE", "Germany", 19), ("FR", "France", 20),
@@ -400,6 +404,7 @@ def seed_pricing(db):
         for code, name, rate in vat_rates:
             db.add(VATRate(country_code=code, country_name=name, rate=rate))
     db.commit()
+
 
 @app.on_event("startup")
 def startup():
@@ -2061,14 +2066,68 @@ def migrate_custom_offers():
 
 migrate_custom_offers()
 
-@app.get("/api/qr-image/{business_id}")
-def get_business_qr_image(business_id: int):
-    join_url = "https://loial.space" + "/join/" + str(business_id)
-    img = qrcode.make(join_url)
+from qrcode.image.styledpil import StyledPilImage
+from qrcode.image.styles.moduledrawers import RoundedModuleDrawer
+from qrcode.image.styles.colormasks import SolidFillColorMask
+from PIL import Image, ImageDraw, ImageFont
+
+def _hex_to_rgb(hex_color: str) -> tuple:
+    h = (hex_color or "#2d6a4f").lstrip("#")
+    if len(h) != 6:
+        return (45, 106, 79)
+    try:
+        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+    except Exception:
+        return (45, 106, 79)
+
+def create_premium_qr_bytes(data: str, color: str = "#2d6a4f", initial: str = "L") -> bytes:
+    rgb = _hex_to_rgb(color)
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=14,
+        border=2,
+    )
+    qr.add_data(data)
+    qr.make(fit=True)
+
+    qr_img = qr.make_image(
+        image_factory=StyledPilImage,
+        module_drawer=RoundedModuleDrawer(),
+        color_mask=SolidFillColorMask(back_color=(255, 255, 255), front_color=rgb)
+    ).convert("RGBA")
+
+    w, h = qr_img.size
+    badge_size = int(w * 0.24)
+    badge = Image.new("RGBA", (badge_size, badge_size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(badge)
+    draw.ellipse((0, 0, badge_size, badge_size), fill=(255, 255, 255, 255))
+
+    margin = int(badge_size * 0.12)
+    draw.ellipse((margin, margin, badge_size - margin, badge_size - margin), fill=rgb)
+
+    letter = (initial or "L")[0].upper()
+    font = ImageFont.load_default()
+    bbox = draw.textbbox((0, 0), letter, font=font)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    draw.text(((badge_size - tw) / 2, (badge_size - th) / 2 - 1), letter, fill=(255, 255, 255, 255), font=font)
+
+    qr_img.paste(badge, ((w - badge_size) // 2, (h - badge_size) // 2), badge)
+
     buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    b64 = base64.b64encode(buf.getvalue()).decode()
+    qr_img.save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+@app.get("/api/qr-image/{business_id}")
+def get_business_qr_image(business_id: int, db: Session = Depends(get_db)):
+    biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
+    color = biz.card_color if (biz and biz.card_color) else "#2d6a4f"
+    initial = biz.name if (biz and biz.name) else "L"
+    join_url = "https://loial.space" + str(business_id)
+    png_bytes = create_premium_qr_bytes(join_url, color=color, initial=initial)
+    b64 = base64.b64encode(png_bytes).decode()
     return {"qr_base64": f"data:image/png;base64,{b64}", "url": join_url}
+
 
 class StaffCreateRequest(BaseModel):
     name: str
@@ -2198,11 +2257,11 @@ def get_biz_full_data(business_id: int, db: Session = Depends(get_db)):
     customers = db.query(Customer).filter(Customer.business_id == biz.id).order_by(Customer.id.desc()).all()
     staff = db.query(StaffMember).filter(StaffMember.business_id == biz.id, StaffMember.active == 1).all()
     
-    join_url = "https://loial.space" + "/join/" + str(biz.id)
-    img = qrcode.make(join_url)
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    qr_b64 = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    color = biz.card_color or "#2d6a4f"
+    initial = biz.name if biz.name else "L"
+    join_url = "https://loial.space" + str(biz.id)
+    png_bytes = create_premium_qr_bytes(join_url, color=color, initial=initial)
+    qr_b64 = "data:image/png;base64," + base64.b64encode(png_bytes).decode()
     
     return {
         "id": biz.id,
@@ -2212,6 +2271,7 @@ def get_biz_full_data(business_id: int, db: Session = Depends(get_db)):
         "max_customers": biz.max_customers or 50,
         "reward_text": biz.reward_text or "Oferta ta aici",
         "stamps_required": getattr(biz, "stamps_required", None) or 6,
+        "card_color": color,
         "google_review_url": biz.google_review_url or "",
         "qr_base64": qr_b64,
         "customers_count": len(customers),
@@ -2271,12 +2331,9 @@ def get_manifest():
     return FileResponse("manifest.json", media_type="application/manifest+json")
 
 @app.get("/api/qr-raw/{code_text}")
-def generate_raw_qr_png(code_text: str):
-    from fastapi.responses import Response
-    img = qrcode.make(code_text)
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return Response(content=buf.getvalue(), media_type="image/png")
+def generate_raw_qr_png(code_text: str, color: str = "#2d6a4f", initial: str = "L"):
+    png_bytes = create_premium_qr_bytes(code_text, color=color, initial=initial)
+    return Response(content=png_bytes, media_type="image/png")
 
 class InstantEnrollRequest(BaseModel):
     business_id: int
