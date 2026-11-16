@@ -1791,7 +1791,7 @@ class QuickRegisterRequest(BaseModel):
     password: str
     business_name: str
     reward: str = "A 6-a e din partea casei!"
-       color: str = "#1e293b"
+    color: str = "#1e293b"
     ref_code: Optional[str] = ""
 
 
