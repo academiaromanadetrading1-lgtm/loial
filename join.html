@@ -804,14 +804,17 @@
     const password = document.getElementById('ambPassword').value;
     const payout_method = document.getElementById('ambPayoutMethod').value;
     const payout_details = document.getElementById('ambPayoutDetails').value.trim();
-    if (!email || password.length < 10) {
+    const authToken=localStorage.getItem('token');
+    if(!authToken && (!email || password.length < 10)) {
       alert('Completează emailul și alege o parolă de minimum 10 caractere.');
       return;
     }
-
-    const btn = document.getElementById('ambJoinBtn');
-    btn.textContent = 'Se activează...';
-    const authToken=localStorage.getItem('token');
+    if(authToken && !name){
+      alert('Completează numele care va apărea pe cardul de ambasador.');
+      return;
+    }
+    const btn=document.getElementById('ambJoinBtn');
+    btn.textContent='Se activează...';
     let res;
     if(authToken){
       // Administratorii Business isi activeaza rolul aditional, fara alt cont/parola.
