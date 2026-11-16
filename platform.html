@@ -276,6 +276,33 @@
     </div>
   </div>
 
+  <div class="card" id="legacyRecovery">
+    <span class="step-tag">RECUPERARE SECURIZATĂ</span>
+    <h2>Transferă un card vechi pe telefonul clientului</h2>
+    <p style="font-size:13px;color:var(--text-muted);line-height:1.6">
+      Disponibil numai pentru cardurile create înaintea activării portofelului privat.
+      Verifică titularul în persoană înainte de a genera linkul. QR-ul vechi singur nu
+      constituie dovadă a identității. Transferul privește exclusiv cardul firmei tale.
+    </p>
+    <label for="recoveryCustomerSearch">Caută clientul</label>
+    <input id="recoveryCustomerSearch" placeholder="Numele clientului sau o parte din nume" maxlength="60">
+    <button type="button" class="btn-secondary" onclick="findLegacyCards()">Caută carduri care pot fi recuperate</button>
+    <label for="recoveryCustomer" style="display:block;margin-top:10px">Cardul verificat</label>
+    <select id="recoveryCustomer"><option value="">Alege un client după verificare</option></select>
+    <label for="recoveryVerificationNote" style="display:block;margin-top:10px">Cum ai verificat identitatea?</label>
+    <input id="recoveryVerificationNote" maxlength="200"
+      placeholder="Ex.: titularul prezent la casă, verificat de administrator">
+    <button type="button" class="btn-secondary" onclick="createRecoveryCode()">
+      Generează link valabil 15 minute
+    </button>
+    <div id="recoveryStatus" role="status" style="font-size:12px;margin:10px 0;color:#48604f"></div>
+    <input id="recoveryLink" readonly style="display:none" aria-label="Link temporar de recuperare">
+    <button id="copyRecoveryLink" type="button" class="btn-secondary"
+      style="display:none" onclick="navigator.clipboard.writeText(document.getElementById('recoveryLink').value)">
+      Copiază linkul și arată-l titularului
+    </button>
+  </div>
+
   <div class="card">
     <h2>Clienții tăi fideli (Activitate recentă)</h2>
     <table>
@@ -609,6 +636,53 @@
     } catch(error) {
       box.textContent=error.message;
     }
+  }
+
+  async function findLegacyCards(){
+    const box=document.getElementById('recoveryCustomer');
+    box.replaceChildren();
+    const empty=document.createElement('option');empty.value='';
+    empty.textContent='Alege titularul verificat';box.appendChild(empty);
+    document.getElementById('recoveryStatus').textContent='';
+    const q=document.getElementById('recoveryCustomerSearch').value.trim();
+    try{
+      const params=new URLSearchParams({q,limit:'100'});
+      const res=await authorizedFetch('/api/loial-wallet-recovery/eligible?'+params);
+      const data=await res.json();
+      if(!res.ok)throw Error(data.detail||'Nu pot căuta cardurile.');
+      for(const customer of data.items){
+        const option=document.createElement('option');
+        option.value=String(customer.id);
+        option.textContent=customer.name+' (ID '+customer.id+
+          ', '+customer.stamps+' ștampile)';
+        box.appendChild(option);
+      }
+      document.getElementById('recoveryStatus').textContent=
+        data.items.length?data.items.length+' carduri vechi găsite.':
+        'Nu s-au găsit carduri care necesită recuperare.';
+    }catch(err){document.getElementById('recoveryStatus').textContent=err.message;}
+  }
+  async function createRecoveryCode(){
+    const customer_id=Number(document.getElementById('recoveryCustomer').value);
+    const verification_note=document.getElementById('recoveryVerificationNote').value.trim();
+    const status=document.getElementById('recoveryStatus');
+    if(!customer_id||verification_note.length<8){
+      status.textContent='Selectează clientul și descrie verificarea făcută în persoană.';
+      return;
+    }
+    if(!confirm('Confirmi că ai verificat personal titularul cardului înainte de transfer?'))return;
+    try{
+      const res=await authorizedFetch('/api/loial-wallet-recovery/request',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({customer_id,verification_note})
+      });
+      const data=await res.json();
+      if(!res.ok)throw Error(data.detail||'Linkul nu a putut fi creat.');
+      document.getElementById('recoveryLink').value=data.recovery_url;
+      document.getElementById('recoveryLink').style.display='block';
+      document.getElementById('copyRecoveryLink').style.display='block';
+      status.textContent='Link unic valabil 15 minute. Arată-l doar titularului verificat.';
+    }catch(err){status.textContent=err.message;}
   }
 
   async function loadDashboard() {
