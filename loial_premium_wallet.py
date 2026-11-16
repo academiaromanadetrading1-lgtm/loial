@@ -291,7 +291,7 @@ def install_premium_wallet(app,engine,session_factory,BusinessAccount,Customer,
 
     @router.get("/brand.png")
     def wallet_issuer_brand():
-        \"\"\"Public Google-hosted logo, no private wallet or subscriber information.\"\"\"
+        """Public Google-hosted logo, no private wallet or subscriber information."""
         image=Image.new("RGB",(256,256),(13,14,17))
         draw=ImageDraw.Draw(image)
         draw.rounded_rectangle((9,9,246,246),radius=40,outline=(216,190,122),width=6)
