@@ -303,11 +303,11 @@
     })
     .catch(() => {});
 
-  function updateQrUrl(uuid) {
-    const cleanColor = encodeURIComponent(currentBrandColor);
-      const scanUrl = encodeURIComponent(`${location.origin}/c/${uuid}`);
-  document.getElementById('qrImg').src = `/api/qr-raw/${scanUrl}?color=${cleanColor}&initial=${initial}`;
-  }
+  function updateCardQr(uuid) {
+  const cleanColor = (currentBrandColor || '#2d6a4f').replace('#', '');
+  const scanUrl = encodeURIComponent(`${location.origin}/c/${uuid}`);
+  document.getElementById('qrImg').src = `https://qrserver.com{cleanColor}&data=${scanUrl}`;
+}
 
   if (savedProfile && savedProfile.name) {
     showCardInstant(globalWalletUuid, savedProfile.name, 0);
