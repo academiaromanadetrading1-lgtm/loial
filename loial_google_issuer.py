@@ -127,8 +127,8 @@ def ensure_google_class(kind, class_id, merchant_name="Loial", transport=None,
             raise RuntimeError("Google Wallet class ID mismatch")
         if kind=="loyalty":
             review=str(result.get("reviewStatus","")).upper()
-            if review in ("DRAFT","REVIEW_STATUS_UNSPECIFIED","REJECTED","") or
-                not review in ("UNDER_REVIEW","APPROVED"):
+            if (review in ("DRAFT","REVIEW_STATUS_UNSPECIFIED","REJECTED","")
+                    or review not in ("UNDER_REVIEW","APPROVED")):
                 raise RuntimeError("Google Wallet class is not ready; review status: "+review)
     if transport is None:
         with _lock:
