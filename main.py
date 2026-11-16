@@ -425,10 +425,17 @@ def seed_pricing(db):
 @app.on_event("startup")
 def startup():
     db = SessionLocal()
-    seed_data(db)
-    seed_pricing(db)
-    cleanup_old_data(db)
-    db.close()
+    try:
+        seed_data(db)
+        seed_pricing(db)
+        cleanup_old_data(db)
+    finally:
+        db.close()
+    # Cerere saptamanala fara email/SMS/AI: mesaj intern in chatul administratorului.
+    from loial_weekly_jobs import start_weekly_worker
+    from loial_business_ai import AIProfile, AIDocument, AIMessage, AISale
+    start_weekly_worker(engine, SessionLocal,
+                        (BusinessAccount, AIProfile, AIDocument, AIMessage, AISale))
 
 class LoginRequest(BaseModel):
     email: str
