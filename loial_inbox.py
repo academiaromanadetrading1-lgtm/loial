@@ -118,6 +118,11 @@ def queue_service_event(db, business, customer, kind="stamp", returning=False, e
         body = "Ai folosit recompensa: " + (business.reward_text or "Premiul de fidelitate")
         body += ". Cardul tau a fost resetat la 0 stampile. Te asteptam din nou!"
         event = "redeem:" + str(customer.id) + ":" + str(event_key or count)
+    elif kind == "reversal":
+        title = "Corectie de stampile la " + business.name
+        body = "Un bon a fost anulat. Stampila aferenta a fost retrasa; ai acum "
+        body += str(count) + " din " + str(target) + " stampile."
+        event = "reversal:" + str(customer.id) + ":" + str(event_key or count)
     else:
         title = "Ai primit o stampila la " + business.name
         body = ("Bine ai revenit! " if returning else "Multumim pentru vizita! ")
