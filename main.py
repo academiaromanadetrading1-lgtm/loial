@@ -437,6 +437,9 @@ def startup():
     from loial_business_ai import AIProfile, AIDocument, AIMessage, AISale
     start_weekly_worker(engine, SessionLocal,
                         (BusinessAccount, AIProfile, AIDocument, AIMessage, AISale))
+    # Sincronizarea externa Google Wallet este optionala si dezactivata fara emitent.
+    from loial_wallet_sync import start_google_sync_worker
+    start_google_sync_worker(engine, SessionLocal, (BusinessAccount, Customer))
 
 class LoginRequest(BaseModel):
     email: str
@@ -1899,7 +1902,8 @@ class QRScanRequest(BaseModel):
 def qr_scan_stamp(req: QRScanRequest, db: Session = Depends(get_db)):
     biz = db.query(BusinessAccount).filter(
         BusinessAccount.id == req.business_id,
-        BusinessAccount.staff_pin == req.pin
+        BusinessAccount.staff_pin == req.pin,
+        BusinessAccount.staff_pin != "1234"
     ).first()
     if not biz:
         raise HTTPException(status_code=401, detail="PIN incorect")
@@ -1911,6 +1915,10 @@ def qr_scan_stamp(req: QRScanRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Client negăsit la această locație")
     customer.stamps = (customer.stamps or 0) + 1
     customer.last_visit = datetime.now().isoformat()
+    from loial_inbox import queue_service_event
+    from loial_wallet_sync import queue_google_refresh
+    queue_service_event(db,biz,customer,kind="stamp",event_key=uuid.uuid4().hex)
+    queue_google_refresh(db,biz.id,customer.wallet_uuid or customer.uuid)
     db.commit()
     return {"stamps": customer.stamps, "name": customer.name, "business_id": biz.id}
 
@@ -2314,7 +2322,7 @@ def qr_scan_with_staff(request: Request, req: QRScanRequest, db: Session = Depen
     ).first()
     
     # Acceptă fie PIN-ul unui angajat activ, fie PIN-ul principal al administratorului
-    if not staff and biz.staff_pin != req.pin:
+    if not staff and (not biz.staff_pin or biz.staff_pin=="1234" or biz.staff_pin!=req.pin):
         raise HTTPException(status_code=401, detail="PIN incorect sau angajat dezactivat")
     
     customer = db.query(Customer).filter(
@@ -2334,6 +2342,10 @@ def qr_scan_with_staff(request: Request, req: QRScanRequest, db: Session = Depen
         staff.scans_count = (staff.scans_count or 0) + 1
         
     customer.last_visit = datetime.now().isoformat()
+    from loial_inbox import queue_service_event
+    from loial_wallet_sync import queue_google_refresh
+    queue_service_event(db,biz,customer,kind="stamp",event_key=uuid.uuid4().hex)
+    queue_google_refresh(db,biz.id,customer.wallet_uuid or customer.uuid)
     db.commit()
     return {
         "stamps": customer.stamps,
@@ -2507,6 +2519,8 @@ def redeem_customer_reward(request: Request, req: RedeemRequest, db: Session = D
     customer.last_visit = datetime.now().isoformat()
     from loial_inbox import queue_service_event
     queue_service_event(db, biz, customer, kind="redeem", event_key=uuid.uuid4().hex)
+    from loial_wallet_sync import queue_google_refresh
+    queue_google_refresh(db,biz.id,customer.wallet_uuid or customer.uuid)
     db.commit()
     return {"status": "redeemed", "name": customer.name, "stamps": 0}
 class InstantEnrollRequest(BaseModel):
@@ -2729,6 +2743,8 @@ def scan_universal_card(request: Request, req: UniversalScanRequest, db: Session
             pass
     queue_service_event(db, biz, customer, kind="stamp", returning=was_away,
                         event_key=uuid.uuid4().hex)
+    from loial_wallet_sync import queue_google_refresh
+    queue_google_refresh(db,biz.id,customer.wallet_uuid or customer.uuid)
     db.commit()
     return {
         "name": customer.name,
