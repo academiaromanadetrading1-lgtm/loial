@@ -2471,6 +2471,7 @@ class InstantEnrollRequest(BaseModel):
     consent_marketing_email: bool = False
     consent_personalized_ads: bool = False
     consent_loial_offers: bool = False
+    wallet_claim_token: Optional[str] = None
 
 @app.post("/api/enroll-sync")
 def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db)):
@@ -2495,7 +2496,12 @@ def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db
         (Customer.uuid == wallet_id) | (Customer.wallet_uuid == wallet_id),
     ).first()
     if card_at_business:
-        return {"status": "exists"}
+        from loial_inbox import issue_wallet_access
+        try:
+            verified_token = issue_wallet_access(db, wallet_id, False, req.wallet_claim_token)
+        except ValueError as exc:
+            raise HTTPException(status_code=422,detail=str(exc))
+        return {"status": "exists", "inbox_access": verified_token}
 
     if existing:
         # Un portofel universal, mai multe carduri cu progres independent.
@@ -2529,7 +2535,12 @@ def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db
         db.add(Consent(customer_id=customer.id, purpose="personalized_ads",
                        granted=1, date=consent_time, ip="join_form"))
     from loial_inbox import issue_wallet_access, record_offer_choice, queue_service_event
-    inbox_token = issue_wallet_access(db, wallet_id, is_new_wallet=(existing is None))
+    try:
+        inbox_token = issue_wallet_access(db, wallet_id, is_new_wallet=(existing is None),
+                                         proposed_token=req.wallet_claim_token)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422,detail=str(exc))
     if req.consent_loial_offers:
         record_offer_choice(db, Consent, customer.id, True, "join_form")
     queue_service_event(db, biz, customer, kind="welcome")
