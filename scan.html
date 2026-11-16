@@ -4,37 +4,50 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Casă & Scanare - Loial</title>
-<link href="https://googleapis.com" rel="stylesheet">
+<link rel="preconnect" href="https://googleapis.com">
+<link rel="preconnect" href="https://gstatic.com" crossorigin>
+<link href="https://googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Inter', system-ui, sans-serif; background: #f8fafc; color: #0f172a; padding: 20px; text-align: center; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: #f6f9f7; color: #111f18; padding: 20px; text-align: center; }
   .container { max-width: 420px; margin: 0 auto; }
   
   .alert-box {
     background: #fef3c7; border: 1.5px solid #f59e0b; color: #92400e;
-    padding: 14px; border-radius: 14px; font-size: 14px; font-weight: 700;
-    margin-bottom: 16px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+    padding: 14px; border-radius: 16px; font-size: 14px; font-weight: 700;
+    margin-bottom: 16px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.12);
+    transition: all 0.25s ease;
   }
   .alert-box.client-near {
     background: #dbeafe; border-color: #2563eb; color: #1e40af;
-    animation: bounce 1s infinite alternate;
+    animation: bounce 0.9s infinite alternate;
   }
   @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-3px); } }
 
-  .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 24px; box-shadow: 0 10px 25px rgba(15,23,42,0.06); }
-  h2 { font-size: 20px; font-weight: 800; margin-bottom: 12px; }
+  .card { background: #ffffff; border: 1px solid #dce6e0; border-radius: 22px; padding: 24px; box-shadow: 0 12px 28px rgba(17, 31, 24, 0.06); }
+  h2 { font-size: 21px; font-weight: 800; margin-bottom: 12px; }
   input {
-    padding: 14px; border: 1px solid #cbd5e1; border-radius: 12px;
-    background: #f8fafc; color: #0f172a; font-size: 22px; font-weight: 700;
-    text-align: center; width: 150px; letter-spacing: 6px;
+    padding: 14px; border: 1.5px solid #dce6e0; border-radius: 14px;
+    background: #f6f9f7; color: #111f18; font-size: 24px; font-weight: 800;
+    text-align: center; width: 160px; letter-spacing: 6px; outline: none;
   }
+  input:focus { border-color: #2d6a4f; background: #ffffff; }
   .btn {
-    display: block; width: 100%; padding: 15px; border: none; border-radius: 12px;
-    background: linear-gradient(135deg, #4f46e5, #0ea5e9); color: #ffffff;
+    display: block; width: 100%; padding: 15px; border: none; border-radius: 14px;
+    background: linear-gradient(135deg, #2d6a4f, #40916c); color: #ffffff;
     font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 16px; font-family: inherit;
+    box-shadow: 0 6px 16px rgba(45, 106, 79, 0.25);
   }
-  #reader { width: 100%; border-radius: 14px; overflow: hidden; margin: 14px 0; }
-  .success-card { background: #dcfce7; border: 1.5px solid #22c55e; color: #166534; padding: 20px; border-radius: 16px; margin-top: 14px; font-weight: 700; }
+  .btn-gold {
+    display: block; width: 100%; padding: 15px; border: none; border-radius: 14px;
+    background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff;
+    font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 12px; font-family: inherit;
+    box-shadow: 0 6px 16px rgba(245, 158, 11, 0.35);
+  }
+  #reader { width: 100%; border-radius: 16px; overflow: hidden; margin: 14px 0; }
+  .success-card { background: #dcfce7; border: 1.5px solid #22c55e; color: #166534; padding: 20px; border-radius: 18px; margin-top: 14px; font-weight: 700; }
+  .reward-card { background: linear-gradient(135deg, #fef3c7, #fde68a); border: 2px solid #f59e0b; color: #78350f; padding: 22px; border-radius: 18px; margin-top: 14px; font-weight: 700; }
+  .pin-error { color: #dc2626; font-size: 13px; font-weight: 700; margin-top: 8px; min-height: 18px; }
 </style>
 </head>
 <body>
@@ -47,8 +60,9 @@
     <h2>Scanare Card Client</h2>
     
     <div id="pinForm">
-      <p style="font-size: 13px; color: #64748b; margin-bottom: 14px;">Introdu PIN-ul locației pentru a porni camera:</p>
+      <p style="font-size: 13.5px; color: #475d52; margin-bottom: 14px;">Introdu PIN-ul tău de 4 cifre pentru a porni camera:</p>
       <input type="password" id="pin" placeholder="••••" maxlength="4" inputmode="numeric">
+      <div class="pin-error" id="pinError"></div>
       <button class="btn" onclick="startScan()">Pornește Camera →</button>
     </div>
 
@@ -65,13 +79,17 @@
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
 
-  const bizId = parseInt(location.pathname.split('/').pop());
-  let pin = '';
+  const bizId = parseInt(location.pathname.split('/').pop()) || 1;
+  let pin = sessionStorage.getItem('loial_staff_pin_' + bizId) || '';
   let isProcessing = false;
   let lastAlertUuid = '';
 
+  if (pin.length === 4) {
+    document.getElementById('pin').value = pin;
+  }
+
   window.addEventListener('online', syncOfflineScans);
-  setInterval(syncOfflineScans, 10000);
+  setInterval(syncOfflineScans, 8000);
 
   async function syncOfflineScans() {
     let queue = JSON.parse(localStorage.getItem('loial_offline_queue') || '[]');
@@ -101,17 +119,21 @@
       osc.frequency.setValueAtTime(880, ctx.currentTime);
       osc.connect(ctx.destination);
       osc.start();
-      osc.stop(ctx.currentTime + 0.15);
+      osc.stop(ctx.currentTime + 0.14);
     } catch (e) {}
   }
 
   function startScan() {
-    pin = document.getElementById('pin').value;
-    if (pin.length !== 4) { alert('PIN-ul trebuie să aibă 4 cifre'); return; }
+    pin = document.getElementById('pin').value.trim();
+    if (pin.length !== 4) {
+      document.getElementById('pinError').textContent = 'PIN-ul trebuie să aibă exact 4 cifre.';
+      return;
+    }
+    sessionStorage.setItem('loial_staff_pin_' + bizId, pin);
     document.getElementById('pinForm').style.display = 'none';
     document.getElementById('scanner').style.display = 'block';
     const scanner = new Html5Qrcode("reader");
-    scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 240 }, onScan);
+    scanner.start({ facingMode: "environment" }, { fps: 12, qrbox: 240 }, onScan);
 
     setInterval(async () => {
       try {
@@ -122,10 +144,10 @@
           lastAlertUuid = data.customer.uuid;
           playBeep();
           alertBox.classList.add('client-near');
-          alertBox.textContent = `👋 Clientul ${data.customer.name} are cardul pregătit! Nu uita să îi ștampilezi cardul!`;
+          alertBox.textContent = `👋 Clientul ${data.customer.name} are cardul pregătit! Scanează-i acum cardul!`;
         }
       } catch (e) {}
-    }, 3000);
+    }, 2500);
   }
 
   async function onScan(uuid) {
@@ -141,11 +163,18 @@
       });
       if (res.ok) {
         const data = await res.json();
-      showSuccessConfirmation(`${data.name}: ${data.stamps}/${data.target} ștampile (scanat de ${data.staff_name})`);
-
+        const unlocked = data.stamps >= data.target;
+        showSuccessConfirmation(
+          `${data.name}: ${data.stamps}/${data.target} ștampile (scanat de ${data.staff_name})`,
+          unlocked,
+          uuid
+        );
       } else if (res.status === 401 || res.status === 404) {
         const errData = await res.json();
-        document.getElementById('result').innerHTML = `<p style="color:#dc2626;font-weight:700;margin-top:12px;">${errData.detail}</p><button class="btn" onclick="resetScan()">Încearcă din nou</button>`;
+        sessionStorage.removeItem('loial_staff_pin_' + bizId);
+        document.getElementById('result').innerHTML = `
+          <p style="color:#dc2626;font-weight:700;margin-top:12px;">${errData.detail}</p>
+          <button class="btn" onclick="location.reload()">Reintrodu PIN-ul</button>`;
       } else {
         throw new Error('Server sync delayed');
       }
@@ -153,25 +182,54 @@
       const queue = JSON.parse(localStorage.getItem('loial_offline_queue') || '[]');
       queue.push(payload);
       localStorage.setItem('loial_offline_queue', JSON.stringify(queue));
-      showSuccessConfirmation('Ștampilă înregistrată pe card');
+      showSuccessConfirmation('Ștampilă salvată offline (se sincronizează automat)', false, uuid);
     }
-    setTimeout(() => { isProcessing = false; }, 3500);
   }
 
-  function showSuccessConfirmation(subtitle) {
+  function showSuccessConfirmation(subtitle, unlocked, customerUuid) {
     playBeep();
-    document.getElementById('staffAlert').classList.remove('client-near');
-    document.getElementById('staffAlert').textContent = '✓ Ștampilă acordată cu succes!';
-    document.getElementById('result').innerHTML = `
-      <div class="success-card">
-        ✓ Ștampilă adăugată!<br>
-        <span style="font-size:17px;">${subtitle}</span><br>
-        <a href="/review/${bizId}" style="display:inline-block;margin-top:10px;color:#15803d;text-decoration:underline;">Cere recenzie Google →</a>
-        <button class="btn" onclick="resetScan()">Scanează următorul client</button>
-      </div>`;
+    const alertBox = document.getElementById('staffAlert');
+    alertBox.classList.remove('client-near');
+    alertBox.textContent = unlocked ? '🏆 PREMIU DEBLOCAT! Oferă recompensa clientului!' : '✓ Ștampilă acordată cu succes!';
+
+    if (unlocked) {
+      document.getElementById('result').innerHTML = `
+        <div class="reward-card">
+          <div style="font-size:20px;margin-bottom:4px;">🏆 PREMIU DEBLOCAT!</div>
+          <div style="font-size:15px;">${subtitle}</div>
+          <button class="btn-gold" id="redeemBtn" onclick="redeemReward('${customerUuid}')">🎁 Acordă premiul și resetează cardul (0)</button>
+          <a href="/review/${bizId}" style="display:inline-block;margin-top:12px;color:#92400e;font-size:13.5px;text-decoration:underline;">Cere recenzie Google →</a>
+          <button class="btn" onclick="resetScan()">Scanează următorul client</button>
+        </div>`;
+    } else {
+      document.getElementById('result').innerHTML = `
+        <div class="success-card">
+          <div style="font-size:18px;margin-bottom:4px;">✓ Ștampilă adăugată!</div>
+          <div style="font-size:15px;">${subtitle}</div>
+          <a href="/review/${bizId}" style="display:inline-block;margin-top:10px;color:#15803d;font-size:13.5px;text-decoration:underline;">Cere recenzie Google →</a>
+          <button class="btn" onclick="resetScan()">Scanează următorul client</button>
+        </div>`;
+    }
+  }
+
+  async function redeemReward(customerUuid) {
+    const btn = document.getElementById('redeemBtn');
+    btn.textContent = 'Se resetează cardul...';
+    const res = await fetch('/api/redeem-reward', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: pin, business_id: bizId, customer_uuid: customerUuid })
+    });
+    if (res.ok) {
+      btn.textContent = '✓ Premiu acordat! Card resetat la 0.';
+      btn.disabled = true;
+    }
   }
 
   function resetScan() {
+    isProcessing = false;
+    document.getElementById('result').innerHTML = '';
+     function resetScan() {
     isProcessing = false;
     document.getElementById('result').innerHTML = '';
   }
