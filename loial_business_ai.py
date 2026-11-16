@@ -507,19 +507,44 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         return {"answer": answer, "mode": "ai" if active else "guided",
                 "source": "profilul firmei si date agregate confirmate"}
     @r.post("/campaigns")
-    def draft_campaign(req: CampaignRequest, biz=Depends(owner), db: Session = Depends(db_session)):
+    async def draft_campaign(req: CampaignRequest, biz=Depends(owner), db: Session = Depends(db_session)):
         allowed = {"all", "active_0_7", "inactive_8_30", "inactive_31_90", "inactive_91_365"}
         if req.audience not in allowed:
             raise HTTPException(status_code=422, detail="Segment invalid")
+        p = account_profile(db, biz)
+        subject = "Noutati de la " + biz.name[:100]
+        message = ("Buna! " + req.offer if req.offer else
+                   "Buna! Te asteptam sa descoperi noutatile noastre.")
+        summary = sector_summary(p.sector, rows(db, biz))
+        structured = {"business": biz.name, "sector": profile(p.sector)["label"],
+                      "objective": req.objective, "audience": req.audience,
+                      "offer_explicit": req.offer, "products": summary["products"][:5]}
+        prompt = ("Esti redactorul campaniilor Loial. Propune un email scurt, clar si natural pentru "
+                  "afacerea descrisa. Returneaza NUMAI JSON valid cu cheile subject si text. "
+                  "Nu inventa reduceri, preturi, promisiuni, stocuri, termene ori performante. "
+                  "Nu mentiona public ca destinatarul a fost profilat dupa cumparaturi. "
+                  "Nu comunica produse sensibile. Include doar oferte aprobate explicit de administrator.")
+        result = await ask_model(prompt, json.dumps(structured, ensure_ascii=False),
+                                 usage_now(db, biz), db)
+        generated = False
+        if result:
+            try:
+                candidate = json.loads(result.strip().replace(chr(96)*3 + "json", "").replace(chr(96)*3, ""))
+                if (isinstance(candidate, dict) and isinstance(candidate.get("subject"), str)
+                    and isinstance(candidate.get("text"), str) and
+                        candidate["subject"].strip() and candidate["text"].strip()):
+                    subject = candidate["subject"].strip()[:180]
+                    message = candidate["text"].strip()[:2000]
+                    generated = True
+            except ValueError:
+                pass
         draft = AICampaign(business_id=biz.id, audience=req.audience, objective=req.objective,
-                           subject="Noutati de la " + biz.name[:100],
-                           content=("Buna! " + req.offer if req.offer else
-                                    "Buna! Te asteptam sa descoperi noutatile noastre."),
-                           status="draft")
+                           subject=subject, content=message, status="draft")
         db.add(draft)
         db.commit()
         return {"id": draft.id, "status": "draft", "subject": draft.subject,
-                "text": draft.content, "sent": 0}
+                "text": draft.content, "generated_by_ai": generated, "sent": 0,
+                "notice": "Previzualizare neexpediata. Administratorul verifica oferta si publicul."}
     @r.get("/campaigns")
     def campaigns(biz=Depends(owner), db: Session = Depends(db_session)):
         data = db.query(AICampaign).filter(AICampaign.business_id == biz.id).order_by(AICampaign.id.desc()).limit(60).all()
