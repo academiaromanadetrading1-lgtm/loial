@@ -162,6 +162,21 @@ def install_wallet_recovery(app,engine,factory,BusinessAccount,Customer,
 
     @router.post("/claim")
     def claim(req:RecoveryClaim,db:Session=Depends(database)):
+        ticket=db.query(RecoveryTicket).filter(
+            RecoveryTicket.ticket_hash==sha(req.code)).first()
+        if ticket and ticket.status=="used":
+            customer=db.query(Customer).filter(
+                Customer.id==ticket.customer_id,
+                Customer.business_id==ticket.business_id).first()
+            verified=verified_wallet(db,req.new_wallet_uuid)
+            if (customer and customer.wallet_uuid==req.new_wallet_uuid and verified
+                and verified.token_hash==access_hash(req.new_private_token)):
+                return {"status":"recovered","wallet_uuid":req.new_wallet_uuid,
+                        "wallet_private_token":req.new_private_token,
+                        "business_id":ticket.business_id,"name":customer.name,
+                        "stamps":customer.stamps or 0,"scope":"single_business",
+                        "other_businesses_moved":False,"replayed":True}
+            raise HTTPException(status_code=409,detail="Cod deja consumat de alt dispozitiv")
         ticket=ticket_by_code(db,req.code)
         customer=db.query(Customer).filter(
             Customer.id==ticket.customer_id,
