@@ -149,7 +149,7 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             from loial_scans import StampAward
             with main.SessionLocal() as db:
                 all_awards=db.query(StampAward).all()
-                assert len(all_awards)==4 # two universal, two compatibility aliases
+                assert len(all_awards)==5 # 2 universal, 1 verified receipt, 2 legacy/v2 aliases
             # No external provider or recipient data is needed for this scenario.
     finally:
         main.engine.dispose()
