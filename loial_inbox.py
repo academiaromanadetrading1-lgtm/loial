@@ -69,20 +69,26 @@ class OfferChoice(BaseModel):
 def access_hash(raw):
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
-def issue_wallet_access(db, wallet_uuid, is_new_wallet):
-    """Only the FIRST new wallet enrollment may mint the private inbox credential.
+def issue_wallet_access(db, wallet_uuid, is_new_wallet, proposed_token=None):
+    """Issue/verify a private wallet credential, never from public QR alone.
 
-    Existing wallets without a credential must use a verified recovery flow,
-    never a QR-only recovery. Return the one-time token to the registering device.
-    Caller owns db.flush/commit.
+    A device may propose its own cryptographically random secret before enrollment.
+    Retrying with that SAME secret returns access; presenting only wallet_uuid
+    does not. Legacy wallets without a credential require verified recovery.
     """
-    if not is_new_wallet:
-        return None
+    if proposed_token is not None and not (
+        isinstance(proposed_token,str) and 40 <= len(proposed_token) <= 180
+    ):
+        raise ValueError("Secretul privat al dispozitivului nu este valid")
     existing = db.query(WalletInboxAccess).filter(
         WalletInboxAccess.wallet_uuid == wallet_uuid).first()
     if existing:
+        if proposed_token and access_hash(proposed_token) == existing.token_hash:
+            return proposed_token
         return None
-    token = secrets.token_urlsafe(32)
+    if not is_new_wallet:
+        return None
+    token = proposed_token or secrets.token_urlsafe(32)
     db.add(WalletInboxAccess(wallet_uuid=wallet_uuid, token_hash=access_hash(token),
                              created_at=now()))
     db.flush()
