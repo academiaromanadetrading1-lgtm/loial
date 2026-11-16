@@ -346,6 +346,46 @@ def summary(db,Agent,period=None):
                     *([PaidMerchantInvoice.period==period] if period else [])).all())/100,2),
             "note":"Fara retineri, comisioane de procesare, TVA sau plati simulate; payout doar dupa verificare."}
 
+def verified_ambassador_overview(db,Agent,period):
+    """Backward-compatible admin display fields, but exclusively verified receipts."""
+    agents=db.query(Agent).order_by(Agent.id).all()
+    entries=db.query(AmbassadorCommission).filter(
+        AmbassadorCommission.period==period).all()
+    invoices=db.query(PaidMerchantInvoice).filter(
+        PaidMerchantInvoice.period==period,
+        PaidMerchantInvoice.eligible==1,
+        PaidMerchantInvoice.refunded==0).all()
+    result=[]
+    for agent in agents:
+        owned=[i for i in invoices if i.agent_id==agent.id]
+        by_id={x.id:x for x in owned}
+        acts=[e for e in entries if e.agent_id==agent.id and
+              e.kind=="activation" and e.status in ("pending","approved","paid")]
+        renewals=[e for e in entries if e.agent_id==agent.id and
+                  e.kind=="recurring" and e.status in ("pending","approved","paid")]
+        sponsored=[e for e in entries if e.agent_id==agent.id and
+                   e.kind=="sponsor" and e.status in ("pending","approved","paid")]
+        unique=len({inv.business_id for inv in owned})
+        current=tier(unique)
+        earned=sum(e.amount_cents for e in acts+renewals+sponsored)
+        result.append({"agent_id":agent.id,"agent_name":agent.name,
+            "email":agent.email,"rank":current["rank"],
+            "total_active_businesses":unique,
+            "new_this_month":len(acts),
+            "activation_commission":sum(e.amount_cents for e in acts)/100,
+            "recurring_businesses":len(renewals),
+            "recurring_rate":current["rate_cents"]/100,
+            "recurring_commission":sum(e.amount_cents for e in renewals)/100,
+            "sponsor_commission":sum(e.amount_cents for e in sponsored)/100,
+            "total":earned/100,
+            "payout_method":agent.payout_method or "wise",
+            "payout_details":"Disponibil in evidenta interna",
+            "verified_receipts_only":True,
+            "recruited_ambassadors":db.query(SponsorRelationship).filter(
+                SponsorRelationship.sponsor_id==agent.id).count()})
+    return result
+
+
 def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm):
     RevenueBase.metadata.create_all(bind=engine)
     router=APIRouter(prefix="/api/loial-revenue",tags=["Verified Loial Revenue"])
