@@ -150,6 +150,22 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             with main.SessionLocal() as db:
                 all_awards=db.query(StampAward).all()
                 assert len(all_awards)==5 # 2 universal, 1 verified receipt, 2 legacy/v2 aliases
+            history=client.get("/api/loial-scans/history?limit=100",headers=bearer)
+            assert history.status_code==200,history.text
+            assert len(history.json()["items"])==5
+            assert history.json()["items"][0]["source"] in ("manual","receipt")
+            assert client.get("/api/loial-scans/history").status_code==401
+            second_business=client.post("/api/register",json={
+                "email":"another.smoke@example.invalid",
+                "password":"another-strong-test-password",
+                "business_name":"Salon Test",
+            })
+            assert second_business.status_code==200,second_business.text
+            other_bearer={"Authorization":"Bearer "+second_business.json()["token"]}
+            other_history=client.get("/api/loial-scans/history",headers=other_bearer)
+            assert other_history.status_code==200
+            assert other_history.json()["items"]==[]
+
             # No external provider or recipient data is needed for this scenario.
     finally:
         main.engine.dispose()
