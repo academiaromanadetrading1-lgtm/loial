@@ -2464,6 +2464,7 @@ class InstantEnrollRequest(BaseModel):
     email: Optional[str] = None
     consent_marketing_email: bool = False
     consent_personalized_ads: bool = False
+    consent_loial_offers: bool = False
 
 @app.post("/api/enroll-sync")
 def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db)):
@@ -2521,8 +2522,13 @@ def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db
     if req.consent_personalized_ads:
         db.add(Consent(customer_id=customer.id, purpose="personalized_ads",
                        granted=1, date=consent_time, ip="join_form"))
+    from loial_inbox import issue_wallet_access, record_offer_choice, queue_service_event
+    inbox_token = issue_wallet_access(db, wallet_id, is_new_wallet=(existing is None))
+    if req.consent_loial_offers:
+        record_offer_choice(db, Consent, customer.id, True, "join_form")
+    queue_service_event(db, biz, customer, kind="welcome")
     db.commit()
-    return {"status": "saved"}
+    return {"status": "saved", "inbox_access": inbox_token}
 class ChangePasswordRequest(BaseModel):
     email: str
     old_password: str
@@ -2632,6 +2638,7 @@ def scan_universal_card(req: UniversalScanRequest, db: Session = Depends(get_db)
         db.flush()
 
     target = getattr(biz, "stamps_required", None) or 6
+    previous_visit = customer.last_visit
     customer.stamps = (customer.stamps or 0) + 1
     customer.last_visit = datetime.now().isoformat()
     if staff:
@@ -2649,6 +2656,14 @@ def scan_universal_card(req: UniversalScanRequest, db: Session = Depends(get_db)
             for c in all_cards:
                 c.network_bonus_text = f"{rule.bonus_title}: {rule.bonus_message}"
 
+    from loial_inbox import queue_service_event
+    was_away = False
+    if previous_visit:
+        try:
+            was_away = (datetime.now() - datetime.fromisoformat(previous_visit)).days >= 30
+        except (ValueError, TypeError):
+            pass
+    queue_service_event(db, biz, customer, kind="stamp", returning=was_away)
     db.commit()
     return {
         "name": customer.name,
@@ -2988,6 +3003,12 @@ def generate_qr_from_query(url: str, color: str = "#2d6a4f", initial: str = "L")
 # Loial AI Business - module independent from existing QR and loyalty routes.
 from loial_business_ai import install_loial_ai
 install_loial_ai(app, engine, SessionLocal, BusinessAccount, Customer, Consent, SECRET_KEY, ALGORITHM)
+
+# Mesagerie Loial in-app, fara email, SMS sau servicii externe.
+from loial_business_ai import AISale
+from loial_inbox import install_loial_inbox
+install_loial_inbox(app, engine, SessionLocal, BusinessAccount, Customer, Consent,
+                    AISale, SECRET_KEY, ALGORITHM)
 
 @app.get("/unsubscribe.html")
 def loial_unsubscribe_page():
