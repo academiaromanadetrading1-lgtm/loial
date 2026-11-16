@@ -79,9 +79,17 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                           "pin":"1234"}
             assert client.post("/api/scan-universal",json=scan_payload).status_code==401
             scan_payload["pin"]=staff_pin
+            scan_payload["idempotency_key"]="integration-first-purchase"
             stamped=client.post("/api/scan-universal",json=scan_payload)
             assert stamped.status_code==200,stamped.text
             assert stamped.json()["stamps"]==1
+            replay=client.post("/api/scan-universal",json=scan_payload)
+            assert replay.status_code==200
+            assert replay.json()["duplicate_ignored"] is True
+            assert replay.json()["stamps"]==1
+            # A fresh operation inside the cooldown is not another real purchase.
+            scan_payload["idempotency_key"]="integration-too-soon"
+            assert client.post("/api/scan-universal",json=scan_payload).status_code==409
 
             rotated=client.post("/api/my-business/rotate-pin",headers=bearer)
             assert rotated.status_code==200,rotated.text
@@ -89,6 +97,14 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert new_pin!=staff_pin and new_pin!="1234"
             assert client.post("/api/scan-universal",json=scan_payload).status_code==401
             scan_payload["pin"]=new_pin
+            # Simulate a later independent purchase rather than repeating the scan.
+            from loial_scans import StampAward
+            from datetime import datetime, timedelta, timezone
+            with main.SessionLocal() as db:
+                first=db.query(StampAward).first()
+                first.created_at=(datetime.now(timezone.utc)-timedelta(minutes=1)).isoformat()
+                db.commit()
+            scan_payload["idempotency_key"]="integration-second-purchase"
             assert client.post("/api/scan-universal",json=scan_payload).status_code==200
 
             # End-to-end: owner issues an itemized one-use Loial receipt; wallet claims
