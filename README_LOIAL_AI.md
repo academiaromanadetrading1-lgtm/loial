@@ -251,3 +251,36 @@ Un portofel mai vechi fara acel secret nu poate fi preluat doar cunoscand QR-ul.
 - Test cu casa de marcat/POS concret si politica de reconciliere a retururilor.
 - Testarea UX si a proceselor GDPR, documentarea consimtamintelor si audit extern
   al izolarii multi-tenant. Publicarea ramane separata de acest PR draft.
+
+
+## Pilot Google Wallet pentru primele 100 de firme (decizie 17.11.2026)
+
+- Google Wallet are prioritate exclusiva; Apple Wallet este ascuns din UI si
+  pilotul este dezactivat (`LOIAL_APPLE_PILOT_ENABLED=0`). Implementarile Apple
+  existente raman in cod, dar nu impun plata contului Apple Developer.
+- Un singur cont emitent Google Wallet pentru Loial. Daca
+  `LOIAL_GOOGLE_MERCHANT_CLASSES=1`, fiecare business are propriul sablon
+  `issuerId.loial_business_{id}_v1` creat pe baza identitatii firmei. La apelul
+  autorizat de emitere, Loial verifica template-ul prin API si il creeaza
+  idempotent daca lipseste. Nu exista o taxa de emitere per card aplicata de
+  Google Wallet, dar se aplica limitarile si conditiile oficiale ale API-ului.
+- Aspectul in Google Wallet respecta propriile limitari Google: programul are
+  numele firmei, fundalul negru Black Metal si sigla Loial; cardul individual
+  contine nume, statut, stampile si stampile ramase pana la recompensa.
+- Cardurile de ambasador folosesc tipul Generic cu sigla Loial, rang real,
+  nume personalizat si QR de recomandare. Emiterea necesita cont emitent aprobat
+  si cheia de serviciu acordata explicit in consola Google.
+- La actualizarea stampilelor, workerul optional modifica in Google si progresul,
+  statutul si denumirea firmei. Foloseste aceeasi clasa ca la emitere, verifica
+  mai intai obiectul existent si nu creeaza carduri noi fara actiunea clientului.
+- Logo public utilizat de Google: `/api/premium-wallet/brand.png`.
+- Endpointurile Google raman indisponibile pana la conectarea si aprobarea
+  emitentului. Testele confirma doar structura, semnatura JWT si apelurile simulate.
+- Pragul de 100 firme este o prioritate de produs, nu o limita artificiala care
+  ar refuza firma 101. Reanalizam Apple dupa primii 100 comercianti activi.
+
+Documentatie Google:
+- https://developers.google.com/wallet/retail/loyalty-cards/use-cases/create
+- https://developers.google.com/wallet/retail/loyalty-cards/resources/template
+- https://developers.google.com/wallet/reference/rest/v1/loyaltyclass
+- https://developers.google.com/wallet/retail/loyalty-cards/use-cases/updates
