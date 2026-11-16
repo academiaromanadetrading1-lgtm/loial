@@ -246,6 +246,9 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
         from loial_scans import record_award
         record_award(db,biz.id,customer.id,"receipt:"+str(receipt.id),
                      "receipt",customer.stamps)
+        from loial_friend_referrals import credit_after_valid_stamp
+        credit_after_valid_stamp(db,access.wallet_uuid,biz.id,
+                                 "receipt:"+str(receipt.id))
         from loial_wallet_sync import queue_google_refresh
         queue_google_refresh(db,biz.id,access.wallet_uuid)
         from loial_apple_updates import mark_customer_pass_changed
@@ -294,6 +297,10 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
                     queue_google_refresh(db,biz.id,r.claimed_wallet)
                     mark_customer_pass_changed(db,biz.id,r.claimed_wallet)
                     reversed_stamp=True
+        if previously_claimed and r.claimed_wallet:
+            from loial_friend_referrals import reverse_referral_for_refunded_receipt
+            reverse_referral_for_refunded_receipt(
+                db,r.claimed_wallet,"receipt:"+str(r.id))
         r.status="refunded"
         doc=db.query(AIDocument).filter(AIDocument.id==r.document_id,
                                         AIDocument.business_id==biz.id).first()
