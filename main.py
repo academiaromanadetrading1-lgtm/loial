@@ -3105,6 +3105,14 @@ install_wallet_recovery(app, engine, SessionLocal, BusinessAccount, Customer,
 def loial_wallet_recovery_page():
     return FileResponse("wallet-recovery.html")
 
+@app.get("/api/admin/google-wallet-pilot")
+def admin_google_pilot(current_user: User = Depends(get_current_user),
+                       db: Session = Depends(get_db)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403,detail="Doar administratorul Loial")
+    from loial_google_pilot import google_pilot_snapshot
+    return google_pilot_snapshot(db,BusinessAccount,Customer)
+
 @app.get("/api/loial-scans/history")
 def business_stamp_audit(limit: int = 40, credentials: HTTPAuthorizationCredentials = Depends(security),
                          db: Session = Depends(get_db)):
