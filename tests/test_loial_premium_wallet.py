@@ -169,6 +169,7 @@ def test_premium_pass_download_is_blocked_without_issuer_credentials(app_env):
     assert client.get("/api/premium-wallet/customer/cards").status_code==401
 
 def test_apple_pass_archive_is_signed_with_test_keys(monkeypatch, app_env):
+    monkeypatch.setenv("LOIAL_APPLE_PILOT_ENABLED","1")
     from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.hazmat.primitives import hashes,serialization
     from cryptography import x509
@@ -221,3 +222,16 @@ def test_apple_download_link_requires_private_identity_and_issuer(app_env):
     assert client.post(endpoint,headers={"X-Loial-Wallet-Token":token}).status_code==503
     assert client.get("/api/premium-wallet/apple/claim?ticket=not-valid").status_code==401
     assert client.post("/api/premium-wallet/ambassador/apple-ticket",headers=headers()).status_code==403
+
+def test_apple_routes_are_disabled_during_google_first_pilot(app_env,monkeypatch):
+    monkeypatch.setenv("LOIAL_APPLE_PILOT_ENABLED","0")
+    client,Session,Agent,ctx,headers,private_token=app_env
+    wallet_headers={"X-Loial-Wallet-Token":private_token}
+    assert client.get("/api/premium-wallet/customer/1/apple",
+                      headers=wallet_headers).status_code==503
+    assert client.post("/api/premium-wallet/customer/1/apple-ticket",
+                       headers=wallet_headers).status_code==503
+    client.post("/api/loial-identity/ambassador/activate",
+                headers=headers(),json={"display_name":"Administrator"})
+    assert client.get("/api/premium-wallet/ambassador/apple",
+                      headers=headers()).status_code==503
