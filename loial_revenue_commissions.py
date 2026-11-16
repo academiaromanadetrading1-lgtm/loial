@@ -1,10 +1,10 @@
 """Loial income-backed ambassador commissions, pilot (no automated money transfers).
 
-Two upstream sponsors each earn EUR 10 once per DISTINCT merchant that the
+A direct sponsor earns EUR 10 once per DISTINCT merchant that the
 recruited ambassador converts to an eligible, VERIFIED paid subscription.
 The direct ambassador earns EUR 20 on the first qualified invoice and EUR 5/10/15
 on monthly renewals per the number of directly-owned paying merchants.
-No bonus for recruiting a person; maximum two upstream levels, never recursive.
+No bonus for recruiting a person; no second-level or recursive compensation.
 No commissions from registration, simulated payments or paid-out-of-band invoices.
 
 A signed Stripe webhook is the ONLY normal channel creating verified receipts.
@@ -117,15 +117,12 @@ def tier(active_paid_businesses):
     return {"rank":"Ambasador","rate_cents":500}
 
 def simulate(own_new=0, own_active=0, friend_ambassadors=0,
-             new_firms_per_friend=0, renewal=True,
-             second_level_ambassadors=0, new_firms_per_second_level=0):
+             new_firms_per_friend=0, renewal=True):
     """Scenario, not a forecast or promise. All amounts EUR excl. VAT."""
-    counts=(own_new,own_active,friend_ambassadors,new_firms_per_friend,
-            second_level_ambassadors,new_firms_per_second_level)
+    counts=(own_new,own_active,friend_ambassadors,new_firms_per_friend)
     if any(not isinstance(n,int) or n<0 or n>100000 for n in counts):
         raise ValueError("Input outside supported simulation bounds")
-    total_new=(own_new+friend_ambassadors*new_firms_per_friend+
-               second_level_ambassadors*new_firms_per_second_level)
+    total_new=own_new+friend_ambassadors*new_firms_per_friend
     active=own_active+own_new
     if total_new>100000:raise ValueError("Simulation too large")
     recurring=own_active*tier(active)["rate_cents"]//100 if renewal else 0
@@ -135,16 +132,12 @@ def simulate(own_new=0, own_active=0, friend_ambassadors=0,
         "sponsored_ambassadors":friend_ambassadors,
         "sponsored_new_paid_firms":friend_ambassadors*new_firms_per_friend,
         "one_time_sponsor_commission_eur":friend_ambassadors*new_firms_per_friend*10,
-        "second_level_ambassadors":second_level_ambassadors,
-        "second_level_new_paid_firms":second_level_ambassadors*new_firms_per_second_level,
-        "one_time_second_level_commission_eur":second_level_ambassadors*new_firms_per_second_level*10,
         "estimated_month_commission_eur":own_new*20+recurring+
-                                          friend_ambassadors*new_firms_per_friend*10+
-                                          second_level_ambassadors*new_firms_per_second_level*10,
+                                          friend_ambassadors*new_firms_per_friend*10,
         "rate_for_own_active_businesses_eur":tier(active)["rate_cents"]/100,
         "scenario_only":True,"guaranteed_income":False,
         "requires_real_paid_merchant_subscription":True,
-        "max_upstream_sponsor_levels":2,
+        "max_upstream_sponsor_levels":1,
         "no_commission_for_ambassador_signup":True
     }
 
@@ -299,24 +292,20 @@ def apply_verified_invoice(db,invoice,Agent,Business):
         status="pending",created_at=now))
     credited=amount
     if activation:
-        # Only B and A earn once from C's first paid merchant invoice.
-        visited={agent.id}
-        cursor=agent.id
-        for level in (1,2):
-            edge=db.query(SponsorRelationship).filter(
-                SponsorRelationship.ambassador_id==cursor).first()
-            if not edge or edge.sponsor_id in visited:break
-            visited.add(edge.sponsor_id)
-            cursor=edge.sponsor_id
+        # Only the agent's DIRECT recruiter receives EUR 10.
+        # Example A recruited B, B recruited C:
+        # firms brought by B -> A earns 10; firms brought by C -> B earns 10.
+        sponsor=db.query(SponsorRelationship).filter(
+            SponsorRelationship.ambassador_id==agent.id).first()
+        if sponsor and sponsor.sponsor_id!=agent.id:
             eligible_sponsor=db.query(Agent).filter(
-                Agent.id==cursor,Agent.active.is_(True)).first()
-            if not eligible_sponsor:continue
-            db.add(AmbassadorCommission(invoice_id=record.id,
-                agent_id=cursor,
-                kind="sponsor" if level==1 else "sponsor_level_2",
-                amount_cents=SPONSOR_EUR_CENTS,period=record.period,
-                status="pending",created_at=now))
-            credited+=SPONSOR_EUR_CENTS
+                Agent.id==sponsor.sponsor_id,Agent.active.is_(True)).first()
+            if eligible_sponsor:
+                db.add(AmbassadorCommission(invoice_id=record.id,
+                    agent_id=eligible_sponsor.id,kind="sponsor",
+                    amount_cents=SPONSOR_EUR_CENTS,period=record.period,
+                    status="pending",created_at=now))
+                credited+=SPONSOR_EUR_CENTS
     else:
         recompute_recurring(db,Agent,record.period,agent.id)
     return {"invoice_id":record.id,"eligible":True,"kind":kind,
@@ -349,8 +338,7 @@ def summary(db,Agent,period=None):
         item=totals.setdefault(str(e.agent_id),
             {"agent_id":e.agent_id,"pending_eur":0,"available_eur":0,
              "paid_eur":0,"reversed_eur":0,"activation_eur":0,
-             "recurring_eur":0,"sponsor_eur":0,
-             "sponsor_level_2_eur":0})
+             "recurring_eur":0,"sponsor_eur":0})
         euros=e.amount_cents/100
         if e.status=="pending":item["pending_eur"]+=euros
         elif e.status=="approved":item["available_eur"]+=euros
@@ -388,8 +376,7 @@ def verified_ambassador_overview(db,Agent,period):
         renewals=[e for e in entries if e.agent_id==agent.id and
                   e.kind=="recurring" and e.status in ("pending","approved","paid")]
         sponsored=[e for e in entries if e.agent_id==agent.id and
-                   e.kind in ("sponsor","sponsor_level_2") and
-                  e.status in ("pending","approved","paid")]
+                   e.kind=="sponsor" and e.status in ("pending","approved","paid")]
         unique=len({inv.business_id for inv in owned})
         current=tier(unique)
         earned=sum(e.amount_cents for e in acts+renewals+sponsored)
@@ -402,8 +389,7 @@ def verified_ambassador_overview(db,Agent,period):
             "recurring_rate":current["rate_cents"]/100,
             "recurring_commission":sum(e.amount_cents for e in renewals)/100,
             "sponsor_commission":sum(e.amount_cents for e in sponsored)/100,
-            "sponsor_level_1_eur":sum(e.amount_cents for e in sponsored if e.kind=="sponsor")/100,
-            "sponsor_level_2_eur":sum(e.amount_cents for e in sponsored if e.kind=="sponsor_level_2")/100,
+
             "total":earned/100,
             "payout_method":agent.payout_method or "wise",
             "payout_details":"Disponibil in evidenta interna",
@@ -461,13 +447,9 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm):
 
     @router.get("/simulate")
     def calculator(own_new:int=0,own_active:int=0,friend_ambassadors:int=0,
-                   new_firms_per_friend:int=0,
-                   second_level_ambassadors:int=0,
-                   new_firms_per_second_level:int=0):
+                   new_firms_per_friend:int=0):
         try:return simulate(own_new,own_active,
-                            friend_ambassadors,new_firms_per_friend,
-                            second_level_ambassadors=second_level_ambassadors,
-                            new_firms_per_second_level=new_firms_per_second_level)
+                            friend_ambassadors,new_firms_per_friend)
         except ValueError as e:raise HTTPException(status_code=422,detail=str(e))
 
     @router.post("/admin/bind")
