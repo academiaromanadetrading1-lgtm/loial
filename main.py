@@ -2701,15 +2701,13 @@ def get_universal_wallet_profile(wallet_uuid: str, db: Session = Depends(get_db)
                 "rank": tier["rank"],
                 "active_businesses": len(sales_list),
                 "monthly_rate": tier["monthly_rate"],
-                "payout_method": agent.payout_method or "wise",
-                "payout_details": agent.payout_details or ""
+                # Datele de plata nu se expun prin API-ul public al portofelului.
             }
 
     return {
         "wallet_uuid": primary.wallet_uuid or primary.uuid,
         "name": primary.name,
-        "email": primary.email or "",
-        "phone": primary.phone or "",
+        # Emailul si telefonul nu se expun prin simpla posesie a QR-ului.
         "businesses_count": len(card_items),
         "total_stamps": sum(item["stamps"] for item in card_items),
         "cards": card_items,
@@ -2722,7 +2720,7 @@ class AmbassadorEnrollRequest(BaseModel):
     name: str
     email: str
     phone: Optional[str] = ""
-    password: Optional[str] = "loial2026"
+    password: str
     payout_method: str = "wise"
     payout_details: str = ""
 
@@ -2732,14 +2730,18 @@ def enroll_ambassador(req: AmbassadorEnrollRequest, db: Session = Depends(get_db
     email = sanitize_input(req.email, 100).lower()
     if not email:
         raise HTTPException(status_code=400, detail="Email obligatoriu pentru contul de Ambasador")
+    if len(req.password) < 10:
+        raise HTTPException(status_code=422, detail="Parola necesita minimum 10 caractere")
     agent = db.query(SalesAgent).filter(SalesAgent.email == email).first()
+    if agent:
+        raise HTTPException(status_code=409, detail="Acest email are deja un cont de ambasador. Foloseste autentificarea contului.")
     if not agent:
         ref_code = f"LOIAL-{uuid.uuid4().hex[:6].upper()}"
         agent = SalesAgent(
             name=sanitize_input(req.name, 100) or "Ambasador Loial",
             email=email,
             phone=sanitize_input(req.phone or "", 40),
-            password=pwd_context.hash(req.password or "loial2026"),
+            password=pwd_context.hash(req.password),
             role="ambassador",
             rank="Ambasador",
             qr_code=ref_code,
@@ -2752,12 +2754,6 @@ def enroll_ambassador(req: AmbassadorEnrollRequest, db: Session = Depends(get_db
         db.add(agent)
         db.commit()
         db.refresh(agent)
-    else:
-        if req.payout_details:
-            agent.payout_method = req.payout_method
-            agent.payout_details = sanitize_input(req.payout_details, 150)
-            db.commit()
-
     qr_info = generate_agent_qr(agent.id, agent.name, agent.qr_code)
     sales_list = db.query(Sale).filter(Sale.agent_id == agent.id, Sale.status == "completed").all()
     tier = get_ambassador_tier(len(sales_list))
@@ -2771,8 +2767,7 @@ def enroll_ambassador(req: AmbassadorEnrollRequest, db: Session = Depends(get_db
         "rank": tier["rank"],
         "active_businesses": len(sales_list),
         "monthly_rate": tier["monthly_rate"],
-        "payout_method": agent.payout_method,
-        "payout_details": agent.payout_details or ""
+        "message": "Contul a fost creat. Pastreaza parola in siguranta."
     }
 
 
