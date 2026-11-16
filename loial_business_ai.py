@@ -21,8 +21,7 @@ from sqlalchemy.orm import Session, declarative_base
 from loial_industries import PROFILES, canonical, profile, weekly_request
 from loial_analytics import customer_segments, sector_summary, abc_products, money, manager_findings
 from loial_knowledge import guidance
-from loial_marketing import TEMPLATES, render as render_template, eligible_segment
-from loial_email import email_enabled, send_text_email, unsubscribe_url, parse_unsubscribe_token
+from loial_marketing import TEMPLATES, render as render_template
 
 BaseAI = declarative_base()
 
@@ -101,22 +100,6 @@ class AIUsage(BaseAI):
     output_tokens = Column(Integer, default=0)
     cost_eur = Column(Float, default=0)
     __table_args__ = (UniqueConstraint("business_id", "month", name="uq_loial_ai_monthly"),)
-
-class AIEmailDispatch(BaseAI):
-    __tablename__ = "loial_ai_email_dispatch"
-    id = Column(Integer, primary_key=True)
-    business_id = Column(Integer, nullable=False, index=True)
-    campaign_id = Column(Integer, nullable=False, index=True)
-    customer_id = Column(Integer, nullable=False)
-    status = Column(String(20), default="sent")
-    sent_at = Column(String(40), nullable=False)
-    __table_args__ = (UniqueConstraint("campaign_id", "customer_id", name="uq_loial_ai_email_campaign_customer"),)
-
-class SendCampaignRequest(BaseModel):
-    confirmation: str = Field(min_length=6, max_length=6)
-
-class UnsubscribeRequest(BaseModel):
-    token: str = Field(min_length=5, max_length=220)
 
 class ProfileRequest(BaseModel):
     sector: str = Field(max_length=100)
@@ -337,7 +320,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                 "description": p.description, "currency": p.currency,
                 "sectors": [{"key": k, "label": v["label"]} for k, v in PROFILES.items()],
                 "topics": [{"key": k, "label": v} for k, v in TOPICS],
-                "ai_connected": bool(model_settings()), "email_connected": bool(email_enabled()), "cost_eur": round(u.cost_eur, 4),
+                "ai_connected": bool(model_settings()), "in_app_messaging": True, "cost_eur": round(u.cost_eur, 4),
                 "budget_eur": min(15, max(0, float(os.getenv("LOIAL_AI_MONTHLY_BUDGET_EUR", "5"))))}
     @r.put("/profile")
     def update_profile(req: ProfileRequest, biz=Depends(owner), db: Session = Depends(db_session)):
@@ -508,25 +491,6 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         db.commit()
         return {"answer": answer, "mode": "ai" if active else "guided",
                 "source": "profilul firmei si date agregate confirmate"}
-    def filtered_marketing_clients(db, biz, audience, product_name=""):
-        clients = db.query(Customer).filter(Customer.business_id == biz.id).all()
-        opt_ins = {row.customer_id for row in db.query(Consent).filter(
-            Consent.purpose == "marketing_email", Consent.granted == 1).all()}
-        segment = "all" if audience == "product_buyers" else audience
-        eligible = eligible_segment(clients, segment, opt_ins)
-        if audience == "product_buyers" or product_name.strip():
-            key = product_name.strip().lower()
-            if not key:
-                return []
-            from sqlalchemy import func as sql_func
-            purchases = db.query(AISale).filter(AISale.business_id == biz.id,
-                                sql_func.lower(AISale.product) == key).all()
-            wallet_ids = {row.customer_uuid for row in purchases if row.customer_uuid}
-            eligible = [client for client in eligible if
-                        (client.uuid in wallet_ids or
-                         getattr(client, "wallet_uuid", None) in wallet_ids)]
-        return eligible
-
     @r.post("/campaigns")
     async def draft_campaign(req: CampaignRequest, biz=Depends(owner), db: Session = Depends(db_session)):
         allowed = {"all", "active_0_7", "inactive_8_30", "inactive_31_90", "inactive_91_365", "product_buyers"}
@@ -540,7 +504,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         structured = {"business": biz.name, "sector": profile(p.sector)["label"],
                       "objective": req.objective, "audience": req.audience,
                       "product_filter": req.product, "offer_explicit": req.offer, "products": summary["products"][:5]}
-        prompt = ("Esti redactorul campaniilor Loial. Propune un email scurt, clar si natural pentru "
+        prompt = ("Esti redactorul campaniilor Loial. Propune un mesaj scurt, clar si natural pentru "
                   "afacerea descrisa. Returneaza NUMAI JSON valid cu cheile subject si text. "
                   "Nu inventa reduceri, preturi, promisiuni, stocuri, termene ori performante. "
                   "Nu mentiona public ca destinatarul a fost profilat dupa cumparaturi. "
@@ -571,85 +535,6 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         data = db.query(AICampaign).filter(AICampaign.business_id == biz.id).order_by(AICampaign.id.desc()).limit(60).all()
         return [{"id": x.id, "audience": x.audience, "product": x.product, "objective": x.objective,
                  "subject": x.subject, "text": x.content, "status": x.status} for x in data]
-    @r.post("/campaigns/{campaign_id}/approve")
-    def approve(campaign_id: int, biz=Depends(owner), db: Session = Depends(db_session)):
-        draft = db.query(AICampaign).filter(AICampaign.business_id == biz.id, AICampaign.id == campaign_id).first()
-        if not draft:
-            raise HTTPException(status_code=404, detail="Campanie inexistenta")
-        draft.status = "approved_not_sent"
-        db.commit()
-        return {"status": draft.status, "sent": 0,
-                "notice": "Trimiterea este dezactivata pana la configurarea emailului si verificarea consimtamantului."}
-    @r.post("/campaigns/{campaign_id}/send")
-    async def send_approved_campaign(campaign_id: int, req: SendCampaignRequest,
-                                     biz=Depends(owner), db: Session = Depends(db_session)):
-        if req.confirmation != "TRIMITE":
-            raise HTTPException(status_code=422, detail="Confirmarea TRIMITE este obligatorie")
-        campaign = db.query(AICampaign).filter(AICampaign.id == campaign_id,
-                              AICampaign.business_id == biz.id).first()
-        if not campaign or campaign.status not in ("approved_not_sent", "partially_sent"):
-            raise HTTPException(status_code=409, detail="Campania trebuie aprobata inainte de trimitere")
-        if not email_enabled():
-            raise HTTPException(status_code=503, detail="Furnizorul email nu este activat")
-        month_prefix = date.today().strftime("%Y-%m")
-        month_count = db.query(AIEmailDispatch).filter(
-            AIEmailDispatch.business_id == biz.id, AIEmailDispatch.status == "sent",
-            AIEmailDispatch.sent_at.like(month_prefix + "%")).count()
-        monthly_limit = max(0, min(5000, int(os.getenv("LOIAL_EMAIL_MONTHLY_LIMIT", "300"))))
-        remaining_quota = max(0, monthly_limit - month_count)
-        if remaining_quota == 0:
-            raise HTTPException(status_code=429, detail="Cota lunara de email a fost atinsa")
-        eligible = filtered_marketing_clients(db, biz, campaign.audience, campaign.product or "")
-        sent = 0
-        failed = 0
-        for client in eligible:
-            if sent >= min(25, remaining_quota):
-                break
-            existing = db.query(AIEmailDispatch).filter(
-                AIEmailDispatch.campaign_id == campaign.id,
-                AIEmailDispatch.customer_id == client.id).first()
-            if existing:
-                continue
-            try:
-                link = unsubscribe_url(biz.id, client.id, secret_key)
-                succeeded = await send_text_email(client.email, campaign.subject,
-                                                 campaign.content, link)
-            except (httpx.HTTPError, RuntimeError, ValueError):
-                succeeded = False
-            if succeeded:
-                db.add(AIEmailDispatch(business_id=biz.id, campaign_id=campaign.id,
-                         customer_id=client.id, status="sent", sent_at=now()))
-                db.commit()
-                sent += 1
-            else:
-                failed += 1
-        campaign.status = "partially_sent" if sent or failed else campaign.status
-        db.commit()
-        return {"sent_in_this_batch": sent, "failed_in_this_batch": failed,
-                "monthly_quota_remaining": remaining_quota - sent,
-                "status": campaign.status,
-                "notice": "Trimitere partiala in loturi de maxim 25; reapeleaza doar cu aprobarea administratorului."}
-
-    @r.post("/email/unsubscribe")
-    def unsubscribe(req: UnsubscribeRequest, db: Session = Depends(db_session)):
-        parsed = parse_unsubscribe_token(req.token, secret_key)
-        if not parsed:
-            raise HTTPException(status_code=400, detail="Link de dezabonare invalid")
-        business_id, customer_id = parsed
-        customer = db.query(Customer).filter(Customer.business_id == business_id,
-                                              Customer.id == customer_id).first()
-        if not customer:
-            raise HTTPException(status_code=404, detail="Client inexistent")
-        consents = db.query(Consent).filter(Consent.customer_id == customer_id,
-                                            Consent.purpose == "marketing_email").all()
-        for c in consents:
-            c.granted = 0
-        if not consents:
-            db.add(Consent(customer_id=customer_id, purpose="marketing_email",
-                           granted=0, date=now(), ip="unsubscribe_link"))
-        db.commit()
-        return {"status": "unsubscribed", "message": "Nu vei mai primi mesaje comerciale prin email de la aceasta firma."}
-
     def export_csv(columns, records, filename):
         stream = io.StringIO()
         stream.write("\ufeff")
@@ -774,17 +659,5 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                 "purchases": [{"date": s.sold_at, "product": s.product, "quantity": s.quantity,
                                "total": round(s.quantity * s.unit_price, 2)} for s in lines],
                 "note": "Produsele sunt asociate numai daca importul contine ID-ul clientului"}
-
-    @r.get("/campaigns/{campaign_id}/audience")
-    def campaign_audience(campaign_id: int, biz=Depends(owner),
-                          db: Session = Depends(db_session)):
-        draft = db.query(AICampaign).filter(AICampaign.business_id == biz.id,
-                                             AICampaign.id == campaign_id).first()
-        if not draft:
-            raise HTTPException(status_code=404, detail="Campanie inexistenta")
-        eligible = filtered_marketing_clients(db, biz, draft.audience, draft.product or "")
-        return {"campaign_id": draft.id, "segment": draft.audience, "product": draft.product,
-                "eligible_email_recipients": len(eligible), "sent": 0,
-                "note": "Verifica dreptul de marketing si preferintele inainte de a trimite. Mesajul nu a fost expediat."}
 
     app.include_router(r)
