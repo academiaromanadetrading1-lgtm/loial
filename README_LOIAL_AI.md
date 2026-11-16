@@ -36,14 +36,17 @@ Administrarea profilului și setul de întrebări sunt independente de baza codu
 
 ## Nu este încă livrat end-to-end
 - Nu s-a efectuat încă un deploy real și nu a fost validat cu baza de producție.
-- Nu există trimitere reală de email; campaniile sunt doar proiecte și previzualizări.
+- Există cod pentru expediere text simplu prin SendGrid, în loturi de max. 25, doar după aprobare și opt-in.
+  Este oprit implicit (LOIAL_EMAIL_ENABLED=0) și netestat cu furnizorul real; nu expediază nimic până la configurarea unei chei noi, senderului verificat și a mediului.
+- Mesajele de bun venit, mulțumire, revenire și ștampile există ca șabloane; declanșarea lor automată la eveniment rămâne de integrat.
 - Nu există încă sincronizare POS, QR de tranzacție fiscală sau integrare în contabilitate.
 - Pentru fotografii este necesară cheia AI + tarifele API configurate.
 - PDF-urile text sunt extrase și folosite ca informație neconfirmată; PDF-urile scanate
   fără text nu pot fi procesate automat dacă modelul multimodal nu este configurat.
 - Nu există cron / notificare push în afara platformei: solicitarea săptămânală apare la
   accesarea paginii și la cererea administratorului.
-- Nu sunt activate încă emailurile automate la evenimentele de ștampilă.
+- Emailurile automate la înscriere și ștampilă nu sunt încă activate; există șabloane și API de previzualizare.
+- Consimțământul pentru email marketing și audiențe publicitare este colectat separat, opțional, la activarea cardului.
 - Nu este implementată încă sincronizarea automată a audiențelor Meta/Google.
 - Bibliotecă managerială de reguli inclusă; recuperarea semantică din cursuri academice (RAG)
   necesită documente verificate, drepturi de utilizare și o etapă de indexare.
@@ -63,6 +66,7 @@ Administrarea profilului și setul de întrebări sunt independente de baza codu
 7. Rulează testele izolate cu pip install -r requirements.txt și
    python -m pytest tests/test_loial_ai_core.py -q.
 8. Efectuează teste reale separate pentru scanare, ștampile, înregistrare și bonusuri.
+9. Activează LOIAL_EMAIL_ENABLED=1 numai după validarea expeditorului și a fluxului de dezabonare; există o cotă implicită de 300 emailuri/firma/lună configurabilă.
 
 ## CSV de vânzări
 Antet minimal: sold_at,product,quantity,unit_price
@@ -95,6 +99,10 @@ GET /api/loial-ai/campaigns/{id}/audience
 GET /api/loial-ai/exports/customers.csv
 GET /api/loial-ai/exports/sales.csv
 GET /api/loial-ai/exports/ads-consented.csv
+POST /api/loial-ai/campaigns/{id}/send
+POST /api/loial-ai/email/unsubscribe
+GET /api/loial-ai/message-templates
+GET /api/loial-ai/customers
 
 ## Siguranță și guvernanță
 Datele de marketing și datele de fidelizare au scopuri diferite. Exportul publicitar
