@@ -2461,6 +2461,9 @@ class InstantEnrollRequest(BaseModel):
     business_id: int
     name: str
     uuid: str
+    email: Optional[str] = None
+    consent_marketing_email: bool = False
+    consent_personalized_ads: bool = False
 
 @app.post("/api/enroll-sync")
 def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db)):
@@ -2468,6 +2471,11 @@ def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
 
+    email_clean = sanitize_input(req.email or "", 160).lower()
+    if email_clean and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email_clean):
+        raise HTTPException(status_code=422, detail="Adresa de email nu este valida")
+    if (req.consent_marketing_email or req.consent_personalized_ads) and not email_clean:
+        raise HTTPException(status_code=422, detail="Pentru comunicari este necesara o adresa de email")
     wallet_id = req.uuid.strip()
     if not wallet_id:
         raise HTTPException(status_code=400, detail="Codul portofelului lipsește")
@@ -2488,7 +2496,7 @@ def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db
             uuid=str(uuid.uuid4()),
             wallet_uuid=existing.wallet_uuid or existing.uuid,
             name=existing.name,
-            email=existing.email,
+            email=email_clean or None,
             phone=existing.phone,
             stamps=0,
             business_id=req.business_id,
@@ -2499,11 +2507,20 @@ def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db
             uuid=wallet_id,
             wallet_uuid=wallet_id,
             name=sanitize_input(req.name, 80),
+            email=email_clean or None,
             stamps=0,
             business_id=req.business_id,
             last_visit=datetime.now().isoformat()
         )
     db.add(customer)
+    db.flush()
+    consent_time = datetime.now().isoformat()
+    if req.consent_marketing_email:
+        db.add(Consent(customer_id=customer.id, purpose="marketing_email",
+                       granted=1, date=consent_time, ip="join_form"))
+    if req.consent_personalized_ads:
+        db.add(Consent(customer_id=customer.id, purpose="personalized_ads",
+                       granted=1, date=consent_time, ip="join_form"))
     db.commit()
     return {"status": "saved"}
 class ChangePasswordRequest(BaseModel):
