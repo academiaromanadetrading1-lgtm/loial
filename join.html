@@ -409,17 +409,41 @@
   document.getElementById('qrImg').src = `/api/qr-link?url=${scanUrl}&color=${cleanColor}&initial=${initial}`;
 }
 
-  async function synchronizeCard(name, email, options = {}) {
-    const response = await fetch('/api/enroll-sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ business_id: bizId, name, email, uuid: globalWalletUuid, consent_marketing_email: false, consent_loial_offers: !!options.inApp, consent_personalized_ads: !!options.ads })
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(typeof error.detail === 'string' ? error.detail : `HTTP ${response.status}`);
+  // Pastram un secret separat de QR inainte de primul apel de inregistrare.
+  // Daca reteaua cade, acelasi dispozitiv poate relua sigur activarea.
+  function walletClaim() {
+    const pendingKey='loial_wallet_claim_pending_'+globalWalletUuid;
+    const known=localStorage.getItem('loial_wallet_inbox_token');
+    if(known)return known;
+    let pending=localStorage.getItem(pendingKey);
+    if(!pending) {
+      const bytes=crypto.getRandomValues(new Uint8Array(36));
+      pending=btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-')
+        .replace(/\//g,'_').replace(/=+$/,'');
+      localStorage.setItem(pendingKey,pending);
     }
-    return response.json();
+    return pending;
+  }
+  async function synchronizeCard(name,email,options={}) {
+    const claim=walletClaim();
+    const response=await fetch('/api/enroll-sync',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        business_id:bizId,name,email,uuid:globalWalletUuid,
+        wallet_claim_token:claim,consent_marketing_email:false,
+        consent_loial_offers:!!options.inApp,consent_personalized_ads:!!options.ads
+      })
+    });
+    if(!response.ok){
+      const error=await response.json().catch(()=>({}));
+      throw Error(typeof error.detail==='string'?error.detail:'HTTP '+response.status);
+    }
+    const result=await response.json();
+    if(result.inbox_access && result.inbox_access===claim){
+      localStorage.setItem('loial_wallet_inbox_token',claim);
+      localStorage.removeItem('loial_wallet_claim_pending_'+globalWalletUuid);
+    }
+    return result;
   }
 
   if (savedProfile && savedProfile.name) {
