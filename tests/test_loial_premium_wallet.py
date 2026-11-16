@@ -168,7 +168,7 @@ def test_premium_pass_download_is_blocked_without_issuer_credentials(app_env):
     assert client.get("/api/premium-wallet/customer/2/apple",headers=card_headers).status_code==404
     assert client.get("/api/premium-wallet/customer/cards").status_code==401
 
-def test_apple_pass_archive_is_signed_with_test_keys(monkeypatch):
+def test_apple_pass_archive_is_signed_with_test_keys(monkeypatch, app_env):
     from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.hazmat.primitives import hashes,serialization
     from cryptography import x509
@@ -197,6 +197,20 @@ def test_apple_pass_archive_is_signed_with_test_keys(monkeypatch):
         assert data["storeCard"]["primaryFields"][0]["value"]=="Alex"
         assert data["barcodes"][0]["format"]=="PKBarcodeFormatQR"
         assert archive.read("signature")
+    # Browser delivery: a temporary verified link returns the correct MIME type,
+    # without exposing the private wallet access token in its URL.
+    client,Session,Agent,ctx,headers,private_token=app_env
+    authorized={"X-Loial-Wallet-Token":private_token}
+    ticket=client.post("/api/premium-wallet/customer/1/apple-ticket",headers=authorized)
+    assert ticket.status_code==200,ticket.text
+    assert ticket.json()["expires_in_seconds"]<=90
+    assert private_token not in ticket.json()["url"]
+    downloaded=client.get(ticket.json()["url"])
+    assert downloaded.status_code==200,downloaded.text
+    assert downloaded.headers["content-type"]=="application/vnd.apple.pkpass"
+    assert downloaded.headers["cache-control"]=="private, no-store"
+    with zipfile.ZipFile(io.BytesIO(downloaded.content)) as saved:
+        assert json.loads(saved.read("pass.json"))["storeCard"]["primaryFields"][0]["value"]=="Alex Proprietar"
 
 
 def test_apple_download_link_requires_private_identity_and_issuer(app_env):
