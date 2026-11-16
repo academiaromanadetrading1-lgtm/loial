@@ -197,3 +197,13 @@ def test_apple_pass_archive_is_signed_with_test_keys(monkeypatch):
         assert data["storeCard"]["primaryFields"][0]["value"]=="Alex"
         assert data["barcodes"][0]["format"]=="PKBarcodeFormatQR"
         assert archive.read("signature")
+
+
+def test_apple_download_link_requires_private_identity_and_issuer(app_env):
+    client,Session,Agent,ctx,headers,token=app_env
+    endpoint="/api/premium-wallet/customer/1/apple-ticket"
+    assert client.post(endpoint).status_code==401
+    assert client.post(endpoint,headers={"X-Loial-Wallet-Token":"A"*43}).status_code==401
+    assert client.post(endpoint,headers={"X-Loial-Wallet-Token":token}).status_code==503
+    assert client.get("/api/premium-wallet/apple/claim?ticket=not-valid").status_code==401
+    assert client.post("/api/premium-wallet/ambassador/apple-ticket",headers=headers()).status_code==403
