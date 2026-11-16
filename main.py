@@ -2438,6 +2438,10 @@ def _ensure_ecosystem_columns():
                 pass
 
 _ensure_ecosystem_columns()
+Customer.wallet_uuid = Column(String, nullable=True)
+Customer.phone = Column(String, nullable=True)
+Customer.network_bonus_text = Column(String, nullable=True)
+BusinessAccount.ref_code = Column(String, nullable=True)
 
 class NetworkRule(Base):
     __tablename__ = "network_rules"
@@ -2534,7 +2538,7 @@ def get_universal_wallet_profile(wallet_uuid: str, db: Session = Depends(get_db)
     if not cards:
         raise HTTPException(status_code=404, detail="Portofel negăsit")
 
-    primary = cards
+    primary = cards[0]
     card_items = []
     bonus_text = None
     for c in cards:
