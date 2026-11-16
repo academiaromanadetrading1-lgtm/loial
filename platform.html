@@ -193,7 +193,68 @@
       </tbody>
     </table>
   </div>
-</div>
+  <!-- CENTRU DE COMANDĂ SUPER-ADMIN (DOAR PENTRU ciprianpop@academiadetrading.llc) -->
+  <div id="superAdminSection" style="display:none;margin-top:32px;border-top:2px dashed #b7d7c5;padding-top:28px;">
+   </div> 
+    <div class="welcome-bar">
+      <div>
+        <span class="step-tag">Super-Admin Loial.space</span>
+        <h2>Centru de Comandă Rețea, Ambasadori & Plăți Wise</h2>
+      </div>
+      <div class="plan-badge" id="adminMonthBadge">Luna curentă</div>
+    </div>
+
+    <div class="card">
+      <h2>1. Firme înscrise & Activare ProBusiness (65 EUR + TVA)</h2>
+      <table>
+        <thead>
+          <tr><th>Firmă</th><th>Email</th><th>Adusă de</th><th>Clienți</th><th>Plan</th><th>Acțiune</th></tr>
+        </thead>
+        <tbody id="adminBizTable"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>2. Ambasadori & Plăți Lunare Wise Business</h2>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px;">
+        Luna 1: <strong>20 EUR</strong>/firmă nouă • Luna 2+: <strong>5 EUR</strong> (1–25 firme), <strong>10 EUR</strong> Manager (26–50), <strong>15 EUR</strong> Senior (51+).
+      </p>
+      <table>
+        <thead>
+          <tr><th>Ambasador</th><th>Rang</th><th>Firme Active</th><th>Luna 1 / Recurent</th><th>Total de virat</th><th>Cont Wise / IBAN</th></tr>
+        </thead>
+        <tbody id="adminAmbTable"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>3. Bonusuri Rețeaua Loial (Automat + Manual)</h2>
+      <div class="grid-2" style="margin-bottom:16px;">
+        <div>
+          <label>Minim afaceri diferite vizitate (ex: 10)</label>
+          <input type="number" id="ruleMinBiz" value="10" min="1">
+        </div>
+        <div>
+          <label>Minim ștampile per afacere (ex: 3)</label>
+          <input type="number" id="ruleMinVisits" value="3" min="1">
+        </div>
+      </div>
+      <label>Titlu Bonus Automat</label>
+      <input type="text" id="ruleTitle" value="Bonus VIP Rețeaua Loial">
+      <label>Mesaj Bonus Automat</label>
+      <input type="text" id="ruleMsg" value="Felicitări! Ai vizitat peste 10 afaceri partenere Loial. Ai câștigat un voucher cadou!">
+      <button type="button" class="btn-primary" id="saveRuleBtn" onclick="saveNetworkRule()">💾 Salvează regula automată de rețea</button>
+
+      <h3 style="font-size:16px;font-weight:800;margin-top:24px;">Top Clienți din Rețea (Trimite bonus manual)</h3>
+      <table>
+        <thead>
+          <tr><th>Client</th><th>Afaceri vizitate</th><th>Total ștampile</th><th>Status Bonus</th><th>Acțiune</th></tr>
+        </thead>
+        <tbody id="adminTopCustTable"></tbody>
+      </table>
+    </div>
+  </div>
+
 
 <script>
   let bizId = localStorage.getItem('biz_id') || '1';
@@ -327,6 +388,100 @@
   }
 
   loadDashboard();
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  if (currentUser.email === 'ciprianpop@academiadetrading.llc' || currentUser.role === 'admin') {
+    document.getElementById('superAdminSection').style.display = 'block';
+    loadSuperAdmin();
+  }
+
+  async function loadSuperAdmin() {
+    const res = await fetch('/api/admin/overview');
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('adminMonthBadge').textContent = 'Luna: ' + data.month;
+
+    document.getElementById('adminBizTable').innerHTML = (data.businesses || []).map(b => `
+      <tr>
+        <td><strong>${b.name}</strong></td>
+        <td>${b.email}</td>
+        <td>${b.ambassador_name}</td>
+        <td>${b.customers_count}</td>
+        <td><strong>${b.plan.toUpperCase()}</strong></td>
+        <td>
+          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" onclick="toggleProPlan(${b.id})">
+            ${b.plan === 'probusiness' ? 'Treci pe Start' : 'Activează ProBusiness (65€)'}
+          </button>
+        </td>
+      </tr>
+    `).join('');
+
+    document.getElementById('adminAmbTable').innerHTML = (data.ambassadors || []).map(a => `
+      <tr>
+        <td><strong>${a.agent_name}</strong><br><span style="font-size:12px;color:#475d52;">${a.email}</span></td>
+        <td>${a.rank}</td>
+        <td>${a.total_active_businesses} firme</td>
+        <td>${a.new_this_month} noi (20€) + ${a.recurring_businesses} rec. (${a.recurring_rate}€)</td>
+        <td><strong style="color:#2d6a4f;font-size:15px;">${a.total} EUR</strong></td>
+        <td><code>${a.payout_method}: ${a.payout_details || 'nesetat'}</code></td>
+      </tr>
+    `).join('');
+
+    if (data.network_rule) {
+      document.getElementById('ruleMinBiz').value = data.network_rule.min_businesses;
+      document.getElementById('ruleMinVisits').value = data.network_rule.min_visits_per_business;
+      document.getElementById('ruleTitle').value = data.network_rule.bonus_title;
+      document.getElementById('ruleMsg').value = data.network_rule.bonus_message;
+    }
+
+    document.getElementById('adminTopCustTable').innerHTML = (data.top_customers || []).map(c => `
+      <tr>
+        <td><strong>${c.name}</strong></td>
+        <td>${c.businesses_count} afaceri</td>
+        <td>${c.total_stamps} ★</td>
+        <td style="font-size:12px;color:#2d6a4f;">${c.bonus || 'Fără bonus încă'}</td>
+        <td>
+          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" onclick="sendManualBonus('${c.wallet_uuid}', '${c.name}')">
+            🎁 Trimite Bonus
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  async function toggleProPlan(id) {
+    await fetch(`/api/admin/business/${id}/toggle-pro`, { method: 'POST' });
+    loadSuperAdmin();
+  }
+
+  async function saveNetworkRule() {
+    const btn = document.getElementById('saveRuleBtn');
+    btn.textContent = 'Se salvează...';
+    await fetch('/api/admin/network-rule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        min_businesses: parseInt(document.getElementById('ruleMinBiz').value) || 10,
+        min_visits_per_business: parseInt(document.getElementById('ruleMinVisits').value) || 3,
+        bonus_title: document.getElementById('ruleTitle').value,
+        bonus_message: document.getElementById('ruleMsg').value,
+        auto_enabled: true
+      })
+    });
+    btn.textContent = '✓ Regulă salvată!';
+    setTimeout(() => { btn.textContent = '💾 Salvează regula automată de rețea'; }, 2000);
+  }
+
+  async function sendManualBonus(walletUuid, name) {
+    const msg = prompt(`Scrie mesajul bonusului Loial pentru ${name}:`, 'Felicitări! Ai primit un voucher cadou din partea rețelei Loial.space!');
+    if (!msg) return;
+    await fetch('/api/admin/network-bonus/manual', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallet_uuid: walletUuid, bonus_text: msg })
+    });
+    loadSuperAdmin();
+  }
+
 </script>
 </body>
 </html>
