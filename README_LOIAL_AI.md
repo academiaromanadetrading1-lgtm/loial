@@ -15,58 +15,54 @@ Sistemul este multi-industrie; nu presupune că orice antreprenor vinde produse 
 
 Administrarea profilului și setul de întrebări sunt independente de baza codului QR.
 
-## Implementat pe ramura de lucru
-- Interfață separată /loial-ai.html, legătură din dashboardul firmelor (fără redesenare)
-- 8 butoane de analiză și chat exclusiv text cu istoric persistent, izolat pe firmă
-- Profil de industrie, descriere adaptabilă, solicitări documente și prompt săptămânal în UI
-- Încărcare CSV, XLSX, PDF cu text, fotografii (prin model multimodal configurat)
-- Previzualizare și confirmare explicită înainte de includerea vânzărilor în rapoarte
-- Fără stocarea fotografiilor/documentelor brute: sunt reținute metadatele și extragerile
-- Raport de contribuție (doar când costurile variabile sunt disponibile), analiza ABC
-- Indicatori pentru rideshare, service auto și self-wash, baza extinsă pentru alte industrii
-- Segmente de inactivitate, director de clienți, produse cumpărate pe baza ID-urilor de client din export
-- Șabloane bun venit, mulțumire, revenire, ștampile, recompensă, oferte
-- Proiecte de campanie, aprobări fără expediere, audiențe cu consimțământ de email
-- Export CSV clienți, vânzări, identificatori publicitari cu acord explicit
-- Router AI nou cu Bearer JWT și acces strict la firma autentificată
-- Endpointurile vechi /api/biz-full și /api/admin sunt protejate în această ramură;
-  fluxul join/scan citește doar configurația publică necesară
-- Buget AI per firmă/lună și model mai puternic opțional dacă prețurile sunt configurate
-- Reguli manageriale interne pentru costuri, marje, stocuri și diferențierea profitului de venituri
+## Implementat in ramura de lucru
+- Loial AI Business: chat text-only, istoric, 8 teme, profiluri multi-industrie si documente
+- Indicatori si rapoarte din date verificate, CRM, export CSV/XLSX, segmente de clienti
+- Mesagerie nativa Loial catre clienti, din panoul Business, fara email, SMS sau WhatsApp
+- Trimitere imediata prin buton, fara aprobarea unui email si fara limita lunara de mesaje
+- Mesaje catre toata audienta eligibila, segmente inactive, cumparatori de produs sau client individual
+- Proiect de mesaj propus optional de AI; antreprenorul poate edita si trimite direct
+- Inbox privat in portofel, cu mesaje necitite, marcare citit si preferinte pentru oferte
+- La inscriere si la scanarea stampilei: notificari de serviciu generate direct in Loial
+- Masurare mesaje livrate si citite; fara furnizori externi si fara taxa de email/SMS
+- Acces separat per firma si token privat al dispozitivului clientului, distinct de QR-ul vizibil angajatului
+- Mesajele comerciale sunt permise doar clientilor care au activat ofertele in Loial;
+  pot opri ofertele fara a pierde cardul si mesajele de serviciu
+- Cheile istorice .env eliminate din versiunea curenta a ramurii; rotirea lor ramane obligatorie
 
-## Nu este încă livrat end-to-end
-- Nu s-a efectuat încă un deploy real și nu a fost validat cu baza de producție.
-- Există cod pentru expediere text simplu prin SendGrid, în loturi de max. 25, doar după aprobare și opt-in.
-  Este oprit implicit (LOIAL_EMAIL_ENABLED=0) și netestat cu furnizorul real; nu expediază nimic până la configurarea unei chei noi, senderului verificat și a mediului.
-- Mesajele de bun venit, mulțumire, revenire și ștampile există ca șabloane; declanșarea lor automată la eveniment rămâne de integrat.
-- Nu există încă sincronizare POS, QR de tranzacție fiscală sau integrare în contabilitate.
-- Pentru fotografii este necesară cheia AI + tarifele API configurate.
-- PDF-urile text sunt extrase și folosite ca informație neconfirmată; PDF-urile scanate
-  fără text nu pot fi procesate automat dacă modelul multimodal nu este configurat.
-- Nu există cron / notificare push în afara platformei: solicitarea săptămânală apare la
-  accesarea paginii și la cererea administratorului.
-- Emailurile automate la înscriere și ștampilă nu sunt încă activate; există șabloane și API de previzualizare.
-- Consimțământul pentru email marketing și audiențe publicitare este colectat separat, opțional, la activarea cardului.
-- Nu este implementată încă sincronizarea automată a audiențelor Meta/Google.
-- Bibliotecă managerială de reguli inclusă; recuperarea semantică din cursuri academice (RAG)
-  necesită documente verificate, drepturi de utilizare și o etapă de indexare.
-- Nu au fost executate teste GitHub Actions sau teste cu conturi reale.
+## Limitari si verificari inainte de lansare
+- Schimbarile sunt in PR draft, nu in productie; testele Python si scenariile end-to-end
+  cu baza reala necesita executie si validare.
+- Accesul privat la inbox este emis sigur la primul card nou. Portofelele existente anterior
+  trebuie migrate prin verificarea titularului; simpla posesie a QR-ului NU este suficienta
+  pentru recuperarea accesului la mesajele private.
+- Mesajele devin vizibile in portofel la deschiderea/actualizarea paginii;
+  nu exista inca notificari push in afara Loial (ar cere configurari separate).
+- Datele se salveaza in baza de date a aplicatiei; nu se trimit emailuri/SMS/WhatsApp.
+- Fara date de contact de la platformele Uber/Bolt si fara drept de a contacta pasageri automat.
+- Trimiterea la volume foarte mari trebuie verificata la testele de performanta;
+  nu exista cote comerciale lunare, dar sunt necesare protectii anti-abuz.
+- Integrarea cu POS/bon fiscal QR, RAG academic complet, notificari saptamanale cron server-side,
+  validarea imaginilor si analizele avansate raman proiecte distincte.
+- Consimtamantul pentru publicitate Meta/Google este diferit de acordul pentru ofertele Loial.
+- Inainte de deploy: rotire chei istorice Stripe/Wise/SendGrid/JWT, secret JWT nou,
+  backup al bazei /data/loial.db, verificarea planurilor si fluxului de scanare QR.
+- AI text si multimodal necesita cheie si preturi API aprobate; mesageria nativa nu necesita AI.
 
-## Condiții obligatorii înainte de merge / deploy
-1. Înlocuiește toate cheile istorice publicate în .env (Wise, Stripe, SendGrid și secretele aplicației).
-   Ștergerea .env din ultima versiune NU elimină valorile din istoricul Git public.
-2. Configurează un JWT_SECRET_KEY nou, unic, de minimum 32 caractere, pe server.
-3. Verifică mediul în care se află baza /data/loial.db și backupul; nu rula migrări pe producție
-   fără backup și test de compatibilitate.
-4. Configurează providerul AI numai după acceptarea condițiilor de prelucrare a datelor.
-5. Configurează LOIAL_AI_INPUT_USD_PER_M, LOIAL_AI_OUTPUT_USD_PER_M,
-   LOIAL_AI_USD_TO_EUR pentru modelul economic. Pentru modelul avansat configurează și
-   LOIAL_AI_ADVANCED_MODEL și prețurile sale. Prețurile trebuie revizuite după tariful real.
-6. Nu folosi API-urile administrative noi fără Bearer token.
-7. Rulează testele izolate cu pip install -r requirements.txt și
-   python -m pytest tests/test_loial_ai_core.py -q.
-8. Efectuează teste reale separate pentru scanare, ștampile, înregistrare și bonusuri.
-9. Activează LOIAL_EMAIL_ENABLED=1 numai după validarea expeditorului și a fluxului de dezabonare; există o cotă implicită de 300 emailuri/firma/lună configurabilă.
+## API mesagerie nativa
+POST /api/loial-inbox/send              # trimitere directa, fara aprobare intermediara
+GET  /api/loial-inbox/audience         # numar destinatari eligibili
+GET  /api/loial-inbox/sent             # livrari si citiri
+GET  /api/loial-inbox/me               # inbox client, token privat in header
+POST /api/loial-inbox/read/{delivery_id}
+GET  /api/loial-inbox/preferences      # oferte permise pe fiecare firma
+POST /api/loial-inbox/preferences
+
+## Teste
+- python -m pytest tests/test_loial_ai_core.py tests/test_loial_inbox.py -q
+- Manual: activare card nou, acordare stampila cu PIN, inbox privat, segment, mesaje,
+  clientul opreste ofertele, alt administrator nu poate vedea/trimitere altor firme.
+- Reactivare acces pentru portofele legacy: NU implementa numai cu wallet_uuid sau QR.
 
 ## CSV de vânzări
 Antet minimal: sold_at,product,quantity,unit_price
@@ -106,7 +102,6 @@ GET /api/loial-ai/customers
 
 ## Siguranță și guvernanță
 Datele de marketing și datele de fidelizare au scopuri diferite. Exportul publicitar
-include numai contactele cu consimțământ specific înregistrat. Campaniile nu pleacă
-automat. Nu trimite documente sensibile la AI fără o bază legală și acord cu furnizorul.
+include numai contactele cu consimțământ specific înregistrat. Campaniile comerciale sunt trimise doar la apăsarea butonului de trimitere. Nu trimite documente sensibile la AI fără o bază legală și acord cu furnizorul.
 Loial afișează rezultatul calculat și proveniența datelor, dar nu expune prompturile,
 formulele de implementare sau raționamentul intern al modelului.
