@@ -2853,4 +2853,10 @@ def admin_delete_customer(wallet_uuid: str, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "deleted"}
 
+@app.get("/api/qr-link")
+def generate_qr_from_query(url: str, color: str = "#2d6a4f", initial: str = "L"):
+    b64_img = make_styled_qr_base64(url, brand_color=color, initial=initial)
+    import base64
+    raw_bytes = base64.b64decode(b64_img.split(",")[1])
+    return Response(content=raw_bytes, media_type="image/png")
 
