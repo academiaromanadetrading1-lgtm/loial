@@ -40,7 +40,7 @@ def test_merchant_branding_is_separate_for_each_business(google_config):
     assert payload["programName"]=="Service Auto Pop"
     assert payload["hexBackgroundColor"]=="#0D0E11"
     assert payload["programLogo"]["sourceUri"]["uri"].startswith("https://loial.space/")
-    assert payload["reviewStatus"]=="underReview"
+    assert payload["reviewStatus"]=="UNDER_REVIEW"
 
 
 def test_google_direct_class_is_idempotent_and_uses_authorized_official_api(google_config):
@@ -82,8 +82,8 @@ def test_google_draft_class_is_not_issued(google_config):
     def mock(req):
         if req.url.path=="/token":
             return httpx.Response(200,json={"access_token":"TEST-OAUTH"})
-        return httpx.Response(200,json={"id":class_id,"reviewStatus":"draft"})
-    with pytest.raises(RuntimeError,match="draft"):
+        return httpx.Response(200,json={"id":class_id,"reviewStatus":"DRAFT"})
+    with pytest.raises(RuntimeError,match="not ready"):
         ensure_google_class("loyalty",class_id,"Test",
                             transport=httpx.MockTransport(mock))
 
@@ -129,3 +129,14 @@ def test_no_external_calls_when_google_credentials_are_not_configured(monkeypatc
     with pytest.raises(ValueError,match="not configured"):
         ensure_google_class("loyalty","123456789012.loial_business_1_v1","Firma")
     assert not valid_class_id("https://evil.example/path")
+
+@pytest.mark.parametrize("status",["REJECTED","REVIEW_STATUS_UNSPECIFIED","", "rejected"])
+def test_rejected_or_unapproved_google_class_is_blocked(google_config,status):
+    class_id=loyalty_class_id_for_business(18)
+    def mock(req):
+        if req.url.path=="/token":
+            return httpx.Response(200,json={"access_token":"TEST-OAUTH"})
+        return httpx.Response(200,json={"id":class_id,"reviewStatus":status})
+    with pytest.raises(RuntimeError,match="not ready"):
+        ensure_google_class("loyalty",class_id,"Salon",
+                            transport=httpx.MockTransport(mock))
