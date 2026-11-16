@@ -323,8 +323,11 @@ def check_ownership(db: Session, user: User, customer_id: int):
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
-    if user.role != "admin" and customer.id != customer_id:
-        pass
+    if user.role != "admin":
+        # Legacy User accounts have no ownership relation to Customer records.
+        # Only the platform admin can access this legacy maintenance path.
+        # Customer self-service must authenticate with the private Wallet token.
+        raise HTTPException(status_code=403,detail="Acces la datele clientului refuzat")
     return customer
 
 def require_role(required: str):
@@ -708,37 +711,8 @@ def list_notifications(current_user: User = Depends(get_current_user), db: Sessi
     return [{"id": n.id, "type": n.type, "title": n.title, "message": n.message, "read": bool(n.read), "date": n.created_at} for n in notifs]
 
 @app.get("/wallet/{customer_id}")
-def generate_wallet_pass(customer_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    customer = db.query(Customer).filter(Customer.id == customer_id).first()
-    if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
-    pass_data = {
-        "formatVersion": 1,
-        "passTypeIdentifier": WALLET_PASS_TYPE,
-        "serialNumber": f"AETHER-{customer_id}",
-        "teamIdentifier": WALLET_TEAM_ID or "TEAMID",
-        "organizationName": "Loial",
-        "description": "Loyalty Card",
-        "logoText": "Loial",
-        "foregroundColor": "rgb(255,255,255)",
-        "backgroundColor": "rgb(124,92,255)",
-        "storeCard": {
-            "primaryFields": [{"key": "stamps", "label": "STAMPS", "value": f"{customer.stamps}/6"}],
-            "secondaryFields": [{"key": "name", "label": "MEMBER", "value": customer.name}],
-            "auxiliaryFields": [{"key": "reward", "label": "NEXT REWARD", "value": "Free coffee" if customer.stamps < 6 else "Ready!"}]
-        },
-        "barcode": {
-            "message": f"AETHER:{customer_id}:{customer.name}",
-            "format": "PKBarcodeFormatQR",
-            "messageEncoding": "iso-8859-1"
-        }
-    }
-    return {
-        "pass": pass_data,
-        "customer": {"id": customer.id, "name": customer.name, "stamps": customer.stamps},
-        "status": "ready_for_signing",
-        "note": "In production, this is signed with Apple certificate and returned as .pkpass"
-    }
+def legacy_apple_wallet_endpoint(customer_id:int):
+    raise HTTPException(status_code=410,detail="Cardul demo a fost retras. Foloseste Google Wallet din portofelul Loial verificat.")
 
 @app.post("/payment/stripe")
 def create_stripe_payment(req: PaymentRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -778,17 +752,9 @@ def send_email(to: str, subject: str, body: str, current_user: User = Depends(ge
     return {"status": "simulated", "to": to, "subject": subject, "note": "Set SENDGRID_API_KEY to send real emails"}
 
 @app.get("/wallet/google/{customer_id}")
-def google_wallet_link(customer_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    customer = db.query(Customer).filter(Customer.id == customer_id).first()
-    if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
-    return {
-        "customer_id": customer_id,
-        "add_to_wallet_url": f"https://pay.google.com/gp/v/save/AETHER-{customer_id}",
-        "object_id": f"loial.loyalty.{customer_id}",
-        "status": "ready",
-        "note": "In production, generate signed JWT for Google Wallet API"
-    }
+def legacy_google_wallet_endpoint(customer_id:int):
+    raise HTTPException(status_code=410,detail="Linkul demo Google Wallet nu este valid. Foloseste emiterea semnata din portofelul privat Loial.")
+
 @app.get("/gdpr/export/{customer_id}")
 def export_customer_data(customer_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     customer = check_ownership(db, current_user, customer_id)
@@ -821,6 +787,7 @@ def delete_customer_data(customer_id: int, current_user: User = Depends(get_curr
 
 @app.post("/gdpr/consent")
 def record_consent(customer_id: int, purpose: str, granted: bool = True, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    check_ownership(db,current_user,customer_id)
     consent = Consent(
         customer_id=customer_id,
         purpose=sanitize_input(purpose, 100),
