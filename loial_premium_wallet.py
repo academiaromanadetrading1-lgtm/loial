@@ -170,7 +170,7 @@ def signed_apple_pkpass(card):
         raise ValueError("Apple Wallet certificate has not been configured")
     try:
         from cryptography import x509
-        from cryptography.hazmat.primitives.serialization import load_pem_private_key, pkcs7
+        from cryptography.hazmat.primitives.serialization import Encoding, load_pem_private_key, pkcs7
         from cryptography.hazmat.primitives import hashes
         pem=lambda name:os.environ[name].replace("\\n","\n").encode()
         signer=x509.load_pem_x509_certificate(pem("LOIAL_APPLE_PASS_CERT_PEM"))
@@ -185,7 +185,7 @@ def signed_apple_pkpass(card):
                             .set_data(files["manifest.json"])
                             .add_signer(signer,key,hashes.SHA256())
                             .add_certificate(wwdr)
-                            .sign(pkcs7.Encoding.DER,
+                            .sign(Encoding.DER,
                                   [pkcs7.PKCS7Options.DetachedSignature,
                                    pkcs7.PKCS7Options.Binary]))
         output=io.BytesIO()
