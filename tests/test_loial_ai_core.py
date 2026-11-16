@@ -15,7 +15,6 @@ from sqlalchemy.pool import StaticPool
 from loial_industries import canonical, profile, weekly_request
 from loial_analytics import summarize_sales, customer_segments, sector_summary
 from loial_business_ai import install_loial_ai, parse_sales_csv
-from loial_email import email_enabled, unsubscribe_token, parse_unsubscribe_token
 from loial_marketing import render, eligible_segment
 
 def test_rideshare_matches_uber_bolt_and_no_pastry_fields():
@@ -158,17 +157,14 @@ def test_ads_export_requires_specific_consent(app_client):
     assert b"taxi@test.invalid" in a.content
     assert b"garage@test.invalid" not in b.content
 
-def test_campaign_approval_never_sends(app_client):
+def test_ai_campaign_is_only_a_draft(app_client):
     client, auth = app_client
-    headers=auth("owner1@test.invalid")
-    result=client.post("/api/loial-ai/campaigns",headers=headers,
-        json={"objective":"revenire clienti","audience":"inactive_31_90","offer":"Revino la noi."})
+    headers = auth("owner1@test.invalid")
+    result = client.post("/api/loial-ai/campaigns", headers=headers,
+      json={"objective":"reactivare clienti", "audience":"inactive_31_90", "offer":"Revino la noi."})
     assert result.status_code == 200
-    item_id=result.json()["id"]
-    confirmed=client.post("/api/loial-ai/campaigns/"+str(item_id)+"/approve",headers=headers)
-    assert confirmed.json()["status"] == "approved_not_sent"
-    assert confirmed.json()["sent"] == 0
-
+    assert result.json()["status"] == "draft"
+    assert result.json()["sent"] == 0
 
 def test_template_renders_without_sending():
     preview = render("remaining", {"business": "Atelier", "name":"Alex",
@@ -178,22 +174,12 @@ def test_template_renders_without_sending():
     assert render("reactivation", {"business":"Atelier", "name":"Alex",
                                    "offer":"Reducere"} )["requires_marketing_permission"]
 
-def test_unsubscribe_token_is_bound_to_specific_business_and_customer():
-    key = "super-long-private-test-key-for-jwt-and-links"
-    token = unsubscribe_token(1, 15, key)
-    assert parse_unsubscribe_token(token, key) == (1, 15)
-    assert parse_unsubscribe_token(token + "wrong", key) is None
-    assert parse_unsubscribe_token(token, "other-signing-secret") is None
-
-def test_email_dispatch_is_off_by_default(app_client):
+def test_email_campaign_endpoints_are_not_part_of_business_ai(app_client):
     client, auth = app_client
     headers = auth("owner1@test.invalid")
-    campaign = client.post("/api/loial-ai/campaigns", headers=headers,
-      json={"objective":"Test", "audience":"all","offer":"Test"}).json()
-    client.post("/api/loial-ai/campaigns/"+str(campaign["id"])+"/approve", headers=headers)
-    blocked = client.post("/api/loial-ai/campaigns/"+str(campaign["id"])+"/send",
-      headers=headers, json={"confirmation":"TRIMITE"})
-    assert blocked.status_code == 503
+    response = client.post("/api/loial-ai/campaigns/42/send",headers=headers,
+                           json={"confirmation":"TRIMITE"})
+    assert response.status_code == 404
 
 def test_campaign_and_customer_history_are_isolated(app_client):
     client, auth = app_client
