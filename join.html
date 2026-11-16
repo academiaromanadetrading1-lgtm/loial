@@ -424,7 +424,7 @@
 
     const row = document.getElementById('stampsRow');
     row.innerHTML = '';
-    const displayMax = Math.min(total, 18);
+    const displayMax = target;
     row.style.gridTemplateColumns = displayMax <= 6 ? `repeat(${displayMax}, 1fr)` : 'repeat(6, 1fr)';
 
     for (let i = 1; i <= displayMax; i++) {
