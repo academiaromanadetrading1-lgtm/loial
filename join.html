@@ -475,15 +475,25 @@
 
       const listEl = document.getElementById('walletCardsList');
       if (data.cards && data.cards.length > 0) {
-        listEl.innerHTML = data.cards.map(c => `
-          <div class="mini-card" onclick="location.href='/join/${c.business_id}'">
-            <div>
-              <strong style="font-size:15px;display:block;color:#111f18;">${c.business_name}</strong>
-              <span style="font-size:12px;color:#475d52;">🎁 ${c.reward_text}</span>
-            </div>
-            <span class="mini-badge" style="background:${c.card_color};">${c.stamps} / ${c.target} ★</span>
-          </div>
-        `).join('');
+        // Datele afacerii raman text: nu interpretam HTML furnizat de comerciant.
+        listEl.replaceChildren();
+        for (const c of data.cards) {
+          const card=document.createElement('div');card.className='mini-card';
+          card.onclick=()=>{location.href='/join/'+Number(c.business_id);};
+          const content=document.createElement('div');
+          const title=document.createElement('strong');
+          title.style.cssText='font-size:15px;display:block;color:#111f18;';
+          title.textContent=c.business_name||'Afacere Loial';
+          const reward=document.createElement('span');
+          reward.style.cssText='font-size:12px;color:#475d52;';
+          reward.textContent='🎁 '+(c.reward_text||'Recompensă');
+          content.append(title,reward);
+          const badge=document.createElement('span');badge.className='mini-badge';
+          badge.style.background=/^#[0-9a-fA-F]{6}$/.test(c.card_color||'')
+            ?c.card_color:'#2d6a4f';
+          badge.textContent=Number(c.stamps||0)+' / '+Number(c.target||6)+' ★';
+          card.append(content,badge);listEl.appendChild(card);
+        }
       }
 
       if (data.ambassador) {
