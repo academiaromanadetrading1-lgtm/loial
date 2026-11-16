@@ -74,7 +74,21 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 <div class="report" id="report"></div>
 </section>
 <section class="card panel">
+<h2>Clienți și cumpărături</h2>
+<button class="ghost" id="showClients" style="width:100%">Vezi clienții firmei</button>
+<div id="customerList" class="file-list" style="margin-top:10px"></div>
+</section>
+<section class="card panel">
+<h2>Indicatori pentru activitatea ta</h2>
+<label for="metricName">Indicator</label><select id="metricName"></select>
+<label for="metricValue">Valoarea raportată</label><input type="number" step="any" id="metricValue" placeholder="Ex.: 125">
+<label for="metricPeriod">Perioada (ex.: 2026-W47)</label><input id="metricPeriod" maxlength="30" placeholder="2026-W47">
+<button class="ghost" id="saveMetric" style="width:100%;margin-top:9px">Salvează indicatorul</button>
+</section>
+<section class="card panel">
 <h2>Campanie de marketing</h2>
+<label for="template">Mesaje predefinite</label><select id="template"><option value="">Selectează un mesaj...</option></select>
+<button class="ghost" id="useTemplate" style="width:100%;margin-top:7px">Folosește acest mesaj</button>
 <label for="objective">Ce vrei să obții?</label>
 <input id="objective" placeholder="Ex.: Reactivarea clienților inactivi">
 <label for="audience">Public vizat</label>
@@ -107,6 +121,23 @@ const API='/api/loial-ai';
 const token=localStorage.getItem('token') || '';
 const $=x=>document.getElementById(x);
 let currentTopic='general', canUse=false, currentIndustry='general';
+const sectorMetrics={
+  rideshare:[['revenue','Încasări din curse'],['online_hours','Ore online'],['kilometres','Kilometri parcurși'],['platform_fees','Comisioane Uber/Bolt'],['fuel_energy','Combustibil sau încărcări']],
+  atelier_auto:[['revenue','Încasări atelier'],['billed_hours','Ore facturate'],['worked_hours','Ore lucrate']],
+  self_wash:[['revenue','Încasări spălătorie'],['wash_cycles','Cicluri de spălare'],['active_bays','Boxe active']],
+  patiserie:[['revenue','Încasări'],['waste_value','Pierderi produse']],
+  restaurant:[['revenue','Încasări'],['waste_value','Pierderi alimente']],
+  salon:[['revenue','Încasări'],['appointments','Programări']],
+  retail:[['revenue','Încasări'],['returns','Retururi']],
+  ecommerce:[['revenue','Încasări'],['returns','Retururi']],
+  general:[['revenue','Încasări'],['operating_cost','Cheltuieli operaționale']]
+};
+function renderMetricChoices(){
+  $('metricName').replaceChildren();
+  (sectorMetrics[currentIndustry]||sectorMetrics.general).forEach(([key,name])=>{
+    const o=document.createElement('option');o.value=key;o.textContent=name;$('metricName').appendChild(o);
+  });
+}
 function status(message,error=false){$('connection').textContent=message;$('connection').classList.toggle('error',error);}
 async function api(path,opts={}){
   const res=await fetch(API+path,{...opts,headers:{'Authorization':'Bearer '+token,...(opts.body instanceof FormData?{}:{'Content-Type':'application/json'}),...(opts.headers||{})}});
@@ -134,10 +165,26 @@ async function init(){
     c.sectors.forEach(s=>{const opt=document.createElement('option');opt.value=s.key;opt.textContent=s.label;$('sector').appendChild(opt);});
     $('sector').value=currentIndustry;
     $('details').value=c.description||'';
+    renderMetricChoices();
+    const templates=await api('/message-templates');
+    templates.forEach(x=>{
+      const o=document.createElement('option');o.value=x.key;
+      o.textContent=x.label+(x.requires_marketing_permission?' • marketing':'');
+      $('template').appendChild(o);
+    });
     c.topics.forEach(t=>{const b=document.createElement('button');b.type='button';b.className='topic';b.dataset.topic=t.key;b.textContent=t.label;
       b.addEventListener('click',()=>setTopic(t.key,t.label));$('topics').appendChild(b);});
     const h=await api('/history');if(h.length){h.forEach(x=>bubble(x.role,x.text));}else{bubble('assistant','Bun venit! Spune-mi ce tip de activitate ai sau alege o temă din stânga. Te voi întreba doar ce date sunt necesare pentru analiză.');}
     await loadFiles();
+    const weekly=await api('/weekly');
+    const weekKey=new Date().toISOString().slice(0,10);
+    const promptKey='loial_weekly_prompt_'+c.business;
+    const previous=localStorage.getItem(promptKey);
+    const daysAgo=weekly.last_document ? (Date.now()-new Date(weekly.last_document).getTime())/86400000 : Infinity;
+    if((!previous||Date.now()-Number(previous)>7*86400000) && daysAgo>=7){
+      bubble('assistant',weekly.message);
+      localStorage.setItem(promptKey,String(Date.now()));
+    }
   }catch(e){status(e.message,true);}
 }
 async function send(){
@@ -153,7 +200,8 @@ $('message').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.p
 $('saveProfile').addEventListener('click',async()=>{
   if(!canUse)return;
   try{const s=await api('/profile',{method:'PUT',body:JSON.stringify({sector:$('sector').value,description:$('details').value,currency:'RON'})});
-    currentIndustry=s.industry.key;status('Profil salvat: '+s.industry.label);}
+    currentIndustry=s.industry.key;renderMetricChoices();
+    status('Profil salvat: '+s.industry.label);}
   catch(e){status(e.message,true);}
 });
 async function loadFiles(){
@@ -192,9 +240,49 @@ $('reportBtn').onclick=async()=>{
       'Produse/servicii: '+s.products.length,'Clienți: '+Object.values(r.customers).reduce((a,b)=>a+b,0),'',
       'Produse/servicii ordonate după venit:'];
     s.products.slice(0,10).forEach(p=>lines.push('• '+p.product+': '+p.revenue+' '+r.currency));
+    const specific=Object.entries(s.sector_metrics||{});
+    if(specific.length){lines.push('','Indicatori specifici activității:');
+      specific.forEach(([k,v])=>lines.push('• '+k.replaceAll('_',' ')+': '+v));}
     lines.push('','Limitări:',...r.limitations.map(x=>'• '+x));
     $('report').textContent=lines.join('\n');
     bubble('meta','Raportul a fost actualizat în panoul din dreapta.');
+  }catch(e){status(e.message,true);}
+};
+$('showClients').onclick=async()=>{
+  try{
+    const response=await api('/customers'),list=$('customerList');list.replaceChildren();
+    if(!response.items.length){list.textContent='Nu există clienți înregistrați.';return;}
+    for(const c of response.items){
+      const b=document.createElement('button');b.className='topic';
+      b.textContent=c.name+' • '+(c.stamps||0)+' ștampile';
+      b.onclick=async()=>{
+        try{
+          const data=await api('/customers/'+c.id+'/purchases');
+          const items=data.purchases.slice(0,15).map(p=>'• '+p.date+' • '+p.product+' × '+p.quantity+' = '+p.total).join('\n');
+          bubble('assistant','Istoricul lui '+data.name+':\n'+(items||'Nu avem produse asociate acestui client în exporturile confirmate.')+'\n'+data.note);
+        }catch(e){status(e.message,true);}
+      };list.appendChild(b);
+    }
+  }catch(e){status(e.message,true);}
+};
+$('saveMetric').onclick=async()=>{
+  const period=$('metricPeriod').value.trim();
+  const value=Number($('metricValue').value);
+  if(!period||!$('metricValue').value||!Number.isFinite(value)){status('Completează indicatorul și perioada.',true);return;}
+  try{
+    await api('/metrics',{method:'POST',body:JSON.stringify({
+      name:$('metricName').value,value,period,source:'declarat de administrator'
+    })});
+    status('Indicator salvat. Îl poți consulta în raport.');
+    $('metricValue').value='';
+  }catch(e){status(e.message,true);}
+};
+$('useTemplate').onclick=async()=>{
+  if(!$('template').value)return;
+  try{
+    const x=await api('/message-templates/'+$('template').value+'/preview');
+    $('offer').value=x.text;
+    $('campaignPreview').textContent='Previzualizare mesaj: '+x.subject+'\n'+x.text+'\n\nNEEXPEDIAT';
   }catch(e){status(e.message,true);}
 };
 $('draftCampaign').onclick=async()=>{
