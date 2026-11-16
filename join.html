@@ -712,7 +712,8 @@
   }
   async function actualWalletTransfer(path,headers,kind) {
     try{
-      const response=await fetch('/api/premium-wallet/'+path,{headers});
+      const response=await fetch('/api/premium-wallet/'+path+(kind==='apple'?'-ticket':''),{
+        method:kind==='apple'?'POST':'GET',headers});
       if(!response.ok){
         const err=await response.json().catch(()=>({}));
         throw Error(err.detail||'Portofelul oficial nu este configurat.');
@@ -723,12 +724,11 @@
         window.location.href=data.url;
         return;
       }
-      const blob=await response.blob();
-      const objectUrl=URL.createObjectURL(blob);
-      const anchor=document.createElement('a');
-      anchor.href=objectUrl;anchor.download='loial-black-metal.pkpass';
-      document.body.appendChild(anchor);anchor.click();anchor.remove();
-      setTimeout(()=>URL.revokeObjectURL(objectUrl),3000);
+      const ticket=await response.json();
+      if(!ticket.url||!ticket.url.startsWith('/api/premium-wallet/apple/claim?')){
+        throw Error('Linkul Apple Wallet nu este valid.');
+      }
+      window.location.assign(ticket.url);
     }catch(error){alert(error.message);}
   }
   function addCustomerToWallet(kind) {
