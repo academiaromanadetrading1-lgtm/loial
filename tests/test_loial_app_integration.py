@@ -70,6 +70,47 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                        for message in inbox.json()["messages"])
             assert client.get("/api/premium-wallet/customer/cards",
                 headers={"X-Loial-Wallet-Token": "T" * 48}).status_code == 200
+            # New firms no longer inherit a publicly predictable primary PIN.
+            account=client.get("/api/my-business",headers=bearer)
+            assert account.status_code==200,account.text
+            staff_pin=account.json()["staff_pin"]
+            assert staff_pin.isdigit() and len(staff_pin)==4 and staff_pin!="1234"
+            scan_payload={"business_id":business_id,"customer_uuid":"W-INTEGRATION-TEST-001",
+                          "pin":"1234"}
+            assert client.post("/api/scan-universal",json=scan_payload).status_code==401
+            scan_payload["pin"]=staff_pin
+            stamped=client.post("/api/scan-universal",json=scan_payload)
+            assert stamped.status_code==200,stamped.text
+            assert stamped.json()["stamps"]==1
+
+            rotated=client.post("/api/my-business/rotate-pin",headers=bearer)
+            assert rotated.status_code==200,rotated.text
+            new_pin=rotated.json()["staff_pin"]
+            assert new_pin!=staff_pin and new_pin!="1234"
+            assert client.post("/api/scan-universal",json=scan_payload).status_code==401
+            scan_payload["pin"]=new_pin
+            assert client.post("/api/scan-universal",json=scan_payload).status_code==200
+
+            # End-to-end: owner issues an itemized one-use Loial receipt; wallet claims
+            # it once and sees a fresh stamp; no accounting or POS API is required.
+            issued=client.post("/api/loial-receipts/issue",headers=bearer,json={
+                "receipt_ref":"SMOKE-101",
+                "lines":[{"product":"Revizie auto","quantity":1,"unit_price":200,
+                          "unit_variable_cost":65}]
+            })
+            assert issued.status_code==200,issued.text
+            receipt_token=issued.json()["claim_url"].split("token=")[1]
+            claimed=client.post("/api/loial-receipts/claim",
+                headers={"X-Loial-Wallet-Token":"T"*48},
+                json={"receipt_token":receipt_token})
+            assert claimed.status_code==200,claimed.text
+            assert claimed.json()["stamps"]==3
+            assert client.post("/api/loial-receipts/claim",
+                headers={"X-Loial-Wallet-Token":"T"*48},
+                json={"receipt_token":receipt_token}).status_code==409
+            messages=client.get("/api/loial-inbox/me",
+                headers={"X-Loial-Wallet-Token":"T"*48}).json()["messages"]
+            assert sum(x["kind"]=="service" for x in messages)>=4
             # No external provider or recipient data is needed for this scenario.
     finally:
         main.engine.dispose()
