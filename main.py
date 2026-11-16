@@ -3016,6 +3016,18 @@ from loial_inbox import install_loial_inbox
 install_loial_inbox(app, engine, SessionLocal, BusinessAccount, Customer, Consent,
                     AISale, SECRET_KEY, ALGORITHM)
 
+# Roluri independente: administratorul firmei poate fi si ambasador si client Loial.
+from loial_inbox import WalletInboxAccess, access_hash
+from loial_identity import install_loial_identity, BusinessAmbassadorLink
+from loial_premium_wallet import install_premium_wallet
+install_loial_identity(app, engine, SessionLocal, BusinessAccount, SalesAgent,
+                       Sale, pwd_context, SECRET_KEY, ALGORITHM, WalletInboxAccess,
+                       access_hash, get_ambassador_tier)
+install_premium_wallet(app, engine, SessionLocal, BusinessAccount, Customer,
+                       SalesAgent, Sale, SECRET_KEY, ALGORITHM,
+                       get_ambassador_tier, BusinessAmbassadorLink)
+
+
 @app.get("/loial-ai.html")
 @app.get("/loial-ai")
 def loial_ai_page():
