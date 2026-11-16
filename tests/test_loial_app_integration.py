@@ -15,6 +15,7 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
     monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-only-this-process-must-not-go-to-production")
     monkeypatch.delenv("LOIAL_ADMIN_BOOTSTRAP_EMAIL", raising=False)
     monkeypatch.delenv("LOIAL_DEV_SEED_DATA", raising=False)
+    monkeypatch.setenv("LOIAL_WEEKLY_JOBS_ENABLED","0")
     sys.modules.pop("main", None)
     main = importlib.import_module("main")
     try:
