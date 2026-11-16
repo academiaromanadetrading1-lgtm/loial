@@ -1791,13 +1791,19 @@ class QuickRegisterRequest(BaseModel):
     password: str
     business_name: str
     reward: str = "A 6-a e din partea casei!"
-    color: str = "#1e293b"
+       color: str = "#1e293b"
+    ref_code: Optional[str] = ""
+
 
 @app.post("/api/register")
 def quick_register(req: QuickRegisterRequest, db: Session = Depends(get_db)):
     existing = db.query(BusinessAccount).filter(BusinessAccount.email == req.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email deja înregistrat")
+
+    clean_ref = sanitize_input(req.ref_code or "", 60)
+    agent = db.query(SalesAgent).filter(SalesAgent.qr_code == clean_ref).first() if clean_ref else None
+
     business = BusinessAccount(
         name=req.business_name,
         email=req.email,
@@ -1807,8 +1813,11 @@ def quick_register(req: QuickRegisterRequest, db: Session = Depends(get_db)):
         reward_text=req.reward,
         card_color=req.color,
         staff_pin="1234",
+        agent_id=agent.id if agent else None,
+        ref_code=clean_ref,
         created_at=datetime.now().isoformat()
     )
+
     db.add(business)
     db.commit()
     db.refresh(business)
