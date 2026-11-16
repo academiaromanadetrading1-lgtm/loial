@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ro"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111318"><meta name="color-scheme" content="light">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Loial">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/pwa-icon-192.png">
+<title>Loial • Portofelul meu Black Metal</title>
+<style>
+:root{--gold:#dbbf82;--ink:#101215;--muted:#687268}
+*{box-sizing:border-box}body{margin:0;background:#eef1ee;color:#19251e;font:15px/1.5 system-ui,-apple-system,Arial;min-height:100vh}
+header{background:#0d0e11;color:#d9c08a;padding:16px 19px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+header strong{font-size:22px;letter-spacing:.2em}header small{color:#a8a392}
+main{max-width:590px;padding:20px 16px 72px;margin:0 auto}
+.metal{position:relative;overflow:hidden;border-radius:22px;min-height:230px;padding:25px 27px;color:#e7d3a5;
+background:repeating-linear-gradient(0deg,rgba(255,255,255,.014) 0 1px,transparent 1px 3px),
+linear-gradient(120deg,#030406,#2b2d32 26%,#121417 48%,#35363a 66%,#08090c 100%);
+border:1px solid #ac976b;box-shadow:0 17px 31px #14161a3a,inset 0 1px 0 #c6ae7d50;display:flex;flex-direction:column;justify-content:space-between}
+.metal::before{content:"";position:absolute;right:-42px;top:-125px;height:310px;width:310px;border-radius:50%;border:1px solid #c7a86425;box-shadow:0 0 0 28px #d0b7820a,0 0 0 60px #d0b78206;pointer-events:none}
+.brand{font-size:24px;font-weight:850;letter-spacing:.21em}.edition{font-size:9px;letter-spacing:.17em;font-weight:800;color:#c3a46e}
+.owner{font-size:23px;font-weight:750;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.owner-label{font-size:10px;letter-spacing:.14em}
+.foot{font-size:10px;color:#b0a17e;display:flex;justify-content:space-between;gap:10px}
+.panel{background:white;border:1px solid #dbe5de;border-radius:17px;padding:19px;margin:18px 0}
+h1{font-size:19px;margin:0 0 8px}h2{font-size:17px;margin:0 0 8px}p{margin:7px 0;color:#58685d}
+label{display:block;font-size:12px;font-weight:750;margin-top:10px}.muted{font-size:12px;color:#657368}
+button,a.button{background:#1d4934;color:white;font:inherit;font-weight:750;border:0;border-radius:12px;cursor:pointer;padding:12px 15px;text-decoration:none;text-align:center;display:inline-block}
+button.secondary,a.secondary{background:white;color:#20573c;border:1px solid #9cb4a4}
+button.black{background:#111318;color:#ddc48b}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.actions>*{flex:1 1 180px}
+#pwaInstallHelp{font-size:12px;color:#687469;margin-top:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:12px}
+.merchant{border:1px solid #dde5dc;background:#f9faf8;border-radius:13px;padding:14px}
+.merchant strong{display:block}.merchant span{font-size:12px;color:#5c6a61}
+.merchant a{margin-top:9px;width:100%}.qr{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.qr img{width:152px;height:152px;object-fit:contain;border:10px solid #fff;border-radius:12px}
+.pill{display:inline-block;border-radius:999px;background:#eff4ee;padding:5px 10px;font-size:12px;font-weight:700;color:#1c5138}
+#referralLink{font-size:13px;width:100%;border:1px solid #bac8bb;padding:12px;border-radius:10px;color:#314538}
+.notice{font-size:12px;color:#54655b}.hidden{display:none!important}
+#state{min-height:20px;font-size:13px;color:#a04d27}
+@media(max-width:380px){main{padding:12px 10px 40px}.metal{padding:18px 19px;min-height:205px}}
+</style>
+<script src="/loial-pwa-install.js" defer></script>
+</head><body>
+<header><strong>LOIAL</strong><small>BLACK METAL<br>PORTOFEL PERSONAL</small></header>
+<main>
+<div class="metal" aria-label="Cardul universal de fidelitate Loial">
+  <div><div class="brand">LOIAL</div><div class="edition">BLACK METAL · LOYALTY</div></div>
+  <div><div class="owner-label">TITULAR</div><div class="owner" id="walletHolder">Portofelul meu Loial</div>
+       <div class="edition" id="walletStatus">CARDURI ȘI RECOMPENSE</div></div>
+  <div class="foot"><span>QR UNIVERSAL · FIDELITATE</span><span>NU ESTE CARD DE PLATĂ</span></div>
+</div>
+<section class="panel">
+  <h1>Loial direct pe telefon</h1>
+  <p>Apasă pictograma Loial de pe ecran și se deschide portofelul tău, fără Google Wallet, Apple Wallet sau instalare din magazin.</p>
+  <button type="button" id="pwaInstallBtn" class="black">Adaugă Loial pe ecran</button>
+  <div id="pwaInstallHelp" role="status">Încarc opțiunile de instalare...</div>
+</section>
+<section class="panel" id="cardsSection">
+  <h2>Cardurile mele</h2>
+  <div id="state" role="status"></div>
+  <div id="verifiedWallet" class="hidden">
+    <div class="qr"><img id="walletQr" src="" alt="Codul QR universal Loial, fără date de autentificare">
+      <div><strong>Arată acest QR la casă</strong><p class="muted">Același QR la toate firmele participante.</p>
+        <span class="pill" id="walletSummary">–</span></div>
+    </div>
+    <div id="merchantCards" class="grid"></div>
+  </div>
+  <div id="activateWallet">
+    <p>Nu ai încă un portofel verificat pe acest dispozitiv. Activează cardul la o firmă Loial participantă.</p>
+    <div class="actions">
+      <a class="button" href="/">Descoperă Loial</a>
+      <a class="button secondary" href="/wallet-recovery.html">Am deja card. Recuperează-l</a>
+    </div>
+    <p class="notice">Pe iPhone, aplicația adăugată pe ecran poate avea un spațiu de date separat de Safari. Dacă nu îți recunoaște cardul, folosește recuperarea verificată, nu QR-ul public.</p>
+  </div>
+</section>
+<section class="panel" id="inboxSection">
+  <h2>Mesaje primite în Loial</h2>
+  <p>Mesajele firmelor și recompensele sunt vizibile aici, fără email și SMS.</p>
+  <div id="inboxList" class="muted">Activează portofelul ca să vezi mesajele.</div>
+  <button type="button" class="secondary" id="inboxReload">Actualizează mesajele</button>
+</section>
+<section class="panel" id="friendsSection">
+  <h2>Recomandă Loial unui prieten</h2>
+  <p>Nu trebuie să devii ambasador. Trimite linkul tău personal. Punctele se înregistrează numai după ce prietenul activează Loial și primește prima ștampilă verificată.</p>
+  <p class="notice" id="inviteBanner"></p>
+  <div id="friendStats" class="muted">Program de recomandări pentru clienții Loial.</div>
+  <div id="shareFriends" class="hidden">
+    <label for="referralLink">Linkul tău de invitație</label>
+    <input id="referralLink" readonly>
+    <div class="actions"><button type="button" id="copyFriendLink">Copiază linkul</button>
+    <button type="button" class="secondary" id="shareFriendLink">Trimite unui prieten</button></div>
+  </div>
+  <p class="notice">Punctele Loial sunt puncte-pilot fără valoare monetară, nu pot fi retrase și nu garantează încă reduceri. Beneficiile comerciale vor necesita reguli și parteneri participanți.</p>
+</section>
+<section class="panel">
+  <h2>Ai o problemă cu cardul?</h2>
+  <p>Recuperarea se face cu verificarea titularului, nu doar pe baza QR-ului.</p>
+  <a class="button secondary" href="/wallet-recovery.html">Recuperează portofelul</a>
+</section>
+</main>
+<script>
+(function(){
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const walletId=localStorage.getItem('loial_universal_uuid');
+  const token=localStorage.getItem('loial_wallet_inbox_token');
+  const query=new URLSearchParams(location.search);
+  const incoming=query.get('invite');
+  if(incoming && /^L-[A-Za-z0-9]{15,50}$/.test(incoming)){
+    localStorage.setItem('loial_friend_invite',incoming);
+    $('inviteBanner').textContent='Ai primit o invitație! Activează un card Loial la un partener. Recomandarea va fi verificată după prima ștampilă reală.';
+  }
+  const params=new URLSearchParams(location.search);
+  if(params.get('tab')==='inbox')$('inboxSection').scrollIntoView({block:'start'});
+  const auth=()=>({'X-Loial-Wallet-Token':token});
+  async function json(path,opts={}){
+    const response=await fetch(path,{...opts,headers:{...auth(),...(opts.headers||{})},cache:'no-store'});
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw Error(payload.detail||'Portofelul nu poate fi încărcat.');
+    return payload;
+  }
+  function newEl(tag,text,className){
+    const node=document.createElement(tag);
+    if(text!=null)node.textContent=text;
+    if(className)node.className=className;
+    return node;
+  }
+  async function loadCards(){
+    if(!token||!walletId){$('state').textContent='Activează mai întâi portofelul Loial.';return;}
+    try{
+      const data=await json('/api/wallet-profile/'+encodeURIComponent(walletId));
+      $('walletHolder').textContent=data.name||'Membru Loial';
+      $('walletStatus').textContent='CARDURI ACTIVE · '+(data.businesses_count||0);
+      $('walletSummary').textContent=(data.businesses_count||0)+' firme · '+(data.total_stamps||0)+' ștampile';
+      const qrURL=location.origin+'/scan.html?wallet_uuid='+encodeURIComponent(walletId);
+      $('walletQr').src='/api/qr-link?url='+encodeURIComponent(qrURL)+'&color=%23D8BE7A&initial=L';
+      $('verifiedWallet').classList.remove('hidden');
+      $('activateWallet').classList.add('hidden');
+      $('state').textContent='';
+      const container=$('merchantCards');container.replaceChildren();
+      for(const c of (data.cards||[])){
+        const card=newEl('article',null,'merchant');
+        card.appendChild(newEl('strong',c.business_name||'Firmă Loial'));
+        const target=Number(c.target)||6,stamps=Number(c.stamps)||0;
+        card.appendChild(newEl('span',stamps+' / '+target+' ștampile'+(stamps>=target?' · Recompensă disponibilă':'')));
+        const link=newEl('a','Deschide cardul','button secondary');
+        link.href='/join/'+Number(c.business_id);
+        card.appendChild(link);container.appendChild(card);
+      }
+      if(!data.cards?.length)container.textContent='Cardul universal e activ. Următoarea firmă îți va apărea aici.';
+    }catch(error){
+      $('state').textContent=error.message;
+      $('verifiedWallet').classList.add('hidden');
+      $('activateWallet').classList.remove('hidden');
+    }
+  }
+  async function loadInbox(){
+    if(!token){$('inboxList').textContent='Portofelul nu este activat.';return;}
+    try{
+      const data=await json('/api/loial-inbox/me');
+      const list=$('inboxList');list.replaceChildren();
+      for(const message of (data.messages||[]).slice(0,12)){
+        const item=newEl('article',null,'merchant');item.style.marginTop='8px';
+        item.appendChild(newEl('strong',message.title||'Mesaj Loial'));
+        item.appendChild(newEl('p',message.body||''));
+        list.appendChild(item);
+      }
+      if(!(data.messages||[]).length)list.textContent='Nu ai încă mesaje.';
+    }catch(error){$('inboxList').textContent=error.message;}
+  }
+  async function loadFriends(){
+    if(!token)return;
+    try{
+      const data=await json('/api/loial-friends/me');
+      $('friendStats').textContent='Recomandări validate: '+data.qualified+
+        ' · În așteptare: '+data.pending+' · Puncte pilot: '+data.points;
+      $('referralLink').value=data.share_url;
+      $('shareFriends').classList.remove('hidden');
+      if(data.my_invitation_status==='pending'){
+        $('inviteBanner').textContent='Invitația ta este înregistrată. Punctele apar după prima ștampilă verificată.';
+      }
+    }catch(error){$('friendStats').textContent=error.message;}
+  }
+  $('inboxReload').onclick=loadInbox;
+  $('copyFriendLink').onclick=async()=>{
+    try{await navigator.clipboard.writeText($('referralLink').value);
+      $('copyFriendLink').textContent='✓ Copiat';}
+    catch(error){$('copyFriendLink').textContent='Selectează linkul pentru copiere';}
+  };
+  $('shareFriendLink').onclick=async()=>{
+    const url=$('referralLink').value;
+    if(!url)return;
+    if(navigator.share){
+      try{await navigator.share({title:'Loial',text:'Activează cardul Loial și primește ștampile la parteneri.',url});}
+      catch(error){}
+    }else $('copyFriendLink').click();
+  };
+  loadCards();loadInbox();loadFriends();
+})();
+</script></body></html>
