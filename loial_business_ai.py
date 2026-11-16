@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
-from sqlalchemy import Column, Float, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Column, Float, Integer, String, Text, UniqueConstraint, or_
 from sqlalchemy.orm import Session, declarative_base
 
 from loial_industries import PROFILES, canonical, profile, weekly_request
@@ -308,8 +308,14 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
             db.add(record)
             db.commit()
         return record
+    def active_sales(db, biz, limit=10000):
+        # Retururile confirmate nu trebuie sa fie confundate cu venituri sau produse cumparate.
+        return (db.query(AISale).outerjoin(AIDocument, AISale.document_id == AIDocument.id)
+                .filter(AISale.business_id == biz.id,
+                        or_(AIDocument.id.is_(None), AIDocument.kind != "receipt_refunded"))
+                .order_by(AISale.id.desc()).limit(limit).all())
     def rows(db, biz):
-        records = db.query(AISale).filter(AISale.business_id == biz.id).order_by(AISale.id.desc()).limit(10000).all()
+        records = active_sales(db, biz)
         return [dict(product=x.product, quantity=x.quantity, unit_price=x.unit_price,
                      unit_variable_cost=x.unit_variable_cost, sold_at=x.sold_at,
                      transaction_id=x.transaction_id) for x in records]
@@ -593,7 +599,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
 
     @r.get("/exports/sales.xlsx")
     def sales_xlsx(biz=Depends(owner), db: Session = Depends(db_session)):
-        sales = db.query(AISale).filter(AISale.business_id == biz.id).order_by(AISale.id.desc()).limit(100000).all()
+        sales = active_sales(db, biz, limit=100000)
         return export_xlsx(["Data", "Bon", "Produs sau serviciu", "Cantitate", "Pret unitar",
                             "Cost variabil unitar", "ID client"],
                            [[s.sold_at, s.transaction_id or "", s.product, s.quantity, s.unit_price,
@@ -608,7 +614,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                            for x in customers], "loial_clienti.csv")
     @r.get("/exports/sales.csv")
     def sales_csv(biz=Depends(owner), db: Session = Depends(db_session)):
-        sales = db.query(AISale).filter(AISale.business_id == biz.id).limit(100000).all()
+        sales = active_sales(db, biz, limit=100000)
         return export_csv(["date", "transaction_id", "product", "quantity", "unit_price", "unit_variable_cost", "customer_uuid"],
                           [[x.sold_at, x.transaction_id or "", x.product, x.quantity, x.unit_price,
                             x.unit_variable_cost if x.unit_variable_cost is not None else "",
@@ -663,8 +669,10 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         ids.discard(None)
         if not ids:
             return {"name": customer.name, "purchases": [], "note": "Nu exista identificator pentru legarea bonurilor"}
-        lines = db.query(AISale).filter(AISale.business_id == biz.id,
-                                        AISale.customer_uuid.in_(ids)).order_by(AISale.sold_at.desc()).limit(500).all()
+        lines = (db.query(AISale).outerjoin(AIDocument, AISale.document_id == AIDocument.id)
+                 .filter(AISale.business_id == biz.id, AISale.customer_uuid.in_(ids),
+                         or_(AIDocument.id.is_(None), AIDocument.kind != "receipt_refunded"))
+                 .order_by(AISale.sold_at.desc()).limit(500).all())
         return {"name": customer.name,
                 "purchases": [{"date": s.sold_at, "product": s.product, "quantity": s.quantity,
                                "total": round(s.quantity * s.unit_price, 2)} for s in lines],
