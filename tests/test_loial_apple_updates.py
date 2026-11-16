@@ -15,6 +15,7 @@ from loial_premium_wallet import premium_card,apple_pass_json
 
 def fixture(monkeypatch):
     monkeypatch.setenv("LOIAL_APPLE_PASS_TYPE_ID","pass.com.test.loial")
+    monkeypatch.setenv("LOIAL_APPLE_TEAM_ID","TESTTEAM01")
     monkeypatch.setenv("LOIAL_APPLE_WEB_SERVICE_URL","https://loial.space/api/passkit")
     monkeypatch.setenv("LOIAL_APPLE_PASS_AUTH_SECRET","unit-only-secret-should-never-go-live-2026-11-16")
     monkeypatch.setenv("LOIAL_APPLE_PUSH_TOKEN_FERNET_KEY",Fernet.generate_key().decode())
