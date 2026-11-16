@@ -2456,6 +2456,7 @@ class InstantEnrollRequest(BaseModel):
     consent_personalized_ads: bool = False
     consent_loial_offers: bool = False
     wallet_claim_token: Optional[str] = None
+    friend_referral_code: Optional[str] = None
 
 @app.post("/api/enroll-sync")
 def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db)):
@@ -2488,6 +2489,15 @@ def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db
         return {"status": "exists", "inbox_access": verified_token}
 
     if existing:
+        # Nu asocia o firma noua la un portofel existent doar din QR-ul public.
+        # Dispozitivul trebuie sa prezinte secretul privat deja emis.
+        from loial_inbox import WalletInboxAccess, access_hash
+        secret_token=(req.wallet_claim_token or "").strip()
+        verified=db.query(WalletInboxAccess).filter(
+            WalletInboxAccess.wallet_uuid==(existing.wallet_uuid or existing.uuid),
+            WalletInboxAccess.token_hash==access_hash(secret_token)).first() if len(secret_token)>=40 else None
+        if not verified:
+            raise HTTPException(status_code=401,detail="Pentru acest card este necesara verificarea portofelului privat")
         # Un portofel universal, mai multe carduri cu progres independent.
         customer = Customer(
             uuid=str(uuid.uuid4()),
@@ -2527,9 +2537,14 @@ def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db
         raise HTTPException(status_code=422,detail=str(exc))
     if req.consent_loial_offers:
         record_offer_choice(db, Consent, customer.id, True, "join_form")
+    friend_status="not_applicable"
+    if existing is None and inbox_token:
+        from loial_friend_referrals import attribute_new_wallet
+        friend_status=attribute_new_wallet(db,wallet_id,req.friend_referral_code)
     queue_service_event(db, biz, customer, kind="welcome")
     db.commit()
-    return {"status": "saved", "inbox_access": inbox_token}
+    return {"status": "saved", "inbox_access": inbox_token,
+            "friend_invitation_status":friend_status}
 class ChangePasswordRequest(BaseModel):
     email: str
     old_password: str
@@ -2689,6 +2704,8 @@ def scan_universal_card(request: Request, req: UniversalScanRequest, db: Session
     queue_service_event(db, biz, customer, kind="stamp", returning=was_away,
                         event_key=operation)
     record_award(db,biz.id,customer.id,operation,"manual",customer.stamps)
+    from loial_friend_referrals import credit_after_valid_stamp
+    credit_after_valid_stamp(db,wallet_id,biz.id,"scan:"+operation)
     from loial_wallet_sync import queue_google_refresh
     queue_google_refresh(db,biz.id,customer.wallet_uuid or customer.uuid)
     from loial_apple_updates import mark_customer_pass_changed
@@ -3066,6 +3083,20 @@ install_receipts(app, engine, SessionLocal, BusinessAccount, Customer,
 # Cheltuieli din facturi confirmate explicit de antreprenor (nu estimari AI).
 from loial_expenses import install_expenses
 install_expenses(app,engine,SessionLocal,BusinessAccount,AIDocument,SECRET_KEY,ALGORITHM)
+
+# Portofelul Loial instalabil pe ecranul telefonului (PWA), fara Apple/Google.
+from loial_pwa import install_pwa
+install_pwa(app)
+
+@app.get("/loial-pwa-install.js")
+def loial_install_script():
+    return FileResponse("loial-pwa-install.js",media_type="application/javascript",
+                        headers={"Cache-Control":"public, max-age=3600"})
+
+# Recomandari client-catre-client, distincte de comisioanele ambasadorilor.
+from loial_friend_referrals import install_friend_referrals
+install_friend_referrals(app,engine,SessionLocal)
+
 
 
 # Recuperare izolata a cardurilor legacy, cu verificare in persoana si cod de unica folosinta.
