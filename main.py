@@ -3085,6 +3085,35 @@ from loial_receipts import install_receipts
 install_receipts(app, engine, SessionLocal, BusinessAccount, Customer,
                  AIDocument, AISale, SECRET_KEY, ALGORITHM)
 
+@app.get("/api/loial-scans/history")
+def business_stamp_audit(limit: int = 40, credentials: HTTPAuthorizationCredentials = Depends(security),
+                         db: Session = Depends(get_db)):
+    """Owner-only loyalty ledger: manual scans, receipts, rewards and reversals."""
+    if not credentials:
+        raise HTTPException(status_code=401,detail="Autentificare obligatorie")
+    try:
+        claims=jwt.decode(credentials.credentials,SECRET_KEY,algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401,detail="Sesiune invalida")
+    if claims.get("role")!="business":
+        raise HTTPException(status_code=403,detail="Doar administratorul firmei")
+    biz=db.query(BusinessAccount).filter(BusinessAccount.email==claims.get("sub")).first()
+    if not biz or (claims.get("business_id") and biz.id!=claims.get("business_id")):
+        raise HTTPException(status_code=403,detail="Firma nu este disponibila")
+    from loial_scans import StampAward
+    safe_limit=max(1,min(int(limit),100))
+    entries=db.query(StampAward).filter(
+        StampAward.business_id==biz.id).order_by(StampAward.id.desc()).limit(safe_limit).all()
+    customer_ids={x.customer_id for x in entries}
+    customers=db.query(Customer).filter(
+        Customer.business_id==biz.id,Customer.id.in_(customer_ids)).all() if customer_ids else []
+    names={x.id:x.name for x in customers}
+    return {"business_id":biz.id,"items":[{
+        "id":x.id,"source":x.source,"customer_id":x.customer_id,
+        "customer":names.get(x.customer_id,"Client indisponibil"),
+        "stamps_after":x.stamps_after,"at":x.created_at
+    } for x in entries],"limit":safe_limit}
+
 @app.get("/loial-receipt.html")
 def loial_receipt_page():
     return FileResponse("loial-receipt.html")
