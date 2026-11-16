@@ -70,6 +70,15 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                        for message in inbox.json()["messages"])
             assert client.get("/api/premium-wallet/customer/cards",
                 headers={"X-Loial-Wallet-Token": "T" * 48}).status_code == 200
+            profile_url="/api/wallet-profile/W-INTEGRATION-TEST-001"
+            assert client.get(profile_url).status_code==401
+            assert client.get(profile_url,headers={
+                "X-Loial-Wallet-Token":"P"*48}).status_code==401
+            own_profile=client.get(profile_url,headers={
+                "X-Loial-Wallet-Token":"T"*48})
+            assert own_profile.status_code==200,own_profile.text
+            assert own_profile.json()["name"]=="Client Test"
+            assert own_profile.json()["cards"][0]["business_name"]=="Service Auto Test"
             # New firms no longer inherit a publicly predictable primary PIN.
             account=client.get("/api/my-business",headers=bearer)
             assert account.status_code==200,account.text
