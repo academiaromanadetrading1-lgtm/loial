@@ -19,7 +19,7 @@ PROFILES = {
         "units": ["produse", "bonuri", "loturi"],
         "metrics": ["marja pe produs", "valoarea bonului", "pierderi", "rotatia ingredientelor"],
         "documents": ["vanzari pe produs", "preturi ingrediente", "retete sau costuri pe lot", "produse nevandute"],
-        "questions": ["Ce produse prepari si ce produse rev inzi?", "Ce se arunca zilnic?"],
+        "questions": ["Ce produse prepari si ce produse revinzi?", "Ce se arunca zilnic?"],
         "insights": ["produse cu contributie buna", "risipa", "oferte combinate"],
     },
     "rideshare": {
