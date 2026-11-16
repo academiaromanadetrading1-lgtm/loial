@@ -532,21 +532,21 @@ def login(request: Request, req: LoginRequest, db: Session = Depends(get_db)):
         role = "business"
         name = business.name
     
-     if not authenticated:
-        log_auth_event(email, False, ip)
-        raise HTTPException(status_code=401, detail="Email sau parolă incorectă")
-
-    log_auth_event(email, True, ip)
-    token = create_access_token({"sub": email, "role": role})
-    biz_id_val = business.id if business else None
-    response = JSONResponse(content={
-        "access_token": token,
-        "token_type": "bearer",
-        "business_id": biz_id_val,
-        "user": {"email": email, "name": name, "role": role}
-    })
-    response.set_cookie(key="loial_token", value=token, httponly=True, max_age=86400, samesite="lax")
-    return response
+        if not authenticated:
+            log_auth_event(email, False, ip)
+            raise HTTPException(status_code=401, detail="Email sau parolă incorectă")
+    
+        log_auth_event(email, True, ip)
+        token = create_access_token({"sub": email, "role": role})
+        biz_id_val = business.id if business else None
+        response = JSONResponse(content={
+            "access_token": token,
+            "token_type": "bearer",
+            "business_id": biz_id_val,
+            "user": {"email": email, "name": name, "role": role}
+        })
+        response.set_cookie(key="loial_token", value=token, httponly=True, max_age=86400, samesite="lax")
+        return response
 
 
 @app.post("/auth/logout")
