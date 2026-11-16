@@ -238,6 +238,7 @@
       <div id="ambEnrollBox">
         <input type="text" id="ambName" placeholder="Numele tău complet">
         <input type="email" id="ambEmail" placeholder="Email-ul tău (pentru statistici și plăți)">
+        <input type="password" id="ambPassword" minlength="10" autocomplete="new-password" placeholder="Parolă nouă (minim 10 caractere)">
         <select id="ambPayoutMethod">
           <option value="wise">Plată prin Wise Business (Email / Tag)</option>
           <option value="iban">Transfer Bancar (IBAN EUR/RON)</option>
@@ -531,20 +532,27 @@
   async function activateAmbassador() {
     const name = document.getElementById('ambName').value.trim();
     const email = document.getElementById('ambEmail').value.trim();
+    const password = document.getElementById('ambPassword').value;
     const payout_method = document.getElementById('ambPayoutMethod').value;
     const payout_details = document.getElementById('ambPayoutDetails').value.trim();
-    if (!email) return;
+    if (!email || password.length < 10) {
+      alert('Completează emailul și alege o parolă de minimum 10 caractere.');
+      return;
+    }
 
     const btn = document.getElementById('ambJoinBtn');
     btn.textContent = 'Se activează...';
     const res = await fetch('/api/ambassador/join', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, payout_method, payout_details })
+      body: JSON.stringify({ name, email, password, payout_method, payout_details })
     });
     if (res.ok) {
       const data = await res.json();
       renderAmbassadorActive(data);
+    } else {
+      const error = await res.json().catch(() => ({}));
+      alert(error.detail || 'Nu am putut activa contul de ambasador.');
     }
     btn.textContent = 'Activează contul de Ambasador →';
   }
