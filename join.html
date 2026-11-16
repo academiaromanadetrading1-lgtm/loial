@@ -546,8 +546,20 @@
 
   async function loadUniversalWallet() {
     try {
-      const r = await fetch('/api/wallet-profile/' + globalWalletUuid);
-      if (!r.ok) return;
+      const privateToken=localStorage.getItem('loial_wallet_inbox_token')||'';
+      if(!privateToken){
+        document.getElementById('walletStatsPill').textContent=
+          'Cardul vechi necesită verificarea titularului pentru afișarea istoricului.';
+        return;
+      }
+      const r = await fetch('/api/wallet-profile/' + encodeURIComponent(globalWalletUuid),{
+        headers:{'X-Loial-Wallet-Token':privateToken}
+      });
+      if(!r.ok) {
+        document.getElementById('walletStatsPill').textContent=
+          'Datele private ale cardului nu pot fi accesate pe acest dispozitiv.';
+        return;
+      }
       const data = await r.json();
 
       document.getElementById('walletCount').textContent = data.businesses_count || 1;
