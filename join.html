@@ -7,6 +7,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#2d6a4f">
 <link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/pwa-icon-192.png">
+<script src="/loial-pwa-install.js" defer></script>
 <title>Portofelul meu - Loial.space</title>
 <style>
   :root { --brand: #2d6a4f; --gold: #f59e0b; }
@@ -184,7 +186,7 @@
     text-overflow:ellipsis;overflow:hidden;max-width:96%;letter-spacing:.03em;margin-top:5px}
   .metal-meta {display:flex;justify-content:space-between;gap:10px;margin-top:8px;
     font-size:9px;letter-spacing:.09em;color:#cfbd91;text-transform:uppercase}
-  .wallet-add-row {display:grid;grid-template-columns:1fr;gap:8px;margin:12px 0 6px}
+  .wallet-add-row {display:none;grid-template-columns:1fr;gap:8px;margin:12px 0 6px}
   .wallet-add-row button {padding:11px 8px;border:1px solid #c5b485;border-radius:10px;
     background:#15171c;color:#f5e5b9;font-weight:700;font-size:12px;cursor:pointer}
   .wallet-add-row button:disabled {opacity:.45;cursor:not-allowed}
@@ -216,6 +218,13 @@
   </div>
 
   <div class="reminder-pill" id="reminderBanner">💡 Codul tău QR universal funcționează la orice afacere Loial</div>
+  <section style="max-width:400px;width:100%;background:#111318;border:1px solid #c9aa69;border-radius:15px;padding:14px;margin:0 0 14px;text-align:center;color:#f0ddac;">
+    <strong style="font-size:15px">LOIAL · DIRECT PE TELEFON</strong>
+    <p style="font-size:12px;color:#d9d3c5;margin:6px 0">Adaugă Loial pe ecran. O apăsare deschide toate cardurile tale, fără Google Wallet sau Apple Wallet.</p>
+    <button type="button" id="pwaInstallBtn" style="background:#dbbf82;color:#151619;border:0;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:800;width:100%;">Adaugă Loial pe telefon</button>
+    <div id="pwaInstallHelp" style="font-size:11px;color:#dbcfae;margin-top:6px;" role="status"></div>
+    <a href="/wallet" style="display:inline-block;color:#ebd9a7;font-size:12px;margin-top:9px">Deschide portofelul meu universal</a>
+  </section>
 
   <!-- TAB 1: CARDUL CURENT -->
   <div class="wallet-pass" id="panelCard">
@@ -433,7 +442,8 @@
       body:JSON.stringify({
         business_id:bizId,name,email,uuid:globalWalletUuid,
         wallet_claim_token:claim,consent_marketing_email:false,
-        consent_loial_offers:!!options.inApp,consent_personalized_ads:!!options.ads
+        consent_loial_offers:!!options.inApp,consent_personalized_ads:!!options.ads,
+        friend_referral_code:localStorage.getItem('loial_friend_invite')||null
       })
     });
     if(!response.ok){
@@ -444,6 +454,15 @@
     if(result.inbox_access && result.inbox_access===claim){
       localStorage.setItem('loial_wallet_inbox_token',claim);
       localStorage.removeItem('loial_wallet_claim_pending_'+globalWalletUuid);
+    }
+    if(result.friend_invitation_status){
+      if(result.friend_invitation_status==='pending_first_verified_visit'){
+        localStorage.removeItem('loial_friend_invite');
+        document.getElementById('reminderBanner').textContent=
+          'Invitația prietenului este înregistrată. Punctele-pilot apar după prima ștampilă validată.';
+      }else if(['invalid','self_referral','already_attributed'].includes(result.friend_invitation_status)){
+        localStorage.removeItem('loial_friend_invite');
+      }
     }
     return result;
   }
