@@ -537,11 +537,24 @@ def login(request: Request, req: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Email sau parolă incorectă")
     
         log_auth_event(email, True, ip)
-    token = create_access_token({"sub": email, "role": role})
-    from fastapi.responses import JSONResponse
-    response = JSONResponse(content={"access_token": token, "token_type": "bearer", "user": {"email": email, "name": name, "role": role}})
+       token = create_access_token({"sub": email, "role": role})
+    biz_id_val = business.id if business else None
+    response = JSONResponse(content={
+        "access_token": token,
+        "token_type": "bearer",
+        "business_id": biz_id_val,
+        "user": {"email": email, "name": name, "role": role}
+    })
     response.set_cookie(key="loial_token", value=token, httponly=True, max_age=86400, samesite="lax")
     return response
+
+@app.post("/auth/logout")
+@app.get("/auth/logout")
+def logout_endpoint():
+    response = JSONResponse(content={"status": "logged_out"})
+    response.delete_cookie(key="loial_token")
+    return response
+
 
 @app.get("/customers")
 def get_customers(page: int = 1, limit: int = 20, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
