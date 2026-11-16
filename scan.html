@@ -3,11 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Scanare Card Client - Loial.space</title>
+<title>Terminal Casă - Loial.space</title>
 <link rel="preconnect" href="https://googleapis.com">
 <link rel="preconnect" href="https://gstatic.com" crossorigin>
 <link href="https://googleapis.com" rel="stylesheet">
-<script async src="https://jsdelivr.net"></script>
 <style>
   :root {
     --bg: #f6f9f7;
@@ -18,35 +17,31 @@
     --border: #dce6e0;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 24px 16px; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 16px; }
 
-  .card { width: 100%; max-width: 440px; background: var(--surface); border: 1px solid var(--border); border-radius: 26px; padding: 28px 22px; box-shadow: 0 18px 40px rgba(17, 31, 24, 0.08); text-align: center; }
+  .card { width: 100%; max-width: 430px; background: var(--surface); border: 1px solid var(--border); border-radius: 26px; padding: 30px 24px; box-shadow: 0 18px 40px rgba(17, 31, 24, 0.08); text-align: center; }
   .badge { display: inline-block; background: #e8f3ed; color: var(--primary); font-size: 12px; font-weight: 800; padding: 5px 12px; border-radius: 999px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
   h1 { font-size: 23px; font-weight: 800; margin-bottom: 6px; }
-  p.sub { font-size: 13.5px; color: var(--muted); margin-bottom: 20px; }
+  p.sub { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
 
-  input[type="password"], input[type="text"] {
+  input {
     width: 100%; padding: 14px; border: 1.5px solid var(--border); border-radius: 14px;
     background: #f6f9f7; font-size: 22px; font-weight: 800; text-align: center; letter-spacing: 8px;
     color: var(--text); margin-bottom: 14px; font-family: inherit;
   }
   input:focus { outline: none; border-color: var(--primary); background: #ffffff; }
 
-  .btn-camera {
-    display: flex; align-items: center; justify-content: center; gap: 10px;
-    width: 100%; padding: 18px 20px; border: none; border-radius: 16px;
+  .btn-primary {
+    width: 100%; padding: 16px 20px; border: none; border-radius: 14px;
     background: linear-gradient(135deg, #2d6a4f, #40916c); color: #ffffff;
-    font-size: 17px; font-weight: 800; cursor: pointer; font-family: inherit;
-    box-shadow: 0 10px 24px rgba(45, 106, 79, 0.32); margin-top: 8px;
+    font-size: 16px; font-weight: 800; cursor: pointer; font-family: inherit;
+    box-shadow: 0 8px 20px rgba(45, 106, 79, 0.28);
   }
-  .btn-camera:active { transform: scale(0.98); }
-
   .btn-secondary {
-    display: block; width: 100%; padding: 12px; border: 1.5px solid var(--border); border-radius: 12px;
-    background: #ffffff; color: var(--muted); font-size: 13.5px; font-weight: 700;
-    cursor: pointer; margin-top: 12px; font-family: inherit;
+    width: 100%; padding: 12px; border: 1.5px solid var(--border); border-radius: 12px;
+    background: #ffffff; color: var(--muted); font-size: 13px; font-weight: 700;
+    cursor: pointer; margin-top: 14px; font-family: inherit;
   }
-
   .btn-reward {
     width: 100%; padding: 16px; border: none; border-radius: 14px;
     background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff;
@@ -54,96 +49,96 @@
     box-shadow: 0 8px 20px rgba(217, 119, 6, 0.35);
   }
 
-  .result-box {
-    margin-top: 18px; padding: 18px; border-radius: 18px;
-    background: #e8f3ed; border: 1.5px solid #b7d7c5; color: #111f18;
-  }
-  .result-box.reward { background: #fef3c7; border-color: #f59e0b; }
-  .result-box.error { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
-
+  .status-box { margin-top: 16px; padding: 20px; border-radius: 18px; background: #e8f3ed; border: 1.5px solid #b7d7c5; }
+  .status-box.reward { background: #fef3c7; border-color: #f59e0b; }
+  .status-box.error { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
   .hidden { display: none; }
 </style>
 </head>
 <body>
 
 <div class="card">
-  <span class="badge" id="bizTag">SCANARE LA CASĂ</span>
-  <h1 id="bizName">Terminal Angajat</h1>
-  <p class="sub" id="subText">Introdu codul tău PIN din 4 cifre pentru a acorda ștampile</p>
+  <span class="badge">TERMINAL ANGAJAT</span>
+  <h1 id="bizName">Conectare Casă</h1>
+  <p class="sub" id="subText">Introdu PIN-ul tău de 4 cifre pentru a activa acest telefon ca terminal</p>
 
-  <!-- ECRAN 1: PIN ANGAJAT -->
+  <!-- ECRAN ACTIVARE TELEFON ANGAJAT -->
   <div id="pinScreen">
     <input type="password" id="pinInput" maxlength="4" inputmode="numeric" placeholder="••••">
-    <button type="button" class="btn-camera" onclick="unlockScanner()">Intră în scanare →</button>
+    <button type="button" class="btn-primary" onclick="activateTerminal()">Activează telefonul pentru scanare →</button>
     <p id="pinError" style="color:#dc2626;font-size:13px;font-weight:700;margin-top:10px;"></p>
   </div>
 
-  <!-- ECRAN 2: CAMERA FOTO NATIVĂ -->
-  <div id="scanScreen" class="hidden">
-    <p style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:14px;" id="staffLabel">✓ Conectat la casă</p>
+  <!-- ECRAN ACTIV -->
+  <div id="readyScreen" class="hidden">
+    <div id="resultBox" class="status-box">
+      <div style="font-size:32px;margin-bottom:8px;">📷</div>
+      <div style="font-size:16px;font-weight:800;color:var(--primary);margin-bottom:6px;">Telefon pregătit!</div>
+      <p style="font-size:13.5px;color:var(--muted);">Deschide <strong>Camera foto</strong> a telefonului (fără să faci poză), îndreaptă obiectivul spre codul QR al clientului și atinge link-ul care apare pe ecran.</p>
+    </div>
 
-    <!-- Input invizibil conectat direct la CAMERA FOTO a telefonului -->
-    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="processCameraPhoto(event)">
-
-    <button type="button" class="btn-camera" onclick="document.getElementById('cameraInput').click()">
-      📸 Scanează QR cu Camera Foto
-    </button>
-
-    <div id="statusBox" class="result-box hidden"></div>
-
-    <button type="button" class="btn-secondary" onclick="lockScanner()">Schimbă PIN / Ieșire</button>
+    <button type="button" class="btn-secondary" onclick="resetTerminal()">Schimbă angajatul / PIN-ul</button>
   </div>
 </div>
 
-<canvas id="qrCanvas" style="display:none;"></canvas>
-
 <script>
-  const pathParts = window.location.pathname.split('/');
-  const bizId = pathParts[pathParts.length - 1] || '1';
-  let activePin = sessionStorage.getItem('loial_staff_pin_' + bizId) || '';
-  let lastScannedUuid = '';
+  const pathParts = window.location.pathname.split('/').filter(Boolean);
+  const isDirectScan = pathParts === 'c';
+  const scannedWalletUuid = isDirectScan ? pathParts : '';
 
-  async function loadBizInfo() {
-    try {
-      const res = await fetch(`/api/biz-full/${bizId}`);
-      if (res.ok) {
-        const data = await res.json();
-        document.getElementById('bizName').textContent = data.name;
-        if (data.card_color) document.documentElement.style.setProperty('--primary', data.card_color);
+  let bizId = isDirectScan ? (localStorage.getItem('loial_terminal_biz_id') || '') : (pathParts || '1');
+  let staffPin = localStorage.getItem('loial_terminal_pin') || '';
+
+  async function init() {
+    if (bizId) {
+      try {
+        const res = await fetch(`/api/biz-full/${bizId}`);
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('bizName').textContent = data.name;
+          if (data.card_color) document.documentElement.style.setProperty('--primary', data.card_color);
+        }
+      } catch (e) {}
+    }
+
+    if (bizId && staffPin.length === 4) {
+      document.getElementById('pinScreen').classList.add('hidden');
+      document.getElementById('readyScreen').classList.remove('hidden');
+      document.getElementById('subText').textContent = 'Terminal activ pentru acordarea ștampilelor';
+
+      if (isDirectScan && scannedWalletUuid) {
+        await grantStampDirect(scannedWalletUuid);
       }
-    } catch (e) {}
+    } else if (isDirectScan) {
+      document.getElementById('subText').textContent = 'Acest telefon nu este încă activat. Deschide întâi link-ul de scanare al firmei.';
+    }
   }
-  loadBizInfo();
+  init();
 
-  if (activePin.length === 4) {
-    showScannerUI();
-  }
-
-  function unlockScanner() {
+  function activateTerminal() {
     const pin = document.getElementById('pinInput').value.trim();
     if (pin.length !== 4) {
       document.getElementById('pinError').textContent = 'Introdu un PIN valid din 4 cifre.';
       return;
     }
-    activePin = pin;
-    sessionStorage.setItem('loial_staff_pin_' + bizId, pin);
-    document.getElementById('pinError').textContent = '';
-    showScannerUI();
-  }
-
-  function showScannerUI() {
+    localStorage.setItem('loial_terminal_biz_id', bizId);
+    localStorage.setItem('loial_terminal_pin', pin);
+    staffPin = pin;
     document.getElementById('pinScreen').classList.add('hidden');
-    document.getElementById('scanScreen').classList.remove('hidden');
-    document.getElementById('subText').textContent = 'Apasă butonul de mai jos și fă o poză codului QR al clientului';
+    document.getElementById('readyScreen').classList.remove('hidden');
+    document.getElementById('subText').textContent = 'Terminal activ pentru acordarea ștampilelor';
+    if (isDirectScan && scannedWalletUuid) {
+      grantStampDirect(scannedWalletUuid);
+    }
   }
 
-  function lockScanner() {
-    sessionStorage.removeItem('loial_staff_pin_' + bizId);
-    activePin = '';
+  function resetTerminal() {
+    localStorage.removeItem('loial_terminal_biz_id');
+    localStorage.removeItem('loial_terminal_pin');
+    staffPin = '';
     document.getElementById('pinInput').value = '';
-    document.getElementById('scanScreen').classList.add('hidden');
+    document.getElementById('readyScreen').classList.add('hidden');
     document.getElementById('pinScreen').classList.remove('hidden');
-    document.getElementById('subText').textContent = 'Introdu codul tău PIN din 4 cifre pentru a acorda ștampile';
   }
 
   function playBeep() {
@@ -158,73 +153,10 @@
     } catch (e) {}
   }
 
-  function processCameraPhoto(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const box = document.getElementById('statusBox');
-    box.className = 'result-box';
-    box.classList.remove('hidden');
-    box.innerHTML = '⏳ Se citește codul QR din fotografie...';
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const img = new Image();
-      img.onload = async function() {
-        const canvas = document.getElementById('qrCanvas');
-        const ctx = canvas.getContext('2d');
-        const maxDim = 1000;
-        let w = img.width;
-        let h = img.height;
-        if (w > maxDim || h > maxDim) {
-          if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
-          else { w = Math.round(w * maxDim / h); h = maxDim; }
-        }
-        canvas.width = w;
-        canvas.height = h;
-        ctx.drawImage(img, 0, 0, w, h);
-
-        const imageData = ctx.getImageData(0, 0, w, h);
-        let decodedText = '';
-
-        if ('BarcodeDetector' in window) {
-          try {
-            const detector = new BarcodeDetector({ formats: ['qr_code'] });
-            const codes = await detector.detect(canvas);
-            if (codes.length > 0) decodedText = codes[0].rawValue;
-          } catch (err) {}
-        }
-
-        if (!decodedText && typeof jsQR !== 'undefined') {
-          const code = jsQR(imageData.data, w, h, { inversionAttempts: 'attemptBoth' });
-          if (code) decodedText = code.data;
-        }
-
-        event.target.value = '';
-
-        if (!decodedText) {
-          box.className = 'result-box error';
-          box.innerHTML = '❌ Nu s-a detectat un cod QR clar în poză. Încearcă să fotografiezi codul mai de aproape.';
-          return;
-        }
-
-        await sendScanToServer(decodedText);
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  }
-
-  async function sendScanToServer(qrContent) {
-    const box = document.getElementById('statusBox');
-    let walletUuid = qrContent.trim();
-    if (walletUuid.includes('wallet=')) {
-      walletUuid = walletUuid.split('wallet=')[1].split('&')[0];
-    } else if (walletUuid.includes('/')) {
-      const parts = walletUuid.split('/').filter(Boolean);
-      walletUuid = parts[parts.length - 1];
-    }
-    lastScannedUuid = walletUuid;
+  async function grantStampDirect(walletUuid) {
+    const box = document.getElementById('resultBox');
+    box.className = 'status-box';
+    box.innerHTML = '⏳ Se acordă ștampila...';
 
     try {
       const res = await fetch('/api/scan-universal', {
@@ -233,46 +165,43 @@
         body: JSON.stringify({
           business_id: parseInt(bizId),
           wallet_uuid: walletUuid,
-          staff_pin: activePin
+          staff_pin: staffPin
         })
       });
-
       const data = await res.json();
+
       if (!res.ok) {
-        box.className = 'result-box error';
-        box.innerHTML = `❌ ${data.detail || 'PIN incorect sau cod invalid.'}`;
+        box.className = 'status-box error';
+        box.innerHTML = `<strong>❌ ${data.detail || 'PIN incorect sau cod invalid.'}</strong>`;
         return;
       }
 
       playBeep();
-      if (data.staff_name) {
-        document.getElementById('staffLabel').textContent = `✓ Angajat la casă: ${data.staff_name}`;
-      }
-
       if (data.reward_unlocked) {
-        box.className = 'result-box reward';
+        box.className = 'status-box reward';
         box.innerHTML = `
-          <div style="font-size:18px;font-weight:800;margin-bottom:6px;">🏆 PREMIU DEBLOCAT!</div>
+          <div style="font-size:19px;font-weight:800;margin-bottom:6px;">🏆 PREMIU DEBLOCAT!</div>
           <div style="font-size:14px;margin-bottom:8px;">Client: <strong>${data.customer_name}</strong> (${data.stamps}/${data.stamps_required})</div>
-          <div style="font-size:13.5px;font-weight:700;color:#92400e;">🎁 ${data.reward_text}</div>
-          <button type="button" class="btn-reward" onclick="redeemReward('${walletUuid}')">🎁 Acordă premiul și resetează cardul (0)</button>
+          <div style="font-size:14px;font-weight:700;color:#92400e;">🎁 ${data.reward_text}</div>
+          <button type="button" class="btn-reward" onclick="redeemDirect('${walletUuid}')">🎁 Acordă premiul și resetează cardul (0)</button>
         `;
       } else {
-        box.className = 'result-box';
+        box.className = 'status-box';
         box.innerHTML = `
-          <div style="font-size:17px;font-weight:800;color:var(--primary);margin-bottom:4px;">✓ Ștampilă adăugată!</div>
-          <div style="font-size:14.5px;">Client: <strong>${data.customer_name}</strong></div>
-          <div style="font-size:16px;font-weight:800;margin-top:4px;">Progres: ${data.stamps} / ${data.stamps_required} ★</div>
+          <div style="font-size:18px;font-weight:800;color:var(--primary);margin-bottom:4px;">✓ Ștampilă adăugată!</div>
+          <div style="font-size:15px;">Client: <strong>${data.customer_name}</strong></div>
+          <div style="font-size:17px;font-weight:800;margin-top:6px;">Progres: ${data.stamps} / ${data.stamps_required} ★</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:10px;">Poți închide fereastra sau scana următorul client cu Camera telefonului.</div>
         `;
       }
     } catch (e) {
-      box.className = 'result-box error';
-      box.innerHTML = '❌ Eroare de conexiune. Încearcă din nou.';
+      box.className = 'status-box error';
+      box.innerHTML = '<strong>❌ Eroare de conexiune. Încearcă din nou.</strong>';
     }
   }
 
-  async function redeemReward(walletUuid) {
-    const box = document.getElementById('statusBox');
+  async function redeemDirect(walletUuid) {
+    const box = document.getElementById('resultBox');
     try {
       const res = await fetch('/api/redeem-universal', {
         method: 'POST',
@@ -280,15 +209,15 @@
         body: JSON.stringify({
           business_id: parseInt(bizId),
           wallet_uuid: walletUuid,
-          staff_pin: activePin
+          staff_pin: staffPin
         })
       });
       if (res.ok) {
         playBeep();
-        box.className = 'result-box';
+        box.className = 'status-box';
         box.innerHTML = `
-          <div style="font-size:17px;font-weight:800;color:var(--primary);">✅ Premiu acordat cu succes!</div>
-          <div style="font-size:13.5px;margin-top:4px;">Cardul clientului a fost resetat la <strong>0 ștampile</strong>.</div>
+          <div style="font-size:18px;font-weight:800;color:var(--primary);">✅ Premiu acordat!</div>
+          <div style="font-size:14px;margin-top:4px;">Cardul clientului a fost resetat la <strong>0 ștampile</strong>.</div>
         `;
       }
     } catch (e) {}
@@ -296,4 +225,3 @@
 </script>
 </body>
 </html>
-
