@@ -10,41 +10,39 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Inter', system-ui, sans-serif; background: #f6f9f7; color: #111f18; padding: 20px; text-align: center; }
-  .container { max-width: 420px; margin: 0 auto; }
+  .container { max-width: 430px; margin: 0 auto; }
   
   .alert-box {
     background: #fef3c7; border: 1.5px solid #f59e0b; color: #92400e;
     padding: 14px; border-radius: 16px; font-size: 14px; font-weight: 700;
     margin-bottom: 16px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.12);
-    transition: all 0.25s ease;
   }
-  .alert-box.client-near {
-    background: #dbeafe; border-color: #2563eb; color: #1e40af;
-    animation: bounce 0.9s infinite alternate;
-  }
-  @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+  .alert-box.client-near { background: #dbeafe; border-color: #2563eb; color: #1e40af; }
 
   .card { background: #ffffff; border: 1px solid #dce6e0; border-radius: 22px; padding: 24px; box-shadow: 0 12px 28px rgba(17, 31, 24, 0.06); }
   h2 { font-size: 21px; font-weight: 800; margin-bottom: 12px; }
-  input {
+  input[type="password"] {
     padding: 14px; border: 1.5px solid #dce6e0; border-radius: 14px;
     background: #f6f9f7; color: #111f18; font-size: 24px; font-weight: 800;
     text-align: center; width: 160px; letter-spacing: 6px; outline: none;
   }
-  input:focus { border-color: #2d6a4f; background: #ffffff; }
   .btn {
     display: block; width: 100%; padding: 15px; border: none; border-radius: 14px;
     background: linear-gradient(135deg, #2d6a4f, #40916c); color: #ffffff;
-    font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 16px; font-family: inherit;
-    box-shadow: 0 6px 16px rgba(45, 106, 79, 0.25);
+    font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 14px; font-family: inherit;
+  }
+  .btn-outline {
+    display: block; width: 100%; padding: 13px; border: 1.5px solid #dce6e0; border-radius: 14px;
+    background: #f6f9f7; color: #111f18; font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-top: 10px; font-family: inherit;
   }
   .btn-gold {
     display: block; width: 100%; padding: 15px; border: none; border-radius: 14px;
     background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff;
     font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 12px; font-family: inherit;
-    box-shadow: 0 6px 16px rgba(245, 158, 11, 0.35);
   }
-  #reader { width: 100%; border-radius: 16px; overflow: hidden; margin: 14px 0; }
+  #reader { width: 100%; border-radius: 16px; overflow: hidden; margin: 12px 0; min-height: 40px; }
+  .cam-note { font-size: 12.5px; color: #475d52; margin-bottom: 10px; }
   .success-card { background: #dcfce7; border: 1.5px solid #22c55e; color: #166534; padding: 20px; border-radius: 18px; margin-top: 14px; font-weight: 700; }
   .reward-card { background: linear-gradient(135deg, #fef3c7, #fde68a); border: 2px solid #f59e0b; color: #78350f; padding: 22px; border-radius: 18px; margin-top: 14px; font-weight: 700; }
   .pin-error { color: #dc2626; font-size: 13px; font-weight: 700; margin-top: 8px; min-height: 18px; }
@@ -60,14 +58,19 @@
     <h2>Scanare Card Client</h2>
     
     <div id="pinForm">
-      <p style="font-size: 13.5px; color: #475d52; margin-bottom: 14px;">Introdu PIN-ul tău de 4 cifre pentru a porni camera:</p>
+      <p style="font-size: 13.5px; color: #475d52; margin-bottom: 14px;">Introdu PIN-ul tău de 4 cifre (implicit 1234):</p>
       <input type="password" id="pin" placeholder="••••" maxlength="4" inputmode="numeric">
       <div class="pin-error" id="pinError"></div>
-      <button class="btn" onclick="startScan()">Pornește Camera →</button>
+      <button type="button" class="btn" onclick="startScan()">Pornește Scanarea →</button>
     </div>
 
     <div id="scanner" style="display:none">
       <div id="reader"></div>
+      <div class="cam-note" id="camStatus">Se inițializează camera...</div>
+      
+      <input type="file" id="qrFileInput" accept="image/*" style="display:none" onchange="scanFromFile(this)">
+      <button type="button" class="btn-outline" onclick="document.getElementById('qrFileInput').click()">🖼️ Scanează QR din poză / galerie</button>
+      
       <div id="result"></div>
     </div>
   </div>
@@ -75,40 +78,14 @@
 
 <script src="https://unpkg.com"></script>
 <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  }
-
   const bizId = parseInt(location.pathname.split('/').pop()) || 1;
   let pin = sessionStorage.getItem('loial_staff_pin_' + bizId) || '';
   let isProcessing = false;
   let lastAlertUuid = '';
+  let html5Qr = null;
 
   if (pin.length === 4) {
     document.getElementById('pin').value = pin;
-  }
-
-  window.addEventListener('online', syncOfflineScans);
-  setInterval(syncOfflineScans, 8000);
-
-  async function syncOfflineScans() {
-    let queue = JSON.parse(localStorage.getItem('loial_offline_queue') || '[]');
-    if (queue.length === 0 || !navigator.onLine) return;
-
-    const remaining = [];
-    for (const item of queue) {
-      try {
-        const res = await fetch('/api/scan-v2', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(item)
-        });
-        if (!res.ok && res.status >= 500) remaining.push(item);
-      } catch (e) {
-        remaining.push(item);
-      }
-    }
-    localStorage.setItem('loial_offline_queue', JSON.stringify(remaining));
   }
 
   function playBeep() {
@@ -132,8 +109,19 @@
     sessionStorage.setItem('loial_staff_pin_' + bizId, pin);
     document.getElementById('pinForm').style.display = 'none';
     document.getElementById('scanner').style.display = 'block';
-    const scanner = new Html5Qrcode("reader");
-    scanner.start({ facingMode: "environment" }, { fps: 12, qrbox: 240 }, onScan);
+
+    if (typeof Html5Qrcode !== 'undefined') {
+      html5Qr = new Html5Qrcode("reader");
+      html5Qr.start({ facingMode: "environment" }, { fps: 12, qrbox: 230 }, onScan)
+        .then(() => {
+          document.getElementById('camStatus').textContent = 'Îndreaptă camera spre codul QR al clientului';
+        })
+        .catch(() => {
+          document.getElementById('camStatus').textContent = 'Camera nu este activă pe acest dispozitiv. Folosește butonul de mai jos pentru a scana o poză QR.';
+        });
+    } else {
+      document.getElementById('camStatus').textContent = 'Modul cameră indisponibil offline. Folosește scanarea din poză.';
+    }
 
     setInterval(async () => {
       try {
@@ -150,13 +138,27 @@
     }, 2500);
   }
 
+  async function scanFromFile(input) {
+    if (!input.files || !input.files) return;
+    const file = input.files;
+    try {
+      const fileScanner = new Html5Qrcode("reader");
+      const decodedText = await fileScanner.scanFile(file, true);
+      isProcessing = false;
+      onScan(decodedText);
+    } catch (err) {
+      document.getElementById('result').innerHTML = `<p style="color:#dc2626;font-weight:700;margin-top:12px;">Nu am detectat un cod QR valid în această imagine.</p>`;
+    }
+    input.value = '';
+  }
+
   async function onScan(uuid) {
     if (isProcessing) return;
     isProcessing = true;
     const payload = { pin: pin, business_id: bizId, customer_uuid: uuid };
 
     try {
-      const res = await fetch('/api/scan-v2', {
+      const res = await fetch('/api/scan-universal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -171,10 +173,9 @@
         );
       } else if (res.status === 401 || res.status === 404) {
         const errData = await res.json();
-        sessionStorage.removeItem('loial_staff_pin_' + bizId);
         document.getElementById('result').innerHTML = `
           <p style="color:#dc2626;font-weight:700;margin-top:12px;">${errData.detail}</p>
-          <button class="btn" onclick="location.reload()">Reintrodu PIN-ul</button>`;
+          <button class="btn" onclick="resetScan()">Încearcă din nou</button>`;
       } else {
         throw new Error('Server sync delayed');
       }
@@ -227,9 +228,6 @@
   }
 
   function resetScan() {
-    isProcessing = false;
-    document.getElementById('result').innerHTML = '';
-     function resetScan() {
     isProcessing = false;
     document.getElementById('result').innerHTML = '';
   }
