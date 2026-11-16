@@ -1897,32 +1897,21 @@ class QRScanRequest(BaseModel):
     pin: str
     business_id: int
     customer_uuid: str
+    idempotency_key: Optional[str] = None
 
 @app.post("/api/scan")
-def qr_scan_stamp(req: QRScanRequest, db: Session = Depends(get_db)):
-    biz = db.query(BusinessAccount).filter(
-        BusinessAccount.id == req.business_id,
-        BusinessAccount.staff_pin == req.pin,
-        BusinessAccount.staff_pin != "1234"
-    ).first()
-    if not biz:
-        raise HTTPException(status_code=401, detail="PIN incorect")
-    customer = db.query(Customer).filter(
-        Customer.uuid == req.customer_uuid,
-        Customer.business_id == req.business_id
-    ).first()
-    if not customer:
-        raise HTTPException(status_code=404, detail="Client negăsit la această locație")
-    customer.stamps = (customer.stamps or 0) + 1
-    customer.last_visit = datetime.now().isoformat()
-    from loial_inbox import queue_service_event
-    from loial_wallet_sync import queue_google_refresh
-    queue_service_event(db,biz,customer,kind="stamp",event_key=uuid.uuid4().hex)
-    queue_google_refresh(db,biz.id,customer.wallet_uuid or customer.uuid)
-    from loial_apple_updates import mark_customer_pass_changed
-    mark_customer_pass_changed(db,biz.id,customer.wallet_uuid or customer.uuid)
-    db.commit()
-    return {"stamps": customer.stamps, "name": customer.name, "business_id": biz.id}
+@limiter.limit("30/minute")
+def qr_scan_stamp(request: Request, req: QRScanRequest, db: Session = Depends(get_db)):
+    """Compatibility endpoint; all stamp grants use the audited universal path."""
+    biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
+    if not biz or not biz.staff_pin or biz.staff_pin == "1234" or req.pin != biz.staff_pin:
+        raise HTTPException(status_code=401, detail="PIN principal invalid sau schimbarea lui este necesara")
+    scanned = scan_universal_card(request, UniversalScanRequest(
+        pin=req.pin,business_id=req.business_id,
+        customer_uuid=req.customer_uuid,idempotency_key=req.idempotency_key),db)
+    return {"stamps":scanned["stamps"],"name":scanned["name"],
+            "business_id":req.business_id,
+            "duplicate_ignored":scanned.get("duplicate_ignored",False)}
 
 @app.get("/review/{business_id}")
 def review_gate_page(business_id: int):
@@ -2313,52 +2302,11 @@ def update_business_offer(req: FullBusinessSettings, credentials: HTTPAuthorizat
 @app.post("/api/scan-v2")
 @limiter.limit("30/minute")
 def qr_scan_with_staff(request: Request, req: QRScanRequest, db: Session = Depends(get_db)):
-    biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
-    if not biz:
-        raise HTTPException(status_code=404, detail="Afacere negăsită")
-    
-    staff = db.query(StaffMember).filter(
-        StaffMember.business_id == req.business_id,
-        StaffMember.pin == req.pin,
-        StaffMember.active == 1
-    ).first()
-    
-    # Acceptă fie PIN-ul unui angajat activ, fie PIN-ul principal al administratorului
-    if not staff and (not biz.staff_pin or biz.staff_pin=="1234" or biz.staff_pin!=req.pin):
-        raise HTTPException(status_code=401, detail="PIN incorect sau angajat dezactivat")
-    
-    customer = db.query(Customer).filter(
-        Customer.uuid == req.customer_uuid,
-        Customer.business_id == req.business_id
-    ).first()
-    if not customer:
-        raise HTTPException(status_code=404, detail="Client negăsit la această locație")
-    
-    target = getattr(biz, "stamps_required", None) or 6
-    customer.stamps = (customer.stamps or 0) + 1
-    reward_unlocked = False
-    if customer.stamps >= target:
-        reward_unlocked = True
-    
-    if staff:
-        staff.scans_count = (staff.scans_count or 0) + 1
-        
-    customer.last_visit = datetime.now().isoformat()
-    from loial_inbox import queue_service_event
-    from loial_wallet_sync import queue_google_refresh
-    queue_service_event(db,biz,customer,kind="stamp",event_key=uuid.uuid4().hex)
-    queue_google_refresh(db,biz.id,customer.wallet_uuid or customer.uuid)
-    from loial_apple_updates import mark_customer_pass_changed
-    mark_customer_pass_changed(db,biz.id,customer.wallet_uuid or customer.uuid)
-    db.commit()
-    return {
-        "stamps": customer.stamps,
-        "target": target,
-        "reward_unlocked": reward_unlocked,
-        "name": customer.name,
-        "staff_name": staff.name if staff else "Administrator",
-        "business_id": biz.id
-    }
+    """Compatibility endpoint with shared idempotency, reward and inbox handling."""
+    scanned = scan_universal_card(request, UniversalScanRequest(
+        pin=req.pin,business_id=req.business_id,
+        customer_uuid=req.customer_uuid,idempotency_key=req.idempotency_key),db)
+    return {**scanned, "business_id":req.business_id}
 
 # Autorizare stricta pentru citirea/modificarea informatiilor private ale firmei.
 def require_business_owner_or_admin(business_id: int, credentials, db: Session):
@@ -2683,6 +2631,8 @@ class UniversalScanRequest(BaseModel):
 @app.post("/api/scan-universal")
 @limiter.limit("30/minute")
 def scan_universal_card(request: Request, req: UniversalScanRequest, db: Session = Depends(get_db)):
+    if req.pin=="1234":
+        raise HTTPException(status_code=401,detail="PIN vechi nesigur. Schimba-l din panoul firmei.")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
