@@ -472,8 +472,13 @@
     }
   }
 
+  function escapeHtml(value) {
+    return String(value==null?'':value).replace(/[&<>"']/g,c=>({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    })[c]);
+  }
   function renderDashboardData(data) {
-    const brandColor = data.card_color || '#2d6a4f';
+    const brandColor = /^#[0-9a-fA-F]{6}$/.test(data.card_color||'') ? data.card_color : '#2d6a4f';
     document.documentElement.style.setProperty('--primary', brandColor);
 
     document.getElementById('bizTitle').textContent = data.name;
@@ -496,10 +501,10 @@
     if (data.staff && data.staff.length > 0) {
       staffTbody.innerHTML = data.staff.map(s => `
         <tr>
-          <td><strong>${s.name}</strong></td>
-          <td><code>${s.pin}</code></td>
-          <td>${s.scans_count} scanări</td>
-          <td><button type="button" class="btn-danger" onclick="removeStaff(${s.id})">Elimină</button></td>
+          <td><strong>${escapeHtml(s.name)}</strong></td>
+          <td><code>${escapeHtml(s.pin)}</code></td>
+          <td>${Number(s.scans_count)||0} scanări</td>
+          <td><button type="button" class="btn-danger" onclick="removeStaff(${Number(s.id)})">Elimină</button></td>
         </tr>
       `).join('');
     } else {
@@ -509,9 +514,9 @@
     if (data.customers && data.customers.length > 0) {
       document.getElementById('customersTable').innerHTML = data.customers.map(c => `
         <tr>
-          <td><strong>${c.name}</strong></td>
-          <td>${c.stamps} / ${data.stamps_required} ★</td>
-          <td style="color: var(--text-muted);">${(c.last_visit || '').split('T')[0]}</td>
+          <td><strong>${escapeHtml(c.name)}</strong></td>
+          <td>${Number(c.stamps)||0} / ${Number(data.stamps_required)||6} ★</td>
+          <td style="color: var(--text-muted);">${escapeHtml((c.last_visit || '').split('T')[0])}</td>
         </tr>
       `).join('');
     }
@@ -637,30 +642,30 @@
 
     document.getElementById('adminBizTable').innerHTML = (data.businesses || []).map(b => `
       <tr>
-        <td><strong>${b.name}</strong></td>
-        <td>${b.email}</td>
-        <td>${b.ambassador_name}</td>
-        <td>${b.customers_count}</td>
-        <td><strong>${b.plan.toUpperCase()}</strong></td>
+        <td><strong>${escapeHtml(b.name)}</strong></td>
+        <td>${escapeHtml(b.email)}</td>
+        <td>${escapeHtml(b.ambassador_name)}</td>
+        <td>${Number(b.customers_count)||0}</td>
+        <td><strong>${escapeHtml((b.plan||'').toUpperCase())}</strong></td>
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
           <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" onclick="toggleProPlan(${b.id})">
             ${b.plan === 'probusiness' ? 'Treci pe Start' : 'Activează ProBusiness (65€)'}
           </button>
-          <button type="button" class="btn-danger" onclick="deleteBiz(${b.id}, '${b.name}')">🗑️ Șterge</button>
+          <button type="button" class="btn-danger" data-admin-action="deleteBiz" data-id="${Number(b.id)}" data-name="${escapeHtml(b.name)}">🗑️ Șterge</button>
         </td>
       </tr>
     `).join('');
 
     document.getElementById('adminAmbTable').innerHTML = (data.ambassadors || []).map(a => `
       <tr>
-        <td><strong>${a.agent_name}</strong><br><span style="font-size:12px;color:#475d52;">${a.email}</span></td>
-        <td>${a.rank}</td>
-        <td>${a.total_active_businesses} firme</td>
-        <td>${a.new_this_month} noi (20€) + ${a.recurring_businesses} rec. (${a.recurring_rate}€)</td>
-        <td><strong style="color:#2d6a4f;font-size:15px;">${a.total} EUR</strong></td>
+        <td><strong>${escapeHtml(a.agent_name)}</strong><br><span style="font-size:12px;color:#475d52;">${escapeHtml(a.email)}</span></td>
+        <td>${escapeHtml(a.rank)}</td>
+        <td>${Number(a.total_active_businesses)||0} firme</td>
+        <td>${Number(a.new_this_month)||0} noi (20€) + ${Number(a.recurring_businesses)||0} rec. (${Number(a.recurring_rate)||0}€)</td>
+        <td><strong style="color:#2d6a4f;font-size:15px;">${Number(a.total)||0} EUR</strong></td>
         <td>
-          <code>${a.payout_method}: ${a.payout_details || 'nesetat'}</code>
-          <button type="button" class="btn-danger" style="margin-left:8px;" onclick="deleteAmb(${a.agent_id}, '${a.agent_name}')">🗑️</button>
+          <code>${escapeHtml(a.payout_method)}: ${escapeHtml(a.payout_details || 'nesetat')}</code>
+          <button type="button" class="btn-danger" style="margin-left:8px;" data-admin-action="deleteAmb" data-id="${Number(a.agent_id)}" data-name="${escapeHtml(a.agent_name)}">🗑️</button>
         </td>
       </tr>
     `).join('');
@@ -674,19 +679,32 @@
 
     document.getElementById('adminTopCustTable').innerHTML = (data.top_customers || []).map(c => `
       <tr>
-        <td><strong>${c.name}</strong></td>
-        <td>${c.businesses_count} afaceri</td>
-        <td>${c.total_stamps} ★</td>
-        <td style="font-size:12px;color:#2d6a4f;">${c.bonus || 'Fără bonus încă'}</td>
+        <td><strong>${escapeHtml(c.name)}</strong></td>
+        <td>${Number(c.businesses_count)||0} afaceri</td>
+        <td>${Number(c.total_stamps)||0} ★</td>
+        <td style="font-size:12px;color:#2d6a4f;">${escapeHtml(c.bonus || 'Fără bonus încă')}</td>
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" onclick="sendManualBonus('${c.wallet_uuid}', '${c.name}')">
+          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" data-admin-action="sendBonus" data-wallet="${escapeHtml(c.wallet_uuid)}" data-name="${escapeHtml(c.name)}">
             🎁 Trimite Bonus
           </button>
-          <button type="button" class="btn-danger" onclick="deleteCust('${c.wallet_uuid}', '${c.name}')">🗑️</button>
+          <button type="button" class="btn-danger" data-admin-action="deleteCust" data-wallet="${escapeHtml(c.wallet_uuid)}" data-name="${escapeHtml(c.name)}">🗑️</button>
         </td>
       </tr>
     `).join('');
   }
+
+  document.getElementById('superAdminSection').addEventListener('click',event=>{
+    const button=event.target.closest('button[data-admin-action]');
+    if(!button)return;
+    const action=button.dataset.adminAction;
+    const id=Number(button.dataset.id);
+    const wallet=button.dataset.wallet||'';
+    const name=button.dataset.name||'';
+    if(action==='deleteBiz'&&Number.isInteger(id))deleteBiz(id,name);
+    else if(action==='deleteAmb'&&Number.isInteger(id))deleteAmb(id,name);
+    else if(action==='sendBonus'&&wallet)sendManualBonus(wallet,name);
+    else if(action==='deleteCust'&&wallet)deleteCust(wallet,name);
+  });
 
   async function toggleProPlan(id) {
     await authorizedFetch(`/api/admin/business/${id}/toggle-pro`, { method: 'POST' });
