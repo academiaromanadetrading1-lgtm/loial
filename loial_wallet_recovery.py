@@ -34,6 +34,7 @@ class RecoveryTicket(RecoveryBase):
     expires_at=Column(String(40),nullable=False)
     created_at=Column(String(40),nullable=False)
     used_at=Column(String(40))
+    verification_note=Column(String(200),nullable=False,default="")
 
 class RecoveryRequest(BaseModel):
     customer_id:int=Field(gt=0)
@@ -116,7 +117,8 @@ def install_wallet_recovery(app,engine,factory,BusinessAccount,Customer,
         ticket=RecoveryTicket(business_id=biz.id,customer_id=customer.id,
             ticket_hash=sha(raw),status="pending",
             expires_at=(now_time+timedelta(minutes=TTL_MINUTES)).isoformat(),
-            created_at=now_time.isoformat())
+            created_at=now_time.isoformat(),
+            verification_note=req.verification_note.strip())
         db.add(ticket)
         db.commit()
         return {"recovery_url":"https://loial.space/wallet-recovery.html?code="+raw,
@@ -152,26 +154,30 @@ def install_wallet_recovery(app,engine,factory,BusinessAccount,Customer,
                 "Un dispozitiv privat este deja asociat; transferul nu este permis prin codul comerciantului.")
         if not req.new_wallet_uuid.startswith("W-"):
             raise HTTPException(status_code=422,detail="Identificatorul portofelului nou este invalid")
-        if verified_wallet(db,req.new_wallet_uuid):
-            # Never transfer the card based on an unverified existing UUID.
-            raise HTTPException(status_code=409,detail="Portofelul destinatie exista deja")
-        # Newly generated wallet UUID may not have an existing claim or card.
-        if db.query(Customer).filter(
-            (Customer.uuid==req.new_wallet_uuid) |
-            (Customer.wallet_uuid==req.new_wallet_uuid)).first():
-            raise HTTPException(status_code=409,detail="Identificatorul de destinatie este folosit")
+        destination=verified_wallet(db,req.new_wallet_uuid)
+        if destination and destination.token_hash!=access_hash(req.new_private_token):
+            raise HTTPException(status_code=409,detail="Portofelul destinatie nu este verificat")
+        existing_card=db.query(Customer).filter(
+            Customer.business_id==ticket.business_id,
+            ((Customer.uuid==req.new_wallet_uuid) |
+             (Customer.wallet_uuid==req.new_wallet_uuid))).first()
+        if existing_card and existing_card.id!=customer.id:
+            raise HTTPException(status_code=409,detail="Exista deja un card pentru aceasta firma pe portofelul ales")
         current=now_utc()
         old_wallet=prior_wallet
         # New independent card identity, so the old public QR cannot be scanned.
+        old_card_uuid=customer.uuid
         customer.uuid="REC-"+uuid.uuid4().hex
         customer.wallet_uuid=req.new_wallet_uuid
-        db.add(WalletInboxAccess(wallet_uuid=req.new_wallet_uuid,
-                                 token_hash=access_hash(req.new_private_token),
-                                 created_at=current.isoformat()))
-        # Move only the merchant's own verified itemized purchase links.
+        if not destination:
+            db.add(WalletInboxAccess(wallet_uuid=req.new_wallet_uuid,
+                                     token_hash=access_hash(req.new_private_token),
+                                     created_at=current.isoformat()))
+        # Preserve purchases only for this business, never for other merchants.
+        from sqlalchemy import or_
         for row in db.query(AISale).filter(
             AISale.business_id==ticket.business_id,
-            AISale.customer_uuid==old_wallet).all():
+            AISale.customer_uuid.in_([old_wallet,old_card_uuid])).all():
             row.customer_uuid=req.new_wallet_uuid
         ticket.status="used"
         ticket.used_at=current.isoformat()
