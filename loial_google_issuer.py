@@ -60,7 +60,7 @@ def merchant_class_payload(class_id, merchant_name):
         "programLogo":{"sourceUri":{"uri":LOGO_URI},
                        "contentDescription":{"defaultValue":{
                          "language":"ro","value":"Loial Black Metal"}}},
-        "reviewStatus":"underReview",
+        "reviewStatus":"UNDER_REVIEW",
         "hexBackgroundColor":"#0D0E11",
         "accountNameLabel":"Titular",
         "accountIdLabel":"Card Loial",
@@ -125,8 +125,11 @@ def ensure_google_class(kind, class_id, merchant_name="Loial", transport=None,
             result=existing.json()
         if result.get("id") != class_id:
             raise RuntimeError("Google Wallet class ID mismatch")
-        if kind=="loyalty" and result.get("reviewStatus") in ("draft","REVIEW_STATUS_UNSPECIFIED"):
-            raise RuntimeError("Google Wallet class is still a draft")
+        if kind=="loyalty":
+            review=str(result.get("reviewStatus","")).upper()
+            if review in ("DRAFT","REVIEW_STATUS_UNSPECIFIED","REJECTED","") or
+                not review in ("UNDER_REVIEW","APPROVED"):
+                raise RuntimeError("Google Wallet class is not ready; review status: "+review)
     if transport is None:
         with _lock:
             _cache[key]=ts+3600
