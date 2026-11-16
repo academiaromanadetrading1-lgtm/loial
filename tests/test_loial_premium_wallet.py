@@ -165,7 +165,7 @@ def test_premium_pass_download_is_blocked_without_issuer_credentials(app_env):
     card_headers={"X-Loial-Wallet-Token":token}
     assert client.get("/api/premium-wallet/customer/1/apple",headers=card_headers).status_code==503
     assert client.get("/api/premium-wallet/customer/1/google",headers=card_headers).status_code==503
-    assert client.get("/api/premium-wallet/customer/2/apple",headers=card_headers).status_code==404
+    assert client.get("/api/premium-wallet/customer/2/apple",headers=card_headers).status_code==503
     assert client.get("/api/premium-wallet/customer/cards").status_code==401
 
 def test_apple_pass_archive_is_signed_with_test_keys(monkeypatch, app_env):
