@@ -654,12 +654,57 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         stream = io.StringIO()
         stream.write("\ufeff")
         writer = csv.writer(stream)
-        writer.writerow(columns)
-        writer.writerows(records)
+        sanitize_cell = lambda value: ("'" + value) if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")) else value
+        writer.writerow([sanitize_cell(x) for x in columns])
+        writer.writerows([[sanitize_cell(x) for x in row] for row in records])
         return StreamingResponse(iter([stream.getvalue().encode("utf-8")]),
                   media_type="text/csv; charset=utf-8",
                   headers={"Cache-Control": "no-store",
                            "Content-Disposition": 'attachment; filename="' + filename + '"'})
+    def export_xlsx(columns, records, filename):
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill
+        from openpyxl.utils import get_column_letter
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Loial"
+        ws.append(columns)
+        for cell in ws[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(fill_type="solid", fgColor="2D6A4F")
+        for row in records:
+            safe_row = []
+            for value in row:
+                if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+                    value = "'" + value
+                safe_row.append(value)
+            ws.append(safe_row)
+        ws.freeze_panes = "A2"
+        for i, column in enumerate(columns, start=1):
+            ws.column_dimensions[get_column_letter(i)].width = min(40, max(16, len(column) + 4))
+        output = io.BytesIO()
+        wb.save(output)
+        return StreamingResponse(iter([output.getvalue()]),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Cache-Control": "no-store",
+                     "Content-Disposition": 'attachment; filename="' + filename + '"'})
+
+    @r.get("/exports/customers.xlsx")
+    def customers_xlsx(biz=Depends(owner), db: Session = Depends(db_session)):
+        clients = db.query(Customer).filter(Customer.business_id == biz.id).all()
+        return export_xlsx(["Client ID", "Nume", "Email", "Ultima vizita", "Stampile"],
+                           [[c.id, c.name, c.email or "", c.last_visit or "", c.stamps or 0]
+                            for c in clients], "loial_clienti.xlsx")
+
+    @r.get("/exports/sales.xlsx")
+    def sales_xlsx(biz=Depends(owner), db: Session = Depends(db_session)):
+        sales = db.query(AISale).filter(AISale.business_id == biz.id).order_by(AISale.id.desc()).limit(100000).all()
+        return export_xlsx(["Data", "Bon", "Produs sau serviciu", "Cantitate", "Pret unitar",
+                            "Cost variabil unitar", "ID client"],
+                           [[s.sold_at, s.transaction_id or "", s.product, s.quantity, s.unit_price,
+                             s.unit_variable_cost if s.unit_variable_cost is not None else "",
+                             s.customer_uuid or ""] for s in sales], "loial_vanzari.xlsx")
+
     @r.get("/exports/customers.csv")
     def customers_csv(biz=Depends(owner), db: Session = Depends(db_session)):
         customers = db.query(Customer).filter(Customer.business_id == biz.id).all()
@@ -669,9 +714,10 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
     @r.get("/exports/sales.csv")
     def sales_csv(biz=Depends(owner), db: Session = Depends(db_session)):
         sales = db.query(AISale).filter(AISale.business_id == biz.id).limit(100000).all()
-        return export_csv(["date", "transaction_id", "product", "quantity", "unit_price", "unit_variable_cost"],
+        return export_csv(["date", "transaction_id", "product", "quantity", "unit_price", "unit_variable_cost", "customer_uuid"],
                           [[x.sold_at, x.transaction_id or "", x.product, x.quantity, x.unit_price,
-                            x.unit_variable_cost if x.unit_variable_cost is not None else ""] for x in sales],
+                            x.unit_variable_cost if x.unit_variable_cost is not None else "",
+                            x.customer_uuid or ""] for x in sales],
                           "loial_vanzari.csv")
     @r.get("/exports/ads-consented.csv")
     def ads_csv(biz=Depends(owner), db: Session = Depends(db_session)):
