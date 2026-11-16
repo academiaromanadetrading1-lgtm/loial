@@ -95,7 +95,7 @@
   async function init() {
     if (bizId) {
       try {
-        const res = await fetch(`/api/biz-full/${bizId}`);
+        const res = await fetch(`/api/loial-public/${bizId}`);
         if (res.ok) {
           const data = await res.json();
           document.getElementById('bizName').textContent = data.name;
