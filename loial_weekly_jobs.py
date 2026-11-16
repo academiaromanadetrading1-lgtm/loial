@@ -37,9 +37,15 @@ def weekly_summary(db, business, p, docs, sales_model, as_of):
     monday=as_of.date()-timedelta(days=as_of.weekday())
     beginning=monday-timedelta(days=7)
     previous_start=beginning-timedelta(days=7)
-    sales=db.query(sales_model).filter(sales_model.business_id==business.id,
-                                      sales_model.sold_at>=previous_start.isoformat(),
-                                      sales_model.sold_at<monday.isoformat()).all()
+    from loial_business_ai import AIDocument
+    from sqlalchemy import or_
+    sales=(db.query(sales_model)
+        .outerjoin(AIDocument,sales_model.document_id==AIDocument.id)
+        .filter(sales_model.business_id==business.id,
+                sales_model.sold_at>=previous_start.isoformat(),
+                sales_model.sold_at<monday.isoformat(),
+                or_(AIDocument.id.is_(None),AIDocument.kind!="receipt_refunded"))
+        .all())
     current=[x for x in sales if beginning.isoformat()<=x.sold_at[:10]<monday.isoformat()]
     before=[x for x in sales if previous_start.isoformat()<=x.sold_at[:10]<beginning.isoformat()]
     def total(rows):
