@@ -103,7 +103,7 @@ def latest_offer_choice(db, Consent, customer_id):
                                   Consent.purpose == PURPOSE).order_by(Consent.id.desc()).first()
     return bool(row and row.granted == 1)
 
-def queue_service_event(db, business, customer, kind="stamp", returning=False):
+def queue_service_event(db, business, customer, kind="stamp", returning=False, event_key=None):
     """Atomic with an enrollment or stamp transaction; no external delivery."""
     target = getattr(business, "stamps_required", None) or 6
     count = customer.stamps or 0
@@ -113,6 +113,11 @@ def queue_service_event(db, business, customer, kind="stamp", returning=False):
         title = "Bun venit la " + business.name
         body = "Cardul tau Loial este activ. Te asteptam la urmatoarea vizita!"
         event = "welcome:" + str(customer.id)
+    elif kind == "redeem":
+        title = "Recompensa folosita la " + business.name
+        body = "Ai folosit recompensa: " + (business.reward_text or "Premiul de fidelitate")
+        body += ". Cardul tau a fost resetat la 0 stampile. Te asteptam din nou!"
+        event = "redeem:" + str(customer.id) + ":" + str(event_key or count)
     else:
         title = "Ai primit o stampila la " + business.name
         body = ("Bine ai revenit! " if returning else "Multumim pentru vizita! ")
@@ -121,7 +126,7 @@ def queue_service_event(db, business, customer, kind="stamp", returning=False):
             body += " Recompensa este disponibila: " + (business.reward_text or "Premiul de fidelitate")
         else:
             body += " Mai ai " + str(remaining) + " stampile pana la recompensa."
-        event = "stamp:" + str(customer.id) + ":" + str(count)
+        event = "stamp:" + str(customer.id) + ":" + str(event_key or count)
     if db.query(InboxEntry).filter(InboxEntry.business_id == business.id,
                                     InboxEntry.source_event == event).first():
         return False
