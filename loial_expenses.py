@@ -51,8 +51,8 @@ class VerifiedExpense(ExpenseBase):
     confirmed_by_owner=Column(Boolean,default=True,nullable=False)
     created_at=Column(String(40),nullable=False)
     voided_at=Column(String(40))
-    __table_args__=(UniqueConstraint("business_id","invoice_ref",
-                    name="uq_loial_expense_business_invoice"),)
+    __table_args__=(UniqueConstraint("business_id","supplier","invoice_ref",
+                    name="uq_loial_expense_business_supplier_invoice"),)
 
 class ExpenseRequest(BaseModel):
     document_id:Optional[int]=Field(default=None,gt=0)
@@ -128,6 +128,7 @@ def install_expenses(app,engine,factory,BusinessAccount,AIDocument,secret,algori
             raise HTTPException(status_code=422,detail=str(exc))
         if db.query(VerifiedExpense).filter(
             VerifiedExpense.business_id==biz.id,
+            VerifiedExpense.supplier==req.supplier.strip(),
             VerifiedExpense.invoice_ref==req.invoice_ref.strip()).first():
             raise HTTPException(status_code=409,detail="Referinta facturii exista deja")
         if req.document_id:
