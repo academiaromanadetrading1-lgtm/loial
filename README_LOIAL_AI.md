@@ -105,3 +105,52 @@ Datele de marketing și datele de fidelizare au scopuri diferite. Exportul publi
 include numai contactele cu consimțământ specific înregistrat. Campaniile comerciale sunt trimise doar la apăsarea butonului de trimitere. Nu trimite documente sensibile la AI fără o bază legală și acord cu furnizorul.
 Loial afișează rezultatul calculat și proveniența datelor, dar nu expune prompturile,
 formulele de implementare sau raționamentul intern al modelului.
+
+
+## Premium Black Metal (2026-11-16)
+- **Doua carduri distincte**: fidelitate client (nume, afacere, stampile, statut) si
+  ambasador (nume verificat, rang calculat, referral QR). Sunt carduri LOYALTY/PARTENER,
+  fara plata, fara embleme bancare.
+- Design dark brushed-metal cu detalii aurii in join.html si in panoul Business.
+  Imagine PNG Black Metal salvabila in telefon si utilizabila in afara Apple/Google Wallet.
+- Administratorul firmei poate deveni ambasador prin /api/loial-identity/ambassador/activate;
+  nu se schimba rolul de administrator. Poate fi si client, prin propriul wallet cu token privat.
+  Numele de ambasador poate fi personalizat, iar rangul vine numai din vanzarile confirmate.
+- Conturile de ambasador deja existente necesita parola proprie pentru asociere; un email
+  introdus manual sau un QR public NU sunt dovezi de identitate.
+- Apple Wallet: arhitectura genereaza .pkpass cu storeCard pentru client si generic pentru
+  ambasador; imagini, manifest SHA-1 si semnatura PKCS#7/CMS. Necesita certificatul
+  Apple Pass Type ID, cheia privata asociata, WWDR si Team ID in secret manager.
+  In lipsa acestora, butonul Apple Wallet ramane dezactivat.
+- Google Wallet: genereaza link de salvare semnat RS256 cu service account;
+  loyaltyObjects pentru client, genericObjects pentru ambasador. Clasele
+  issuerId.classSuffix trebuie create si aprobate de emitent, iar contul sa
+  primeasca acces de publicare. Nu se emite link daca lipseste configurarea.
+- Cardul Apple/Google creat reflecta situatia la momentul emiterii; actualizarea
+  automata a stampilelor pe cardul deja instalat necesita urmatoarea etapa
+  (Apple PassKit web service/APNs, Google Wallet object updates).
+  Portofelul web Loial continua sa arate datele actualizate.
+- API: GET /api/premium-wallet/availability,
+  GET /api/premium-wallet/customer/cards,
+  GET /api/premium-wallet/customer/{business_id}/apple,
+  GET /api/premium-wallet/customer/{business_id}/google,
+  GET /api/premium-wallet/ambassador/card,
+  GET /api/premium-wallet/ambassador/apple,
+  GET /api/premium-wallet/ambassador/google.
+- API identitati: GET /api/loial-identity/me,
+  POST /api/loial-identity/ambassador/activate,
+  POST /api/loial-identity/ambassador/link,
+  PUT /api/loial-identity/ambassador/name,
+  POST /api/loial-identity/customer/link.
+- Validarea reala pe iOS/Android si emiterea oficiala nu pot fi facute fara
+  cheile/certificatele issuerului. Nu sunt deja active pe loial.space.
+
+## Teste premium
+python -m pytest -q tests/test_loial_premium_wallet.py
+Testele folosesc certificate de laborator pentru formatul PassKit, fara a pretinde
+ca sunt certificate Apple si fara a crea un cont Google Wallet real.
+
+## Documentatia oficiala pentru configurare
+Apple: https://developer.apple.com/help/account/capabilities/create-wallet-identifiers-and-certificates
+Google: https://developers.google.com/wallet/retail/loyalty-cards/getting-started/issuer-onboarding
+Google API auth: https://developers.google.com/wallet/retail/loyalty-cards/getting-started/auth/rest
