@@ -2296,11 +2296,55 @@ def qr_scan_with_staff(req: QRScanRequest, db: Session = Depends(get_db)):
         "business_id": biz.id
     }
 
+# Autorizare stricta pentru citirea/modificarea informatiilor private ale firmei.
+def require_business_owner_or_admin(business_id: int, credentials, db: Session):
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Autentificare obligatorie")
+    try:
+        claims = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Sesiune invalida")
+    email = claims.get("sub")
+    if not email:
+        raise HTTPException(status_code=403, detail="Acces interzis")
+    if claims.get("role") == "business":
+        account = db.query(BusinessAccount).filter(BusinessAccount.id == business_id,
+                          BusinessAccount.email == email).first()
+        if account:
+            return account
+    elif claims.get("role") in ("admin", "owner"):
+        operator = db.query(User).filter(User.email == email).first()
+        if operator and operator.role in ("admin", "owner"):
+            return operator
+    raise HTTPException(status_code=403, detail="Nu ai acces la aceasta firma")
+
+def require_platform_admin(credentials, db: Session):
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Autentificare obligatorie")
+    try:
+        claims = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Sesiune invalida")
+    admin = db.query(User).filter(User.email == claims.get("sub")).first()
+    if not admin or admin.role not in ("admin", "owner") or claims.get("role") not in ("admin", "owner"):
+        raise HTTPException(status_code=403, detail="Doar administratorul platformei")
+    return admin
+
+@app.get("/api/loial-public/{business_id}")
+def get_loial_public_business(business_id: int, db: Session = Depends(get_db)):
+    biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Afacere negasita")
+    return {"name": biz.name, "reward_text": biz.reward_text or "Premiu fidelitate",
+            "stamps_required": getattr(biz, "stamps_required", None) or 6,
+            "card_color": biz.card_color or "#2d6a4f"}
+
 # ==========================================
 # DIRECT BUSINESS ID ROUTES (NO TOKEN ISSUES)
 # ==========================================
 @app.get("/api/biz-full/{business_id}")
-def get_biz_full_data(business_id: int, db: Session = Depends(get_db)):
+def get_biz_full_data(business_id: int, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_business_owner_or_admin(business_id, credentials, db)
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
@@ -2330,7 +2374,8 @@ def get_biz_full_data(business_id: int, db: Session = Depends(get_db)):
     }
 
 @app.post("/api/biz-full/{business_id}/offer")
-def save_biz_offer_direct(business_id: int, req: FullBusinessSettings, db: Session = Depends(get_db)):
+def save_biz_offer_direct(business_id: int, req: FullBusinessSettings, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_business_owner_or_admin(business_id, credentials, db)
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
@@ -2344,7 +2389,8 @@ def save_biz_offer_direct(business_id: int, req: FullBusinessSettings, db: Sessi
     return {"status": "ok"}
 
 @app.post("/api/biz-full/{business_id}/staff")
-def add_biz_staff_direct(business_id: int, req: StaffCreateRequest, db: Session = Depends(get_db)):
+def add_biz_staff_direct(business_id: int, req: StaffCreateRequest, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_business_owner_or_admin(business_id, credentials, db)
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
@@ -2366,7 +2412,8 @@ def add_biz_staff_direct(business_id: int, req: StaffCreateRequest, db: Session 
     return {"status": "added"}
 
 @app.delete("/api/biz-full/{business_id}/staff/{staff_id}")
-def delete_biz_staff_direct(business_id: int, staff_id: int, db: Session = Depends(get_db)):
+def delete_biz_staff_direct(business_id: int, staff_id: int, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_business_owner_or_admin(business_id, credentials, db)
     member = db.query(StaffMember).filter(StaffMember.id == staff_id, StaffMember.business_id == business_id).first()
     if member:
         member.active = 0
@@ -2711,7 +2758,8 @@ def enroll_ambassador(req: AmbassadorEnrollRequest, db: Session = Depends(get_db
 
 
 @app.get("/api/admin/overview")
-def admin_super_overview(db: Session = Depends(get_db)):
+def admin_super_overview(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_platform_admin(credentials, db)
     current_month = datetime.now().strftime("%Y-%m")
     ambassador_stats = calculate_commissions(db, Sale, Commission, SalesAgent, current_month)
 
@@ -2791,7 +2839,8 @@ def admin_super_overview(db: Session = Depends(get_db)):
 
 
 @app.post("/api/admin/business/{biz_id}/toggle-pro")
-def admin_toggle_business_pro(biz_id: int, db: Session = Depends(get_db)):
+def admin_toggle_business_pro(biz_id: int, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_platform_admin(credentials, db)
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == biz_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
@@ -2837,7 +2886,8 @@ class NetworkBonusManualRequest(BaseModel):
 
 
 @app.post("/api/admin/network-bonus/manual")
-def admin_send_manual_bonus(req: NetworkBonusManualRequest, db: Session = Depends(get_db)):
+def admin_send_manual_bonus(req: NetworkBonusManualRequest, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_platform_admin(credentials, db)
     cards = db.query(Customer).filter(
         (Customer.wallet_uuid == req.wallet_uuid) | (Customer.uuid == req.wallet_uuid)
     ).all()
@@ -2858,7 +2908,8 @@ class NetworkRuleUpdateRequest(BaseModel):
 
 
 @app.post("/api/admin/network-rule")
-def admin_update_network_rule(req: NetworkRuleUpdateRequest, db: Session = Depends(get_db)):
+def admin_update_network_rule(req: NetworkRuleUpdateRequest, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_platform_admin(credentials, db)
     rule = db.query(NetworkRule).first()
     if not rule:
         rule = NetworkRule()
@@ -2875,7 +2926,8 @@ def admin_update_network_rule(req: NetworkRuleUpdateRequest, db: Session = Depen
 def serve_ambasador_page():
     return FileResponse("ambasador.html")
 @app.delete("/api/admin/business/{biz_id}")
-def admin_delete_business(biz_id: int, db: Session = Depends(get_db)):
+def admin_delete_business(biz_id: int, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_platform_admin(credentials, db)
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == biz_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
@@ -2888,7 +2940,8 @@ def admin_delete_business(biz_id: int, db: Session = Depends(get_db)):
 
 
 @app.delete("/api/admin/ambassador/{agent_id}")
-def admin_delete_ambassador(agent_id: int, db: Session = Depends(get_db)):
+def admin_delete_ambassador(agent_id: int, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_platform_admin(credentials, db)
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Ambasador negăsit")
@@ -2900,7 +2953,8 @@ def admin_delete_ambassador(agent_id: int, db: Session = Depends(get_db)):
     return {"status": "deleted"}
 
 @app.delete("/api/admin/customer/{wallet_uuid}")
-def admin_delete_customer(wallet_uuid: str, db: Session = Depends(get_db)):
+def admin_delete_customer(wallet_uuid: str, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_platform_admin(credentials, db)
     db.query(Customer).filter(
         (Customer.wallet_uuid == wallet_uuid) | (Customer.uuid == wallet_uuid)
     ).delete(synchronize_session=False)
