@@ -3096,6 +3096,15 @@ from loial_receipts import install_receipts
 install_receipts(app, engine, SessionLocal, BusinessAccount, Customer,
                  AIDocument, AISale, SECRET_KEY, ALGORITHM)
 
+# Recuperare izolata a cardurilor legacy, cu verificare in persoana si cod de unica folosinta.
+from loial_wallet_recovery import install_wallet_recovery
+install_wallet_recovery(app, engine, SessionLocal, BusinessAccount, Customer,
+                        AIDocument, AISale, SECRET_KEY, ALGORITHM)
+
+@app.get("/wallet-recovery.html")
+def loial_wallet_recovery_page():
+    return FileResponse("wallet-recovery.html")
+
 @app.get("/api/loial-scans/history")
 def business_stamp_audit(limit: int = 40, credentials: HTTPAuthorizationCredentials = Depends(security),
                          db: Session = Depends(get_db)):
