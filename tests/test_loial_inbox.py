@@ -115,7 +115,8 @@ def test_no_wallet_token_is_leaked_on_reenroll(env):
 
 def test_business_scoping_and_free_plan(env):
     client, _, _, _, _, _, boss, _ = env
-    assert client.post("/api/loial-inbox/send").status_code == 401
+    assert client.post("/api/loial-inbox/send",
+                       json={"subject":"Test","text":"Test","audience":"all"}).status_code == 401
     assert client.get("/api/loial-inbox/sent", headers=boss("boss1@example.test", role="admin")).status_code == 403
     assert client.get("/api/loial-inbox/sent", headers=boss("boss3@example.test")).status_code == 403
     assert client.get("/api/loial-inbox/sent", headers=boss("boss1@example.test")).status_code == 200
