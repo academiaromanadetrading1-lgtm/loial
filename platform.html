@@ -238,13 +238,26 @@
       <button type="button" class="btn-primary" style="margin-top:0;" onclick="addStaff()">+ Adaugă angajat</button>
     </div>
     <div class="status-msg" id="staffError"></div>
+    <div style="border:1px solid #e0e9e0;border-radius:12px;padding:14px;margin:14px 0;background:#f7faf8;">
+      <strong>PIN principal pentru administrator</strong>
+      <p id="primaryPinStatus" style="font-size:13px;color:#476251;margin:8px 0;">
+        PIN-ul rămâne privat. Nu folosi 1234.
+      </p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button type="button" class="btn-secondary" onclick="revealPrimaryPin()">Arată / ascunde PIN</button>
+        <button type="button" class="btn-secondary" onclick="rotatePrimaryPin()">Generează PIN nou</button>
+      </div>
+      <p style="font-size:11px;color:#5a7063;margin:8px 0 0;">
+        După schimbare, PIN-ul anterior nu mai funcționează. Comunică noul cod doar persoanelor autorizate.
+      </p>
+    </div>
 
     <table>
       <thead>
         <tr><th>Nume Angajat</th><th>Cod PIN</th><th>Ștampile acordate</th><th>Acțiune</th></tr>
       </thead>
       <tbody id="staffTable">
-        <tr><td colspan="4" style="color: var(--text-muted);">Nu ai adăugat încă angajați. Poți scana și cu PIN-ul principal (1234).</td></tr>
+        <tr><td colspan="4" style="color: var(--text-muted);">Nu ai angajați înregistrați. Folosește PIN-ul principal afișat în zona securizată de mai sus.</td></tr>
       </tbody>
     </table>
   </div>
@@ -490,7 +503,7 @@
         </tr>
       `).join('');
     } else {
-      staffTbody.innerHTML = '<tr><td colspan="4" style="color: var(--text-muted);">Nu ai adăugat încă angajați. Poți scana și cu PIN-ul principal (1234).</td></tr>';
+      staffTbody.innerHTML = '<tr><td colspan="4" style="color: var(--text-muted);">Nu ai angajați înregistrați. Folosește PIN-ul principal afișat în zona securizată de mai sus.</td></tr>';
     }
 
     if (data.customers && data.customers.length > 0) {
@@ -504,12 +517,50 @@
     }
   }
 
+  let primaryPinValue=null, primaryPinRevealed=false;
+  async function loadPrimaryPin() {
+    try {
+      const response=await authorizedFetch('/api/my-business');
+      if(!response.ok)return;
+      const data=await response.json();
+      primaryPinValue=data.staff_pin||null;
+      const label=document.getElementById('primaryPinStatus');
+      if(!primaryPinValue||primaryPinValue==='1234'){
+        label.textContent='PIN vechi nesigur sau absent. Generează unul nou înainte de scanare.';
+        label.style.color='#9c3d25';
+      }else{
+        label.textContent=primaryPinRevealed?'PIN principal: '+primaryPinValue:'PIN principal: ••••';
+        label.style.color='#476251';
+      }
+    }catch(error){document.getElementById('primaryPinStatus').textContent='PIN-ul nu a putut fi verificat.';}
+  }
+  function revealPrimaryPin() {
+    primaryPinRevealed=!primaryPinRevealed;
+    const label=document.getElementById('primaryPinStatus');
+    label.textContent=primaryPinRevealed&&primaryPinValue&&primaryPinValue!=='1234'
+      ?'PIN principal: '+primaryPinValue
+      :'PIN principal: ••••';
+  }
+  async function rotatePrimaryPin() {
+    if(!confirm('Schimbi PIN-ul principal? Codul vechi nu va mai putea acorda ștampile.'))return;
+    try{
+      const response=await authorizedFetch('/api/my-business/rotate-pin',{method:'POST'});
+      const data=await response.json();
+      if(!response.ok)throw Error(data.detail||'Nu s-a putut schimba PIN-ul.');
+      primaryPinValue=data.staff_pin;
+      primaryPinRevealed=true;
+      document.getElementById('primaryPinStatus').textContent=
+        'PIN principal nou: '+primaryPinValue+' (comunică-l doar personalului autorizat)';
+    }catch(error){document.getElementById('primaryPinStatus').textContent=error.message;}
+  }
+
   async function loadDashboard() {
     const res = await authorizedFetch(`/api/biz-full/${bizId}`);
     if (!res.ok) return;
     const data = await res.json();
     // Nu pastram date despre clienti sau PIN-uri in localStorage.
     renderDashboardData(data);
+    await loadPrimaryPin();
   }
 
   function copyJoinLink() {
