@@ -69,14 +69,26 @@ def summarize_sales(rows):
     }
 
 def abc_products(products):
-    total = sum(p["revenue"] for p in products)
+    """Clasificare ABC pe venituri: articolul care TRECE pragul ramane in clasa lui.
+
+    Ex.: un singur produs cu 100% din venituri este A, nu C.
+    Produsele cu venituri zero nu sunt tratate drept vanzari de tip A.
+    """
+    positive = [p for p in products if p["revenue"] > 0]
+    total = sum(p["revenue"] for p in positive)
     running = 0.0
     out = []
     for product in sorted(products, key=lambda p: p["revenue"], reverse=True):
+        prior_share = 100.0 * running / total if total else 100
+        if product["revenue"] <= 0:
+            category = "C"
+        else:
+            category = "A" if prior_share < 80 else ("B" if prior_share < 95 else "C")
         running += product["revenue"]
         share = 100.0 * running / total if total else 0
-        out.append({"product": product["product"], "share_cumulative_pct": round(share, 1),
-                    "class": "A" if share <= 80 else "B" if share <= 95 else "C"})
+        out.append({"product": product["product"],
+                    "share_cumulative_pct": round(share, 1),
+                    "class": category})
     return out
 
 def customer_segments(customers, today=None):
@@ -152,6 +164,30 @@ def manager_findings(summary, sector):
             notes.append({"type": "observation", "text":
                 "Cea mai mare contributie totala cunoscuta o are " + best["product"] +
                 ". Compara cererea si capacitatea inainte de a promova acest produs."})
+        # Contributia totala si contributia pe unitate pot indica prioritati diferite.
+        # Explicatiile catre antreprenor sunt concrete, fara formule afisate.
+        positive_units = [p for p in known if p["quantity"] > 0]
+        if positive_units:
+            best_unit = max(positive_units, key=lambda p: p["contribution"] / p["quantity"])
+            unit_value = best_unit["contribution"] / best_unit["quantity"]
+            notes.append({"type":"opportunity","text":
+                "Din produsele cu costuri cunoscute, "+best_unit["product"]+
+                " lasa cea mai mare contributie estimata pe unitate vanduta ("+
+                str(round(unit_value,2))+
+                " in moneda raportului). Verifica cererea, capacitatea si costurile complete inainte de a-i creste promovarea."})
+            loss = [p for p in positive_units if p["contribution"] < 0]
+            if loss:
+                names=", ".join(p["product"] for p in loss[:4])
+                notes.append({"type":"risk","text":
+                    "In datele introduse, costul variabil depaseste incasarea pentru: "+
+                    names+". Verifica preturile, reducerile si costurile din documente."})
+        known_pct = [p for p in known if p["contribution_pct"] is not None]
+        if len(known_pct)>1:
+            top_rate = max(known_pct,key=lambda p:p["contribution_pct"])
+            notes.append({"type":"observation","text":
+                "Cea mai buna rata a contributiei din produsele verificate apare la "+
+                top_rate["product"]+" ("+str(top_rate["contribution_pct"])+
+                "%). O rata mare nu garanteaza si cel mai mare castig total."})
         if len(known) < len(products):
             notes.append({"type": "missing", "text":
                 "Pentru o parte dintre produse lipsesc costurile variabile; comparația completa a marjelor nu este posibila."})
