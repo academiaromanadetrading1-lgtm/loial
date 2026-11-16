@@ -117,6 +117,12 @@ def apple_pass_json(card):
                       "messageEncoding":"iso-8859-1"}],
         "sharingProhibited":False
     }
+    # Activam suportul de actualizare Apple doar cand sunt configurate secretele
+    # emitentului si stocarea criptata a tokenurilor de dispozitiv.
+    from loial_apple_updates import apple_updates_ready, pass_authentication_token
+    if apple_updates_ready():
+        common["webServiceURL"]=os.environ["LOIAL_APPLE_WEB_SERVICE_URL"].rstrip("/")+"/"
+        common["authenticationToken"]=pass_authentication_token(serial)
     fields={
         "primaryFields":[{"key":"holder","label":"TITULAR","value":card["holder"]}],
         "secondaryFields":[{"key":"status","label":"STATUT","value":card["status"]}],
@@ -327,6 +333,13 @@ def install_premium_wallet(app,engine,session_factory,BusinessAccount,Customer,
             binary=signed_apple_pkpass(card)
         except ValueError as e:
             raise HTTPException(status_code=503,detail=str(e))
+        from loial_apple_updates import register_issued_pass
+        if card["role"]=="customer":
+            register_issued_pass(db,card,business_id=int(claims["business_id"]),
+                                 wallet_uuid=claims["sub"])
+        else:
+            register_issued_pass(db,card,agent_id=int(claims["sub"]))
+        db.commit()
         filename="loial-ambassador.pkpass" if card["role"]=="ambassador" else "loial-black-metal.pkpass"
         return Response(content=binary,media_type="application/vnd.apple.pkpass",
                         headers={"Content-Disposition":'attachment; filename="'+filename+'"',
@@ -351,6 +364,10 @@ def install_premium_wallet(app,engine,session_factory,BusinessAccount,Customer,
             binary=signed_apple_pkpass(card)
         except ValueError as e:
             raise HTTPException(status_code=503,detail=str(e))
+        from loial_apple_updates import register_issued_pass
+        register_issued_pass(db,card,business_id=business_id,
+                             wallet_uuid=wallet_record.wallet_uuid)
+        db.commit()
         return Response(content=binary,media_type="application/vnd.apple.pkpass",
                        headers={"Content-Disposition":'attachment; filename="loial-black-metal.pkpass"',
                                 "Cache-Control":"private, no-store"})
@@ -370,10 +387,14 @@ def install_premium_wallet(app,engine,session_factory,BusinessAccount,Customer,
 
     @router.get("/ambassador/apple")
     def ambassador_apple(agent=Depends(ambassador),db:Session=Depends(session)):
+        card=ambassador_card(agent,db)
         try:
-            binary=signed_apple_pkpass(ambassador_card(agent,db))
+            binary=signed_apple_pkpass(card)
         except ValueError as e:
             raise HTTPException(status_code=503,detail=str(e))
+        from loial_apple_updates import register_issued_pass
+        register_issued_pass(db,card,agent_id=agent.id)
+        db.commit()
         return Response(content=binary,media_type="application/vnd.apple.pkpass",
                         headers={"Content-Disposition":'attachment; filename="loial-ambassador.pkpass"',
                                  "Cache-Control":"private, no-store"})
