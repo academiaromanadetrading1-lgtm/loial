@@ -60,6 +60,25 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 <p class="tiny">Loial folosește datele confirmate ale firmei. Când lipsesc informații, le solicită. Recomandările nu înlocuiesc contabilul.</p>
 </section>
 <aside class="right">
+<section class="card panel" id="receipts">
+<h2>Bonuri cu QR Loial • pilot</h2>
+<p>Înregistrează bonul real și produsele. Loial creează un QR unic pe care îl poți afișa sau tipări separat de bonul fiscal.</p>
+<label for="receiptNumber">Numărul bonului / comenzii</label>
+<input id="receiptNumber" maxlength="100" placeholder="Ex.: Bon-2026-1042">
+<label for="receiptItems">Linii de bon</label>
+<textarea id="receiptItems" rows="4" placeholder="Produs;Cantitate;Preț unitar;Cost variabil (opțional)
+Ex.: Revizie auto;1;220;65"></textarea>
+<button type="button" id="issueReceipt" style="width:100%;margin-top:9px">Generează QR pentru bon</button>
+<div class="report" id="receiptStatus" role="status"></div>
+<img id="receiptQR" alt="QR unic de revendicare a bonului" style="width:190px;max-width:100%;display:none;margin:12px auto;">
+<div id="receiptUrlBox" style="display:none">
+  <input id="receiptUrl" readonly aria-label="Link de revendicare">
+  <button class="ghost" type="button" id="copyReceipt" style="width:100%;margin-top:6px">Copiază linkul bonului</button>
+</div>
+<button class="ghost" type="button" id="showReceipts" style="width:100%;margin-top:9px">Bonuri recente și retururi</button>
+<div id="receiptList" class="file-list"></div>
+<p class="tiny">Integrarea directă cu POS-ul sau casa fiscală necesită suportul sistemului de vânzări. Codul QR fiscal standard nu transmite automat produsele către Loial.</p>
+</section>
 <section class="card panel">
 <h2>Documente și capturi</h2>
 <p>Încarcă facturi, fotografii, screenshoturi, PDF, Excel sau CSV. Verifică întotdeauna datele extrase.</p>
@@ -388,6 +407,79 @@ $('sendCampaign').onclick=async()=>{
     await refreshSent();
   }catch(e){status(e.message,true);}
   finally{$('sendCampaign').disabled=false;}
+};
+async function receiptApi(path,options={}){
+  const res=await fetch('/api/loial-receipts'+path,{
+    ...options,headers:{Authorization:'Bearer '+token,
+      ...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})}});
+  const result=await res.json().catch(()=>({}));
+  if(!res.ok)throw Error(result.detail||'Bonul nu a putut fi prelucrat');
+  return result;
+}
+$('issueReceipt').onclick=async()=>{
+  const ref=$('receiptNumber').value.trim();
+  if(ref.length<2){$('receiptStatus').textContent='Completează numărul bonului.';return;}
+  const lines=[];
+  for(const raw of $('receiptItems').value.split(/\r?\n/).filter(x=>x.trim())){
+    const parts=raw.split(';').map(x=>x.trim());
+    if(parts.length<3||!parts[0]){
+      $('receiptStatus').textContent='Format: Produs;Cantitate;Preț unitar;Cost variabil (opțional)';return;
+    }
+    const number=x=>Number(x.replace(',','.'));
+    const row={product:parts[0],quantity:number(parts[1]),unit_price:number(parts[2])};
+    if(parts[3])row.unit_variable_cost=number(parts[3]);
+    if(!Number.isFinite(row.quantity)||!Number.isFinite(row.unit_price)){
+      $('receiptStatus').textContent='Verifică valorile numerice din linii.';return;
+    }
+    lines.push(row);
+  }
+  if(!lines.length){$('receiptStatus').textContent='Adaugă cel puțin un produs.';return;}
+  $('issueReceipt').disabled=true;
+  try{
+    const res=await receiptApi('/issue',{method:'POST',
+      body:JSON.stringify({receipt_ref:ref,lines,currency:$('currency').value})});
+    $('receiptStatus').textContent='Bon înregistrat: '+res.total+' '+res.currency+
+      '. QR-ul poate fi revendicat o singură dată. Nu înlocuiește bonul fiscal.';
+    $('receiptQR').src=res.qr_png_base64;$('receiptQR').style.display='block';
+    $('receiptUrl').value=res.claim_url;$('receiptUrlBox').style.display='block';
+  }catch(e){$('receiptStatus').textContent=e.message;}
+  finally{$('issueReceipt').disabled=false;}
+};
+$('copyReceipt').onclick=async()=>{
+  try{await navigator.clipboard.writeText($('receiptUrl').value);
+  $('receiptStatus').textContent='Linkul de bon Loial a fost copiat.';}
+  catch(e){$('receiptStatus').textContent='Nu am putut copia linkul; selectează-l din câmp.';}
+};
+$('showReceipts').onclick=async()=>{
+  const list=$('receiptList');list.replaceChildren();
+  try{
+    const records=await receiptApi('/recent');
+    if(!records.length){list.textContent='Nu există bonuri înregistrate.';return;}
+    for(const receipt of records.slice(0,20)){
+      const row=document.createElement('div');row.className='file-row';
+      const title=document.createElement('span');
+      title.textContent=receipt.receipt_ref+' · '+receipt.total+' '+receipt.currency+
+        ' · '+receipt.status;
+      row.appendChild(title);
+      if(receipt.status!=='refunded'){
+        const button=document.createElement('button');button.className='ghost';
+        button.textContent='Retur';
+        button.onclick=async()=>{
+          const reason=prompt('Motivul returului pentru bonul '+receipt.receipt_ref);
+          if(!reason||reason.trim().length<4)return;
+          if(!confirm('Confirmi anularea financiară a acestui bon? O ștampilă deja acordată necesită verificare manuală.'))return;
+          try{
+            const result=await receiptApi('/refund',{method:'POST',
+             body:JSON.stringify({receipt_ref:receipt.receipt_ref,reason:reason.trim()})});
+            $('receiptStatus').textContent=result.notice||'Bon anulat.';
+            $('showReceipts').click();
+          }catch(e){$('receiptStatus').textContent=e.message;}
+        };
+        row.appendChild(button);
+      }
+      list.appendChild(row);
+    }
+  }catch(e){$('receiptStatus').textContent=e.message;}
 };
 document.querySelectorAll('[data-export]').forEach(button=>button.onclick=async()=>{
   try{
