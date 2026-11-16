@@ -325,6 +325,25 @@
       <div class="plan-badge" id="adminMonthBadge">Luna curentă</div>
     </div>
 
+    <div class="card" id="googlePilotPanel">
+      <span class="step-tag">PILOT PRIMELE 100 DE FIRME</span>
+      <h2>Google Wallet · Lansare fără Apple Developer</h2>
+      <p style="font-size:13px;color:var(--text-muted)">
+        Firmele active sunt cele cu cel puțin o ștampilă acordată în Loial. Înscrierile singure nu sunt considerate activitate.
+      </p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin:14px 0;">
+        <div><strong id="pilotActive">–</strong><div style="font-size:12px">Firme active / 100</div></div>
+        <div><strong id="pilotCards">–</strong><div style="font-size:12px">Firme cu clienți</div></div>
+        <div><strong id="pilotRegistered">–</strong><div style="font-size:12px">Firme înscrise</div></div>
+      </div>
+      <div style="height:9px;border-radius:999px;background:#e4e9e5;overflow:hidden">
+        <div id="pilotProgress" style="height:100%;width:0;background:#2d6a4f;border-radius:999px"></div>
+      </div>
+      <p id="pilotIssuerStatus" style="font-size:12px;color:#536b5b;margin:12px 0">Verificare emitent Google...</p>
+      <button class="btn-secondary" type="button" onclick="loadGooglePilot()">Actualizează stadiul pilotului</button>
+      <p style="font-size:11px;color:#607467">Apple Wallet rămâne amânat. Prezența credențialelor Google nu confirmă aprobarea publicării.</p>
+    </div>
+
     <div class="card">
       <h2>1. Firme înscrise & Activare ProBusiness (65 EUR + TVA)</h2>
       <table>
@@ -761,7 +780,32 @@
     }
   }
 
+  async function loadGooglePilot() {
+    const notice=document.getElementById('pilotIssuerStatus');
+    try {
+      const response=await authorizedFetch('/api/admin/google-wallet-pilot');
+      const state=await response.json();
+      if(!response.ok)throw Error(state.detail||'Nu pot verifica pilotul.');
+      document.getElementById('pilotActive').textContent=
+        state.businesses_with_recorded_stamp_awards+' / '+state.goal_active_businesses;
+      document.getElementById('pilotCards').textContent=
+        state.businesses_with_customer_cards;
+      document.getElementById('pilotRegistered').textContent=
+        state.businesses_registered;
+      document.getElementById('pilotProgress').style.width=
+        Math.min(100,100*state.businesses_with_recorded_stamp_awards/
+          state.goal_active_businesses)+'%';
+      const google=state.google_wallet;
+      const ready=google.issuer_credentials_present &&
+        google.loyalty_class_id_configured;
+      notice.textContent=ready
+        ?'Emitentul și clasa Google sunt configurate tehnic. Verifică aprobarea pentru publicare în Google Wallet Console.'
+        :'Emiterea Google Wallet nu este încă pregătită: configurează emitentul și clasa de fidelitate. Codul funcționează fără cost suplimentar de dezvoltare.';
+    }catch(error){notice.textContent=error.message;}
+  }
+
     async function loadSuperAdmin() {
+    await loadGooglePilot();
     const res = await authorizedFetch('/api/admin/overview');
     if (!res.ok) return;
     const data = await res.json();
