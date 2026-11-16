@@ -2677,6 +2677,7 @@ class UniversalScanRequest(BaseModel):
     pin: str
     business_id: int
     customer_uuid: str
+    idempotency_key: Optional[str] = None
 
 
 @app.post("/api/scan-universal")
@@ -2722,6 +2723,24 @@ def scan_universal_card(request: Request, req: UniversalScanRequest, db: Session
         db.flush()
 
     target = getattr(biz, "stamps_required", None) or 6
+    from loial_scans import existing_operation, recent_duplicate, record_award
+    operation = req.idempotency_key or uuid.uuid4().hex
+    if len(operation)<8 or len(operation)>120:
+        raise HTTPException(status_code=422,detail="Identificatorul scanarii nu este valid")
+    prior = existing_operation(db,biz.id,operation)
+    if prior:
+        if prior.customer_id!=customer.id:
+            raise HTTPException(status_code=409,detail="Aceasta operatiune apartine altui card")
+        return {"name":customer.name,"stamps":prior.stamps_after,
+                "target":target,"staff_name":staff.name if staff else "Administrator",
+                "reward_unlocked":prior.stamps_after>=target,
+                "duplicate_ignored":True}
+    if recent_duplicate(db,biz.id,customer.id):
+        raise HTTPException(status_code=409,
+            detail="Acest card a fost scanat recent. Verifica daca e o cumparatura noua.")
+    if (customer.stamps or 0)>=target:
+        raise HTTPException(status_code=409,
+            detail="Recompensa este deja disponibila; acord-o inaintea unei noi stampile.")
     previous_visit = customer.last_visit
     customer.stamps = (customer.stamps or 0) + 1
     customer.last_visit = datetime.now().isoformat()
@@ -2748,7 +2767,8 @@ def scan_universal_card(request: Request, req: UniversalScanRequest, db: Session
         except (ValueError, TypeError):
             pass
     queue_service_event(db, biz, customer, kind="stamp", returning=was_away,
-                        event_key=uuid.uuid4().hex)
+                        event_key=operation)
+    record_award(db,biz.id,customer.id,operation,"manual",customer.stamps)
     from loial_wallet_sync import queue_google_refresh
     queue_google_refresh(db,biz.id,customer.wallet_uuid or customer.uuid)
     from loial_apple_updates import mark_customer_pass_changed
@@ -3106,6 +3126,8 @@ install_apple_pass_updates(app, engine, SessionLocal, BusinessAccount, Customer,
 
 # Bon QR unic, verificare la nivel de tranzactie si asociere cu cumparaturile clientului.
 from loial_business_ai import AIDocument
+from loial_scans import ScanBase
+ScanBase.metadata.create_all(bind=engine)
 from loial_receipts import install_receipts
 install_receipts(app, engine, SessionLocal, BusinessAccount, Customer,
                  AIDocument, AISale, SECRET_KEY, ALGORITHM)
