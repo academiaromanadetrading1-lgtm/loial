@@ -2128,7 +2128,7 @@ def get_business_qr_image(business_id: int, db: Session = Depends(get_db)):
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     color = biz.card_color if (biz and biz.card_color) else "#2d6a4f"
     initial = biz.name if (biz and biz.name) else "L"
-    join_url = "https://loial.space" + str(business_id)
+    join_url = "https://" + "loial.space" + "/join/" + str(business_id)
     png_bytes = create_premium_qr_bytes(join_url, color=color, initial=initial)
     b64 = base64.b64encode(png_bytes).decode()
     return {"qr_base64": f"data:image/png;base64,{b64}", "url": join_url}
@@ -2264,7 +2264,7 @@ def get_biz_full_data(business_id: int, db: Session = Depends(get_db)):
     
     color = biz.card_color or "#2d6a4f"
     initial = biz.name if biz.name else "L"
-    join_url = "https://loial.space" + str(biz.id)
+    join_url = "https://" + "loial.space" + "/join/" + str(biz.id)
     png_bytes = create_premium_qr_bytes(join_url, color=color, initial=initial)
     qr_b64 = "data:image/png;base64," + base64.b64encode(png_bytes).decode()
     
