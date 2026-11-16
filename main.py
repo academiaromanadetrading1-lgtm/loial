@@ -2692,7 +2692,7 @@ def scan_universal_card(request: Request, req: UniversalScanRequest, db: Session
         StaffMember.pin == req.pin,
         StaffMember.active == 1
     ).first()
-    if not staff and req.pin != (biz.staff_pin or "1234"):
+    if not staff and (not biz.staff_pin or biz.staff_pin=="1234" or req.pin!=biz.staff_pin):
         raise HTTPException(status_code=401, detail="PIN angajat incorect")
 
     code = req.customer_uuid.strip()
