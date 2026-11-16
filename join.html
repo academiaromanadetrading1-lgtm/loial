@@ -743,46 +743,59 @@
   loadWalletReadiness();
   loadVerifiedAmbassador();
   function saveCardImageDirect() {
-    const img = document.getElementById('qrImg');
-    const canvas = document.createElement('canvas');
-    canvas.width = 600;
-    canvas.height = 780;
-    const ctx = canvas.getContext('2d');
-
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, 600, 780);
-
-    ctx.fillStyle = currentBrandColor;
-    ctx.fillRect(0, 0, 600, 180);
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 34px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(currentBizName, 300, 88);
-
-    ctx.font = '22px sans-serif';
-    ctx.fillText('Titular: ' + (savedProfile ? savedProfile.name : ''), 300, 136);
-
-    ctx.drawImage(img, 125, 225, 350, 350);
-
-    ctx.fillStyle = '#111f18';
-    ctx.font = 'bold 24px sans-serif';
-    ctx.fillText('Cod QR Universal • Arată la casă', 300, 645);
-
-    ctx.fillStyle = '#475d52';
-    ctx.font = '18px sans-serif';
-    ctx.fillText('Portofel Digital • Loial.space', 300, 690);
-
-    const link = document.createElement('a');
-    link.download = `Card-Loial-${currentBizName.replace(/\s+/g, '-')}.png`;
-    link.href = canvas.toDataURL('image/png');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    const btn = document.getElementById('saveImgBtn');
-    btn.textContent = '✓ Card salvat direct în galerie!';
-    setTimeout(() => { btn.textContent = '📥 Salvează Cardul în Galerie (1 clic)'; }, 2500);
+    const img=document.getElementById('qrImg');
+    if(!img.complete || !img.naturalWidth){
+      alert('Codul QR se încarcă. Încearcă din nou când apare pe card.');
+      return;
+    }
+    const canvas=document.createElement('canvas');canvas.width=800;canvas.height=1050;
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#e9edec';ctx.fillRect(0,0,800,1050);
+    const x=48,y=56,w=704,h=444,r=36;
+    ctx.save();
+    ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.clip();
+    const background=ctx.createLinearGradient(x,y,x+w,y+h);
+    background.addColorStop(0,'#030408');background.addColorStop(.27,'#2e3037');
+    background.addColorStop(.47,'#101116');background.addColorStop(.66,'#383b40');
+    background.addColorStop(1,'#090b11');
+    ctx.fillStyle=background;ctx.fillRect(x,y,w,h);
+    for(let i=0;i<145;i++){
+      ctx.strokeStyle='rgba(255,255,255,'+(i%5===0?.047:.012)+')';
+      ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,y+i*3.1);
+      ctx.lineTo(x+w,y+i*3.1);ctx.stroke();
+    }
+    ctx.strokeStyle='rgba(218,194,136,.2)';ctx.lineWidth=2;
+    for(const radius of [150,190,232]){
+      ctx.beginPath();ctx.arc(730,62,radius,0,2*Math.PI);ctx.stroke();
+    }
+    ctx.restore();
+    ctx.strokeStyle='#c7b17d';ctx.lineWidth=2;ctx.beginPath();
+    ctx.roundRect(x,y,w,h,r);ctx.stroke();
+    ctx.fillStyle='#ecd7a8';ctx.font='800 49px sans-serif';ctx.textAlign='left';
+    ctx.fillText('LOIAL',88,136);
+    ctx.font='bold 14px sans-serif';ctx.letterSpacing='2px';
+    ctx.fillText('BLACK METAL  •  LOYALTY',91,165);
+    const status=document.getElementById('premiumCustomerStatus').textContent;
+    ctx.font='bold 19px sans-serif';ctx.fillText(status.slice(0,25),89,328);
+    ctx.fillStyle='#bdad8a';ctx.font='bold 14px sans-serif';
+    ctx.fillText('TITULAR',90,382);
+    ctx.fillStyle='#f2e4c1';ctx.font='bold 29px sans-serif';
+    ctx.fillText((savedProfile?.name||'MEMBRU LOIAL').slice(0,30),90,421);
+    ctx.font='bold 15px sans-serif';
+    ctx.fillText(currentBizName.slice(0,32),90,460);
+    ctx.textAlign='right';ctx.font='12px sans-serif';
+    ctx.fillText('CARD DE FIDELITATE • NU ESTE CARD DE PLATĂ',710,460);
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.roundRect(204,535,392,392,25);ctx.fill();
+    ctx.drawImage(img,223,555,354,354);
+    ctx.fillStyle='#172b22';ctx.textAlign='center';
+    ctx.font='bold 22px sans-serif';ctx.fillText('Arată acest QR la casă',400,964);
+    ctx.font='16px sans-serif';ctx.fillText('Card digital de fidelitate · loial.space',400,998);
+    const link=document.createElement('a');
+    link.download='Loial-Black-Metal-'+currentBizName.replace(/[^A-Za-z0-9_-]+/g,'-')+'.png';
+    link.href=canvas.toDataURL('image/png');link.click();
+    const button=document.getElementById('saveImgBtn');
+    button.textContent='✓ Card Black Metal salvat ca imagine';
+    setTimeout(()=>{button.textContent='📥 Salvează cardul Black Metal ca imagine';},2500);
   }
 
   async function activateAmbassador() {
