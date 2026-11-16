@@ -2451,7 +2451,6 @@ Customer.wallet_uuid = Column(String, nullable=True)
 Customer.network_bonus_text = Column(String, nullable=True)
 BusinessAccount.ref_code = Column(String, nullable=True)
 BusinessAccount.stamps_required = Column(Integer, default=6)
-BusinessAccount.google_review_url = Column(String, nullable=True)
 
 class NetworkRule(Base):
     __tablename__ = "network_rules"
