@@ -60,6 +60,7 @@ class DirectMessage(BaseModel):
     audience: str = Field(default="all", max_length=40)
     product: str = Field(default="", max_length=200)
     customer_ids: Optional[List[int]] = None
+    idempotency_key: Optional[str] = Field(default=None, min_length=8, max_length=120)
 
 class OfferChoice(BaseModel):
     business_id: int
@@ -199,11 +200,19 @@ def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent
             raise HTTPException(status_code=422, detail="Alege produsul sau serviciul")
         product_wallets = read_customer_ids(db, account.id, Sale, product) if product.strip() else None
         users = db.query(Customer).filter(Customer.business_id == account.id).all()
+        selected = [c for c in users if selected_ids is None or c.id in selected_ids]
+        # Citim acordurile intr-un numar constant de interogari pe lot, nu una per client.
+        grants = {}
+        for index in range(0, len(selected), 400):
+            block_ids = [c.id for c in selected[index:index+400]]
+            consents = db.query(Consent).filter(
+                Consent.customer_id.in_(block_ids), Consent.purpose == PURPOSE
+            ).order_by(Consent.id.asc()).all()
+            for consent in consents:
+                grants[consent.customer_id] = bool(consent.granted)
         result = []
-        for c in users:
-            if selected_ids is not None and c.id not in selected_ids:
-                continue
-            if not latest_offer_choice(db, Consent, c.id):
+        for c in selected:
+            if not grants.get(c.id, False):
                 continue
             if not audience_matches(c, audience):
                 continue
@@ -215,6 +224,16 @@ def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent
 
     @route.post("/send")
     def send_direct(req: DirectMessage, biz=Depends(owner), db: Session = Depends(db_session)):
+        event = "direct:" + req.idempotency_key if req.idempotency_key else None
+        if event:
+            previous = db.query(InboxEntry).filter(
+                InboxEntry.business_id == biz.id, InboxEntry.source_event == event).first()
+            if previous:
+                if previous.title != req.subject.strip() or previous.body != req.text.strip():
+                    raise HTTPException(status_code=409, detail="Cheia mesajului a fost reutilizata pentru alt text")
+                delivered = db.query(InboxDelivery).filter(InboxDelivery.entry_id == previous.id).count()
+                return {"message_id": previous.id, "sent": delivered,
+                        "status": "already_delivered", "channel": "loial", "external_messages": 0}
         if req.customer_ids is not None and len(req.customer_ids) > 10000:
             raise HTTPException(status_code=422, detail="Selectie prea mare; foloseste segmentul toti")
         ids = set(req.customer_ids) if req.customer_ids is not None else None
@@ -223,12 +242,19 @@ def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent
             return {"sent": 0, "visible_to_wallets": 0, "status": "no_eligible_clients",
                     "message": "Nu exista clienti din segment care sa fi permis oferte in Loial."}
         entry = InboxEntry(business_id=biz.id, title=req.subject.strip(), body=req.text.strip(),
-                           category="marketing", source_event=None, created_at=now())
+                           category="marketing", source_event=event, created_at=now())
         db.add(entry)
         db.flush()
         sent = 0
         accessible = 0
-        access_wallets = {x.wallet_uuid for x in db.query(WalletInboxAccess.wallet_uuid).all()}
+        wallet_ids = {(getattr(c, "wallet_uuid", None) or c.uuid) for c in eligible}
+        wallet_ids.discard(None)
+        access_wallets = set()
+        identifiers = list(wallet_ids)
+        for index in range(0, len(identifiers), 400):
+            for wallet_id, in db.query(WalletInboxAccess.wallet_uuid).filter(
+                WalletInboxAccess.wallet_uuid.in_(identifiers[index:index+400])).all():
+                access_wallets.add(wallet_id)
         for c in eligible:
             db.add(InboxDelivery(entry_id=entry.id, business_id=biz.id, customer_id=c.id,
                                  created_at=now()))
