@@ -217,18 +217,31 @@ def model_settings():
     except ValueError:
         return None
 
-async def ask_model(system, question, usage, db, picture=None):
+async def ask_model(system, question, usage, db, picture=None, advanced=False):
     settings = model_settings()
     budget = min(15.0, max(0.0, float(os.getenv("LOIAL_AI_MONTHLY_BUDGET_EUR", "5"))))
     if not settings or usage.cost_eur >= budget:
         return None
     key, rates = settings
+    selected_model = os.getenv("LOIAL_AI_ECONOMY_MODEL", "gpt-4.1-nano")
+    if advanced:
+        strong = os.getenv("LOIAL_AI_ADVANCED_MODEL", "").strip()
+        advanced_in = os.getenv("LOIAL_AI_ADVANCED_INPUT_USD_PER_M", "").strip()
+        advanced_out = os.getenv("LOIAL_AI_ADVANCED_OUTPUT_USD_PER_M", "").strip()
+        if strong and advanced_in and advanced_out:
+            try:
+                strong_rates = [float(advanced_in), float(advanced_out)]
+                if min(strong_rates) > 0:
+                    selected_model = strong
+                    rates = [strong_rates[0], strong_rates[1], rates[2]]
+            except ValueError:
+                pass
     parts = [{"type": "text", "text": question[:12000]}]
     if picture:
         mime, raw = picture
         parts.append({"type": "image_url", "image_url": {"url":
                       "data:" + mime + ";base64," + base64.b64encode(raw).decode()}})
-    payload = {"model": os.getenv("LOIAL_AI_ECONOMY_MODEL", "gpt-4.1-nano"),
+    payload = {"model": selected_model,
                "max_tokens": 750, "messages": [
                   {"role": "system", "content": system},
                   {"role": "user", "content": parts}]}
@@ -441,6 +454,16 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         data = {"sector": profile(p.sector), "description": p.description, "currency": p.currency,
                 "summary": {k: sales[k] for k in ("total_revenue", "total_contribution", "missing", "sector_metrics")},
                 "products": sales["products"][:15], "customers": customer_segments(clients)}
+        recent_document = db.query(AIDocument).filter(AIDocument.business_id == biz.id).order_by(AIDocument.id.desc()).first()
+        if recent_document:
+            extracted = json.loads(recent_document.data_json or "{}")
+            data["latest_document"] = {
+                "kind": recent_document.kind,
+                "confirmed": bool(recent_document.confirmed),
+                "document_extract_unverified": json.dumps(extracted, ensure_ascii=False)[:5000]
+            }
+        recent_messages = db.query(AIMessage).filter(AIMessage.business_id == biz.id).order_by(AIMessage.id.desc()).limit(12).all()
+        conversation = "\n".join(x.role + ": " + x.content[:1000] for x in reversed(recent_messages))
         system = ("Esti Loial, consultantul managerial al acestei afaceri. Vorbesti romaneste natural, "
                   "pe intelesul unui antreprenor fara pregatire contabila. "
                   "Te adaptezi activitatii. Explica decizii si cifre in termeni practici, nu formule, "
@@ -448,7 +471,8 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                   "cu profitul net, nu promite rezultate. Daca datele lipsesc cere screenshot, foto, "
                   "raport CSV sau PDF. Nicio campanie nu se trimite fara aprobare. "
                   "Context agregat verificabil: " + json.dumps(data, ensure_ascii=False) + "\n" + guidance(p.sector))
-        answer = await ask_model(system, req.text, usage_now(db, biz), db)
+        answer = await ask_model(system, conversation, usage_now(db, biz), db,
+                                 advanced=req.topic in ("products", "margin", "performance", "invoices"))
         active = answer is not None
         if not active:
             answer = ("Pot analiza activitatea ta de tip " + profile(p.sector)["label"] + ". " +
