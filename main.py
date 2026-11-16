@@ -2380,4 +2380,24 @@ def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db
     db.add(customer)
     db.commit()
     return {"status": "saved"}
+class ChangePasswordRequest(BaseModel):
+    email: str
+    old_password: str
+    new_password: str
 
+@app.post("/api/change-password")
+def change_any_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
+    email = sanitize_input(req.email, 100)
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Parola nouă trebuie să aibă minim 6 caractere")
+    new_hash = pwd_context.hash(req.new_password)
+    updated = False
+    for model in [User, BusinessAccount, SalesAgent]:
+        acc = db.query(model).filter(model.email == email).first()
+        if acc and pwd_context.verify(req.old_password, acc.password):
+            acc.password = new_hash
+            updated = True
+    if not updated:
+        raise HTTPException(status_code=401, detail="Email sau parolă actuală incorectă")
+    db.commit()
+    return {"status": "password_updated", "message": "Parola a fost schimbată cu succes!"}
