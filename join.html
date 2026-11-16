@@ -726,6 +726,12 @@
       if(!res.ok)return;
       const card=await res.json();
       premiumAmbassadorAuthenticated=true;
+      const profileRes=await fetch('/api/loial-identity/me',{
+        headers:{Authorization:'Bearer '+token}});
+      if(profileRes.ok){
+        const identity=await profileRes.json();
+        if(identity.ambassador)renderAmbassadorActive(identity.ambassador);
+      }
       document.getElementById('ambEnrollBox').classList.add('hidden');
       document.getElementById('ambActiveBox').classList.remove('hidden');
       document.getElementById('premiumAmbName').textContent=card.holder;
@@ -792,14 +798,28 @@
 
     const btn = document.getElementById('ambJoinBtn');
     btn.textContent = 'Se activează...';
-    const res = await fetch('/api/ambassador/join', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password, payout_method, payout_details })
-    });
+    const authToken=localStorage.getItem('token');
+    let res;
+    if(authToken){
+      // Administratorii Business isi activeaza rolul aditional, fara alt cont/parola.
+      res=await fetch('/api/loial-identity/ambassador/activate',{
+        method:'POST',headers:{Authorization:'Bearer '+authToken,
+          'Content-Type':'application/json'},
+        body:JSON.stringify({display_name:name})
+      });
+    }else{
+      res=await fetch('/api/ambassador/join',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name,email,password,payout_method,payout_details})
+      });
+    }
     if (res.ok) {
       const data = await res.json();
-      renderAmbassadorActive(data);
+      renderAmbassadorActive(data.ambassador||data);
+      if(authToken){
+        premiumAmbassadorAuthenticated=true;
+        refreshOfficialWalletButtons();
+      }
     } else {
       const error = await res.json().catch(() => ({}));
       alert(error.detail || 'Nu am putut activa contul de ambasador.');
@@ -818,8 +838,13 @@
     refreshOfficialWalletButtons();
     document.getElementById('ambBizCount').textContent = `${amb.active_businesses} firme`;
     document.getElementById('ambRateLabel').textContent = `${amb.monthly_rate} EUR / lună / firmă`;
-    document.getElementById('ambQrImg').src = amb.qr_image;
+    document.getElementById('ambQrImg').src = amb.qr_image ||
+      ('/api/qr-link?url='+encodeURIComponent(amb.referral_url||'')+'&color=%23D8BE7A&initial=L');
     document.getElementById('ambRefUrl').value = amb.referral_url;
+    if(!premiumAmbassadorAuthenticated){
+      document.getElementById('ambWalletAvailability').textContent=
+        'Cardul premium este vizibil în Loial. Conectează-te pentru a-l emite în Apple/Google Wallet.';
+    }
   }
 
   function copyAmbLink() {
