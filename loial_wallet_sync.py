@@ -89,7 +89,12 @@ def make_customer_card(business,customer,wallet_uuid):
 
 def google_patch_body(card):
     return {"loyaltyPoints":{"label":"Ștampile",
-                             "balance":{"int":int(card["stamps"])}}}
+                             "balance":{"int":int(card["stamps"])}},
+            "secondaryLoyaltyPoints":{"label":"Până la premiu",
+                                      "balance":{"int":max(0,int(card["target"])-int(card["stamps"]))}},
+            "textModulesData":[
+                {"id":"status","header":"Statut","body":card["status"]},
+                {"id":"merchant","header":"Afacere","body":card["entity"]}]}
 
 def request_google_refresh(card,transport=None):
     """Synchronously fetch, compare and patch an already-created Google LoyaltyObject.
@@ -101,7 +106,10 @@ def request_google_refresh(card,transport=None):
     try:
         credentials=json.loads(os.environ["LOIAL_GOOGLE_WALLET_SERVICE_ACCOUNT_JSON"])
         assertion=oauth_assertion(credentials)
-        class_id=os.environ["LOIAL_GOOGLE_LOYALTY_CLASS_ID"]
+        from loial_google_issuer import loyalty_class_id_for_business
+        # The same class ID must be used when issuing and refreshing each card.
+        business_id=int(card["id"].split(":",2)[1])
+        class_id=loyalty_class_id_for_business(business_id)
         obj=google_object_id(card,credentials,class_id)
     except (KeyError,ValueError,TypeError) as error:
         raise RuntimeError("Google Wallet issuer configuration invalid") from error
@@ -123,7 +131,13 @@ def request_google_refresh(card,transport=None):
         current.raise_for_status()
         existing=current.json()
         old=(existing.get("loyaltyPoints") or {}).get("balance") or {}
-        if str(old.get("int"))==str(card["stamps"]):
+        secondary=(existing.get("secondaryLoyaltyPoints") or {}).get("balance") or {}
+        old_status=next((x.get("body") for x in existing.get("textModulesData",[])
+                         if x.get("id")=="status"),None)
+        remaining=max(0,int(card["target"])-int(card["stamps"]))
+        if (str(old.get("int"))==str(card["stamps"])
+            and str(secondary.get("int"))==str(remaining)
+            and old_status==card["status"]):
             return "unchanged"
         patch=client.patch(GOOGLE_OBJECT_ROOT+obj,headers=headers,
                            json=google_patch_body(card))
