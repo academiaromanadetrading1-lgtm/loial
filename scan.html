@@ -83,11 +83,14 @@
 
 <script>
   const pathParts = window.location.pathname.split('/').filter(Boolean);
-  const isDirectScan = pathParts === 'c';
-  const scannedWalletUuid = isDirectScan ? pathParts : '';
+  const scannedWalletUuid = new URLSearchParams(window.location.search).get('wallet_uuid') || '';
+  const isDirectScan = Boolean(scannedWalletUuid);
 
-  let bizId = isDirectScan ? (localStorage.getItem('loial_terminal_biz_id') || '') : (pathParts || '1');
+  let bizId = (!isDirectScan && pathParts[0] === 'scan' && /^\d+$/.test(pathParts[1] || ''))
+    ? pathParts[1]
+    : (localStorage.getItem('loial_terminal_biz_id') || '');
   let staffPin = localStorage.getItem('loial_terminal_pin') || '';
+  let currentRewardText = 'Premiu de fidelitate';
 
   async function init() {
     if (bizId) {
@@ -96,6 +99,7 @@
         if (res.ok) {
           const data = await res.json();
           document.getElementById('bizName').textContent = data.name;
+          currentRewardText = data.reward_text || currentRewardText;
           if (data.card_color) document.documentElement.style.setProperty('--primary', data.card_color);
         }
       } catch (e) {}
@@ -117,7 +121,7 @@
 
   function activateTerminal() {
     const pin = document.getElementById('pinInput').value.trim();
-    if (pin.length !== 4) {
+    if (!/^\d{4}$/.test(pin)) {
       document.getElementById('pinError').textContent = 'Introdu un PIN valid din 4 cifre.';
       return;
     }
@@ -164,8 +168,8 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           business_id: parseInt(bizId),
-          wallet_uuid: walletUuid,
-          staff_pin: staffPin
+          customer_uuid: walletUuid,
+          pin: staffPin
         })
       });
       const data = await res.json();
@@ -181,16 +185,16 @@
         box.className = 'status-box reward';
         box.innerHTML = `
           <div style="font-size:19px;font-weight:800;margin-bottom:6px;">🏆 PREMIU DEBLOCAT!</div>
-          <div style="font-size:14px;margin-bottom:8px;">Client: <strong>${data.customer_name}</strong> (${data.stamps}/${data.stamps_required})</div>
-          <div style="font-size:14px;font-weight:700;color:#92400e;">🎁 ${data.reward_text}</div>
+          <div style="font-size:14px;margin-bottom:8px;">Client: <strong>${data.name}</strong> (${data.stamps}/${data.target})</div>
+          <div style="font-size:14px;font-weight:700;color:#92400e;">🎁 ${currentRewardText}</div>
           <button type="button" class="btn-reward" onclick="redeemDirect('${walletUuid}')">🎁 Acordă premiul și resetează cardul (0)</button>
         `;
       } else {
         box.className = 'status-box';
         box.innerHTML = `
           <div style="font-size:18px;font-weight:800;color:var(--primary);margin-bottom:4px;">✓ Ștampilă adăugată!</div>
-          <div style="font-size:15px;">Client: <strong>${data.customer_name}</strong></div>
-          <div style="font-size:17px;font-weight:800;margin-top:6px;">Progres: ${data.stamps} / ${data.stamps_required} ★</div>
+          <div style="font-size:15px;">Client: <strong>${data.name}</strong></div>
+          <div style="font-size:17px;font-weight:800;margin-top:6px;">Progres: ${data.stamps} / ${data.target} ★</div>
           <div style="font-size:12px;color:var(--muted);margin-top:10px;">Poți închide fereastra sau scana următorul client cu Camera telefonului.</div>
         `;
       }
@@ -203,13 +207,13 @@
   async function redeemDirect(walletUuid) {
     const box = document.getElementById('resultBox');
     try {
-      const res = await fetch('/api/redeem-universal', {
+      const res = await fetch('/api/redeem-reward', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           business_id: parseInt(bizId),
-          wallet_uuid: walletUuid,
-          staff_pin: staffPin
+          customer_uuid: walletUuid,
+          pin: staffPin
         })
       });
       if (res.ok) {
