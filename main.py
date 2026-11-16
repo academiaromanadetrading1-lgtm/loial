@@ -2915,3 +2915,13 @@ def generate_qr_from_query(url: str, color: str = "#2d6a4f", initial: str = "L")
         media_type="image/png",
         headers={"Cache-Control": "no-store"},
     )
+
+
+# Loial AI Business - module independent from existing QR and loyalty routes.
+from loial_business_ai import install_loial_ai
+install_loial_ai(app, engine, SessionLocal, BusinessAccount, Customer, Consent, SECRET_KEY, ALGORITHM)
+
+@app.get("/loial-ai.html")
+@app.get("/loial-ai")
+def loial_ai_page():
+    return FileResponse("loial-ai.html")
