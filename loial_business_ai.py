@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session, declarative_base
 from loial_industries import PROFILES, canonical, profile, weekly_request
 from loial_analytics import customer_segments, sector_summary, abc_products, money
 from loial_knowledge import guidance
+from loial_marketing import TEMPLATES, render as render_template, eligible_segment
 
 BaseAI = declarative_base()
 
@@ -546,4 +547,65 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                     Consent.purpose == "personalized_ads", Consent.granted == 1).first():
                 records.append([x.email])
         return export_csv(["email"], records, "loial_ads_consimtamant.csv")
+    @r.get("/message-templates")
+    def message_templates(biz=Depends(owner), db: Session = Depends(db_session)):
+        return [{"key": key, "label": tpl["label"],
+                 "requires_marketing_permission": tpl["commercial"]}
+                for key, tpl in TEMPLATES.items()]
+
+    @r.get("/message-templates/{template_key}/preview")
+    def preview_template(template_key: str, biz=Depends(owner),
+                         db: Session = Depends(db_session)):
+        if template_key not in TEMPLATES:
+            raise HTTPException(status_code=404, detail="Sablon inexistent")
+        return render_template(template_key, {"business": biz.name, "name": "Client",
+                 "stamps": 2, "target": getattr(biz, "stamps_required", None) or 6,
+                 "remaining": 4, "reward": biz.reward_text or "Premiu fidelitate",
+                 "product": "produsul preferat", "offer": "Detalii la locatie."})
+
+    @r.get("/customers")
+    def customer_directory(page: int = 1, biz=Depends(owner),
+                           db: Session = Depends(db_session)):
+        page = max(1, page)
+        records = db.query(Customer).filter(Customer.business_id == biz.id)
+        count = records.count()
+        clients = records.order_by(Customer.id.desc()).offset((page-1)*100).limit(100).all()
+        return {"page": page, "total": count,
+                "items": [{"id": c.id, "name": c.name, "email": c.email or "",
+                           "last_visit": c.last_visit, "stamps": c.stamps or 0} for c in clients]}
+
+    @r.get("/customers/{customer_id}/purchases")
+    def purchase_history(customer_id: int, biz=Depends(owner),
+                         db: Session = Depends(db_session)):
+        customer = db.query(Customer).filter(Customer.business_id == biz.id,
+                                              Customer.id == customer_id).first()
+        if not customer:
+            raise HTTPException(status_code=404, detail="Client inexistent in firma ta")
+        wallet = getattr(customer, "wallet_uuid", None) or customer.uuid
+        ids = {wallet, customer.uuid}
+        ids.discard(None)
+        if not ids:
+            return {"name": customer.name, "purchases": [], "note": "Nu exista identificator pentru legarea bonurilor"}
+        lines = db.query(AISale).filter(AISale.business_id == biz.id,
+                                        AISale.customer_uuid.in_(ids)).order_by(AISale.sold_at.desc()).limit(500).all()
+        return {"name": customer.name,
+                "purchases": [{"date": s.sold_at, "product": s.product, "quantity": s.quantity,
+                               "total": round(s.quantity * s.unit_price, 2)} for s in lines],
+                "note": "Produsele sunt asociate numai daca importul contine ID-ul clientului"}
+
+    @r.get("/campaigns/{campaign_id}/audience")
+    def campaign_audience(campaign_id: int, biz=Depends(owner),
+                          db: Session = Depends(db_session)):
+        draft = db.query(AICampaign).filter(AICampaign.business_id == biz.id,
+                                             AICampaign.id == campaign_id).first()
+        if not draft:
+            raise HTTPException(status_code=404, detail="Campanie inexistenta")
+        customers = db.query(Customer).filter(Customer.business_id == biz.id).all()
+        consented = {c.customer_id for c in db.query(Consent).filter(
+            Consent.purpose == "marketing_email", Consent.granted == 1).all()}
+        eligible = eligible_segment(customers, draft.audience, consented)
+        return {"campaign_id": draft.id, "segment": draft.audience,
+                "eligible_email_recipients": len(eligible), "sent": 0,
+                "note": "Verifica dreptul de marketing si preferintele inainte de a trimite. Mesajul nu a fost expediat."}
+
     app.include_router(r)
