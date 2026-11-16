@@ -315,22 +315,27 @@
     loadUniversalWallet();
   }
 
-  document.getElementById('enrollForm').onsubmit = (e) => {
-    e.preventDefault();
-    const nameVal = document.getElementById('nameInput').value.trim();
-    const emailVal = document.getElementById('emailInput').value.trim();
-    if (!nameVal) return;
+   const activeForm = document.getElementById('enrollForm') || document.querySelector('form');
+  if (activeForm) {
+    activeForm.onsubmit = (e) => {
+      e.preventDefault();
+      const nameEl = document.getElementById('nameInput') || activeForm.querySelector('input[type="text"]');
+      const emailEl = document.getElementById('emailInput') || activeForm.querySelector('input[type="email"]');
+      const nameVal = nameEl ? nameEl.value.trim() : '';
+      const emailVal = emailEl ? emailEl.value.trim() : '';
+      if (!nameVal) return;
 
-    savedProfile = { uuid: globalWalletUuid, name: nameVal, email: emailVal };
-    localStorage.setItem('loial_universal_profile', JSON.stringify(savedProfile));
-    showCardInstant(globalWalletUuid, nameVal, 0);
+      savedProfile = { uuid: globalWalletUuid, name: nameVal, email: emailVal };
+      localStorage.setItem('loial_universal_profile', JSON.stringify(savedProfile));
+      showCardInstant(globalWalletUuid, nameVal, 0);
 
-    fetch('/api/enroll-sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ business_id: bizId, name: nameVal, email: emailVal, uuid: globalWalletUuid })
-    }).then(() => loadUniversalWallet()).catch(() => {});
-  };
+      fetch('/api/enroll-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ business_id: bizId, name: nameVal, email: emailVal, uuid: globalWalletUuid })
+      }).then(() => loadUniversalWallet()).catch(() => {});
+    };
+  }
 
   function showCardInstant(uuid, name, stamps) {
     knownStamps = stamps;
