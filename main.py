@@ -3063,6 +3063,11 @@ from loial_receipts import install_receipts
 install_receipts(app, engine, SessionLocal, BusinessAccount, Customer,
                  AIDocument, AISale, SECRET_KEY, ALGORITHM)
 
+# Cheltuieli din facturi confirmate explicit de antreprenor (nu estimari AI).
+from loial_expenses import install_expenses
+install_expenses(app,engine,SessionLocal,BusinessAccount,AIDocument,SECRET_KEY,ALGORITHM)
+
+
 # Recuperare izolata a cardurilor legacy, cu verificare in persoana si cod de unica folosinta.
 from loial_wallet_recovery import install_wallet_recovery
 install_wallet_recovery(app, engine, SessionLocal, BusinessAccount, Customer,
