@@ -345,16 +345,22 @@ def require_role(required: str):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 def seed_data(db: Session):
-    if db.query(User).count() == 0:
-        db.add(User(email="demo@loial.app", password=pwd_context.hash("demo123"), name="Demo Cafe", plan="pro", role="owner"))
-        db.add(Customer(name="Andrei", stamps=4, lang="ro", email="andrei@example.com", lat=44.4268, lng=26.1025, last_visit="2026-10-25"))
-        db.add(Location(name="Lejer Cafe", address="Str. Exemplu 1, Bucharest", lat=44.4268, lng=26.1025, radius=150))
-    admin_email = "ciprianpop@academiadetrading.llc"
-    existing_admin = db.query(User).filter(User.email == admin_email).first()
-    if not existing_admin:
-        db.add(User(email=admin_email, password=pwd_context.hash("Cod515900."), name="Ciprian Pop", plan="pro", role="admin"))
-    else:
-        existing_admin.role = "admin"
+    """Seeding explicit only. Never create admin/demo accounts with public passwords."""
+    if os.getenv("LOIAL_DEV_SEED_DATA", "0") == "1" and db.query(User).count() == 0:
+        demo_secret = os.getenv("LOIAL_DEV_DEMO_PASSWORD", "")
+        if len(demo_secret) < 12:
+            raise RuntimeError("Set LOIAL_DEV_DEMO_PASSWORD (minim 12 caractere) for explicit dev seed")
+        db.add(User(email="demo@loial.app", password=pwd_context.hash(demo_secret),
+                    name="Cont demo", plan="starter", role="owner"))
+    admin_email = os.getenv("LOIAL_ADMIN_BOOTSTRAP_EMAIL", "").strip().lower()
+    admin_secret = os.getenv("LOIAL_ADMIN_BOOTSTRAP_PASSWORD", "")
+    if admin_email:
+        if len(admin_secret) < 12:
+            raise RuntimeError("LOIAL_ADMIN_BOOTSTRAP_PASSWORD trebuie sa aiba minimum 12 caractere")
+        existing = db.query(User).filter(User.email == admin_email).first()
+        if not existing:
+            db.add(User(email=admin_email, password=pwd_context.hash(admin_secret),
+                        name="Administrator Loial", plan="pro", role="admin"))
     db.commit()
 
 def cleanup_old_data(db: Session):
