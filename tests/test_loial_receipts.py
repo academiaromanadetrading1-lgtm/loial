@@ -141,6 +141,10 @@ def test_refund_excludes_sale_and_reverses_latest_unredeemed_stamp(setup_receipt
     claim=client.post("/api/loial-receipts/claim",
                       headers=wallet(token_a),json={"receipt_token":token})
     assert claim.status_code==200
+    from loial_inbox import read_customer_ids
+    from loial_business_ai import AISale
+    with db_factory() as db:
+        assert "wallet-1" in read_customer_ids(db,1,AISale,"Revizie auto")
     refund=client.post("/api/loial-receipts/refund",headers=owner(),
            json={"receipt_ref":"B-100","reason":"Returnare integrala"})
     assert refund.status_code==200,refund.text
@@ -150,6 +154,8 @@ def test_refund_excludes_sale_and_reverses_latest_unredeemed_stamp(setup_receipt
     report=client.get("/api/loial-ai/report",headers=owner()).json()
     assert report["sales"]["total_revenue"]==0
     assert client.get("/api/loial-ai/customers/1/purchases",headers=owner()).json()["purchases"]==[]
+    with db_factory() as db:
+        assert "wallet-1" not in read_customer_ids(db,1,AISale,"Revizie auto")
     assert client.post("/api/loial-receipts/claim",headers=wallet(token_b),
         json={"receipt_token":token}).status_code==409
 
