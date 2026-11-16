@@ -19,6 +19,7 @@
   .btn { width: 100%; padding: 15px; border: none; border-radius: 12px; background: linear-gradient(135deg, #2d6a4f, #40916c); color: #ffffff; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 22px; box-shadow: 0 6px 18px rgba(45, 106, 79, 0.25); font-family: inherit; }
   .color-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
   .color-preview { width: 42px; height: 42px; border-radius: 10px; border: 1px solid #dce6e0; flex-shrink: 0; }
+  .ref-pill { background: #e8f3ed; border: 1px solid #b7d7c5; color: #2d6a4f; font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 10px; margin-bottom: 14px; display: none; }
   .err-box { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 10px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; margin-top: 14px; display: none; }
 </style>
 </head>
@@ -27,6 +28,7 @@
   <a href="/" class="logo">● LOIAL.SPACE</a>
   <h1>Creează-ți contul gratuit</h1>
   <p class="sub">Cardul tău digital este pregătit. Completează datele pentru activare:</p>
+  <div class="ref-pill" id="refBadge">🤝 Recomandat prin cod partener: <span id="refCodeLabel"></span></div>
   <form id="regForm">
     <label>Email afacere</label>
     <input type="email" id="email" placeholder="contact@afacereata.ro" required>
@@ -46,6 +48,14 @@
   </form>
 </div>
 <script>
+const urlRef = new URLSearchParams(location.search).get('ref');
+if (urlRef) localStorage.setItem('loial_ref_code', urlRef.trim());
+const savedRef = localStorage.getItem('loial_ref_code') || '';
+if (savedRef) {
+  document.getElementById('refBadge').style.display = 'block';
+  document.getElementById('refCodeLabel').textContent = savedRef;
+}
+
 document.getElementById('bizName').value = localStorage.getItem('draft_biz') || '';
 document.getElementById('reward').value = localStorage.getItem('draft_reward') || 'La 6 vizite primești un premiu din partea noastră!';
 const color = localStorage.getItem('draft_color') || '#2d6a4f';
@@ -65,7 +75,8 @@ document.getElementById('regForm').onsubmit = async (e) => {
     password: document.getElementById('password').value,
     business_name: document.getElementById('bizName').value.trim(),
     reward: document.getElementById('reward').value.trim(),
-    color: document.getElementById('color').value
+    color: document.getElementById('color').value,
+    ref_code: savedRef
   };
   try {
     const res = await fetch('/api/register', {
