@@ -157,6 +157,17 @@
     } catch (e) {}
   }
 
+  function stableScanOperation(walletUuid) {
+    const key='loial_pending_scan_'+bizId+'_'+walletUuid;
+    const created=Date.now();
+    try{
+      const pending=JSON.parse(sessionStorage.getItem(key)||'null');
+      if(pending&&pending.id&&created-pending.when<5*60*1000)return pending.id;
+      const id=crypto.randomUUID();
+      sessionStorage.setItem(key,JSON.stringify({id,when:created}));
+      return id;
+    }catch(error){return crypto.randomUUID();}
+  }
   async function grantStampDirect(walletUuid) {
     const box = document.getElementById('resultBox');
     box.className = 'status-box';
@@ -169,7 +180,8 @@
         body: JSON.stringify({
           business_id: parseInt(bizId),
           customer_uuid: walletUuid,
-          pin: staffPin
+          pin: staffPin,
+          idempotency_key: stableScanOperation(walletUuid)
         })
       });
       const responseText = await res.text();
@@ -188,6 +200,11 @@
         return;
       }
 
+      if(data.duplicate_ignored){
+        box.className='status-box';
+        box.textContent='✓ Această scanare a fost deja procesată. Ștampilele nu s-au dublat.';
+        return;
+      }
       playBeep();
       box.replaceChildren();
       function addLine(text, fontSize, color) {
