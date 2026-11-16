@@ -86,6 +86,7 @@ class AICampaign(BaseAI):
     id = Column(Integer, primary_key=True)
     business_id = Column(Integer, index=True, nullable=False)
     audience = Column(String(60))
+    product = Column(String(200), nullable=True)
     objective = Column(String(250))
     subject = Column(String(200))
     content = Column(Text)
@@ -135,6 +136,7 @@ class MetricRequest(BaseModel):
 class CampaignRequest(BaseModel):
     objective: str = Field(min_length=3, max_length=250)
     audience: str = Field(default="inactive_31_90", max_length=60)
+    product: str = Field(default="", max_length=200)
     offer: str = Field(default="", max_length=300)
 
 TOPICS = [
@@ -506,9 +508,28 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         db.commit()
         return {"answer": answer, "mode": "ai" if active else "guided",
                 "source": "profilul firmei si date agregate confirmate"}
+    def filtered_marketing_clients(db, biz, audience, product_name=""):
+        clients = db.query(Customer).filter(Customer.business_id == biz.id).all()
+        opt_ins = {row.customer_id for row in db.query(Consent).filter(
+            Consent.purpose == "marketing_email", Consent.granted == 1).all()}
+        segment = "all" if audience == "product_buyers" else audience
+        eligible = eligible_segment(clients, segment, opt_ins)
+        if audience == "product_buyers" or product_name.strip():
+            key = product_name.strip().lower()
+            if not key:
+                return []
+            from sqlalchemy import func as sql_func
+            purchases = db.query(AISale).filter(AISale.business_id == biz.id,
+                                sql_func.lower(AISale.product) == key).all()
+            wallet_ids = {row.customer_uuid for row in purchases if row.customer_uuid}
+            eligible = [client for client in eligible if
+                        (client.uuid in wallet_ids or
+                         getattr(client, "wallet_uuid", None) in wallet_ids)]
+        return eligible
+
     @r.post("/campaigns")
     async def draft_campaign(req: CampaignRequest, biz=Depends(owner), db: Session = Depends(db_session)):
-        allowed = {"all", "active_0_7", "inactive_8_30", "inactive_31_90", "inactive_91_365"}
+        allowed = {"all", "active_0_7", "inactive_8_30", "inactive_31_90", "inactive_91_365", "product_buyers"}
         if req.audience not in allowed:
             raise HTTPException(status_code=422, detail="Segment invalid")
         p = account_profile(db, biz)
@@ -518,7 +539,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         summary = sector_summary(p.sector, rows(db, biz))
         structured = {"business": biz.name, "sector": profile(p.sector)["label"],
                       "objective": req.objective, "audience": req.audience,
-                      "offer_explicit": req.offer, "products": summary["products"][:5]}
+                      "product_filter": req.product, "offer_explicit": req.offer, "products": summary["products"][:5]}
         prompt = ("Esti redactorul campaniilor Loial. Propune un email scurt, clar si natural pentru "
                   "afacerea descrisa. Returneaza NUMAI JSON valid cu cheile subject si text. "
                   "Nu inventa reduceri, preturi, promisiuni, stocuri, termene ori performante. "
@@ -538,8 +559,8 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                     generated = True
             except ValueError:
                 pass
-        draft = AICampaign(business_id=biz.id, audience=req.audience, objective=req.objective,
-                           subject=subject, content=message, status="draft")
+        draft = AICampaign(business_id=biz.id, audience=req.audience, product=req.product.strip() or None,
+                           objective=req.objective, subject=subject, content=message, status="draft")
         db.add(draft)
         db.commit()
         return {"id": draft.id, "status": "draft", "subject": draft.subject,
@@ -548,7 +569,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
     @r.get("/campaigns")
     def campaigns(biz=Depends(owner), db: Session = Depends(db_session)):
         data = db.query(AICampaign).filter(AICampaign.business_id == biz.id).order_by(AICampaign.id.desc()).limit(60).all()
-        return [{"id": x.id, "audience": x.audience, "objective": x.objective,
+        return [{"id": x.id, "audience": x.audience, "product": x.product, "objective": x.objective,
                  "subject": x.subject, "text": x.content, "status": x.status} for x in data]
     @r.post("/campaigns/{campaign_id}/approve")
     def approve(campaign_id: int, biz=Depends(owner), db: Session = Depends(db_session)):
@@ -578,10 +599,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         remaining_quota = max(0, monthly_limit - month_count)
         if remaining_quota == 0:
             raise HTTPException(status_code=429, detail="Cota lunara de email a fost atinsa")
-        clients = db.query(Customer).filter(Customer.business_id == biz.id).all()
-        allowed_ids = {x.customer_id for x in db.query(Consent).filter(
-            Consent.purpose == "marketing_email", Consent.granted == 1).all()}
-        eligible = eligible_segment(clients, campaign.audience, allowed_ids)
+        eligible = filtered_marketing_clients(db, biz, campaign.audience, campaign.product or "")
         sent = 0
         failed = 0
         for client in eligible:
@@ -718,11 +736,8 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                                              AICampaign.id == campaign_id).first()
         if not draft:
             raise HTTPException(status_code=404, detail="Campanie inexistenta")
-        customers = db.query(Customer).filter(Customer.business_id == biz.id).all()
-        consented = {c.customer_id for c in db.query(Consent).filter(
-            Consent.purpose == "marketing_email", Consent.granted == 1).all()}
-        eligible = eligible_segment(customers, draft.audience, consented)
-        return {"campaign_id": draft.id, "segment": draft.audience,
+        eligible = filtered_marketing_clients(db, biz, draft.audience, draft.product or "")
+        return {"campaign_id": draft.id, "segment": draft.audience, "product": draft.product,
                 "eligible_email_recipients": len(eligible), "sent": 0,
                 "note": "Verifica dreptul de marketing si preferintele inainte de a trimite. Mesajul nu a fost expediat."}
 
