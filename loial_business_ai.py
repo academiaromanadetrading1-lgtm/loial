@@ -337,8 +337,18 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
     def weekly(biz=Depends(owner), db: Session = Depends(db_session)):
         p = account_profile(db, biz)
         recent = db.query(AIDocument).filter(AIDocument.business_id == biz.id).order_by(AIDocument.id.desc()).first()
+        from loial_weekly_jobs import WeeklyCycle
+        from sqlalchemy.exc import OperationalError
+        try:
+            cycle = db.query(WeeklyCycle).filter(
+                WeeklyCycle.business_id == biz.id).order_by(WeeklyCycle.id.desc()).first()
+        except OperationalError:
+            cycle = None
+        automated = os.getenv("LOIAL_WEEKLY_JOBS_ENABLED","1")=="1"
         return {"message": weekly_request(p.sector), "last_document": recent.created_at if recent else None,
-                "automated_delivery": False}
+                "automated_delivery": automated,
+                "last_weekly_request_at": cycle.created_at if cycle else None,
+                "channel": "loial_ai_chat", "external_messages": 0}
     @r.get("/report")
     def report(biz=Depends(owner), db: Session = Depends(db_session)):
         p = account_profile(db, biz)
