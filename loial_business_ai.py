@@ -370,7 +370,13 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         for x in reversed(manual):
             operational[x.name] = x.value
         calculated = sector_summary(p.sector, rows(db, biz), operational)
+        from loial_expenses import VerifiedExpense, expense_totals
+        expense_rows=db.query(VerifiedExpense).filter(
+            VerifiedExpense.business_id==biz.id,VerifiedExpense.voided_at.is_(None)).all()
+        verified_expenses={"confirmed_rows":len(expense_rows),
+                           "totals_by_currency_vat_basis_and_category":expense_totals(expense_rows)}
         return {"industry": profile(p.sector)["label"], "currency": p.currency,
+                "verified_expenses":verified_expenses,
                 "sales": calculated, "abc": abc_products(calculated["products"]),
                 "findings": manager_findings(calculated, p.sector),
                 "customers": customer_segments(customers),
@@ -501,7 +507,13 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         db.commit()
         sales = sector_summary(p.sector, rows(db, biz))
         clients = db.query(Customer).filter(Customer.business_id == biz.id).all()
+        from loial_expenses import VerifiedExpense, expense_totals
+        expenses=db.query(VerifiedExpense).filter(
+            VerifiedExpense.business_id==biz.id,VerifiedExpense.voided_at.is_(None)
+            ).order_by(VerifiedExpense.id.desc()).limit(500).all()
         data = {"sector": profile(p.sector), "description": p.description, "currency": p.currency,
+                "verified_expenses":{"rows":len(expenses),"totals":expense_totals(expenses),
+                    "warning":"Sume cu TVA/fara TVA si valute diferite nu se aduna; cheltuielile pot fi incomplete."},
                 "summary": {k: sales[k] for k in ("total_revenue", "total_contribution", "missing", "sector_metrics")},
                 "products": sales["products"][:15], "customers": customer_segments(clients)}
         recent_document = db.query(AIDocument).filter(AIDocument.business_id == biz.id).order_by(AIDocument.id.desc()).first()
