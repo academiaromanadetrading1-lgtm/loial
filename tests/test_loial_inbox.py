@@ -226,3 +226,25 @@ def test_one_targeted_customer_does_not_receive_other_customer_messages(env):
     assert sent2.json()["sent"]==1
     assert client.get("/api/loial-inbox/me",headers=wallet(tokens[0])).json()["messages"]==[]
     assert len(client.get("/api/loial-inbox/me",headers=wallet(tokens[1])).json()["messages"])==1
+
+
+def test_wallet_preferences_are_per_business(env):
+    client, _, _, _, _, tokens, boss, wallet = env
+    preferences = client.get("/api/loial-inbox/preferences", headers=wallet(tokens[0])).json()
+    by_biz = {p["business_id"]: p["offers_enabled"] for p in preferences}
+    assert by_biz[1] is True
+    assert by_biz[2] is True
+    changed = client.post("/api/loial-inbox/preferences", headers=wallet(tokens[0]),
+                          json={"business_id":1,"enabled":False})
+    assert changed.status_code == 200
+    again=client.get("/api/loial-inbox/preferences", headers=wallet(tokens[0])).json()
+    latest = {p["business_id"]:p["offers_enabled"] for p in again}
+    assert latest[1] is False and latest[2] is True
+
+def test_private_wallet_token_cannot_be_replaced_by_public_qr_uuid(env):
+    client, _, _, _, _, tokens, _, wallet = env
+    spoof = client.get("/api/loial-inbox/me",
+        headers={"X-Loial-Wallet-Token":"wallet-a"})
+    assert spoof.status_code == 401
+    valid = client.get("/api/loial-inbox/me", headers=wallet(tokens[0]))
+    assert valid.status_code == 200
