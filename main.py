@@ -3072,6 +3072,17 @@ install_premium_wallet(app, engine, SessionLocal, BusinessAccount, Customer,
                        SalesAgent, Sale, SECRET_KEY, ALGORITHM,
                        get_ambassador_tier, BusinessAmbassadorLink)
 
+# Bon QR unic, verificare la nivel de tranzactie si asociere cu cumparaturile clientului.
+from loial_business_ai import AIDocument
+from loial_receipts import install_receipts
+install_receipts(app, engine, SessionLocal, BusinessAccount, Customer,
+                 AIDocument, AISale, SECRET_KEY, ALGORITHM)
+
+@app.get("/loial-receipt.html")
+def loial_receipt_page():
+    return FileResponse("loial-receipt.html")
+
+
 
 @app.get("/loial-ai.html")
 @app.get("/loial-ai")
