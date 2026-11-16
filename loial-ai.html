@@ -139,6 +139,7 @@ const API='/api/loial-ai';
 const token=localStorage.getItem('token') || '';
 const $=x=>document.getElementById(x);
 let currentTopic='general', canUse=false, currentIndustry='general', currentCampaignId=null;
+let pendingMessageKey='', pendingMessageFingerprint='';
 const sectorMetrics={
   rideshare:[['revenue','Încasări din curse'],['online_hours','Ore online'],['kilometres','Kilometri parcurși'],['platform_fees','Comisioane Uber/Bolt'],['fuel_energy','Combustibil sau încărcări']],
   atelier_auto:[['revenue','Încasări atelier'],['billed_hours','Ore facturate'],['worked_hours','Ore lucrate']],
@@ -366,7 +367,15 @@ $('sendCampaign').onclick=async()=>{
     const payload={subject,text:message,audience:$('audience').value,
       product:$('productFilter').value};
     if($('singleRecipient').value)payload.customer_ids=[Number($('singleRecipient').value)];
+    const signature=JSON.stringify(payload);
+    if(signature!==pendingMessageFingerprint){
+      pendingMessageFingerprint=signature;
+      pendingMessageKey=crypto.randomUUID();
+    }
+    payload.idempotency_key=pendingMessageKey;
     const data=await nativeInbox('/send',{method:'POST',body:JSON.stringify(payload)});
+    pendingMessageFingerprint='';
+    pendingMessageKey='';
     $('campaignPreview').textContent='Mesaj livrat în Loial: '+data.sent+' carduri. '+
       (data.visible_to_wallets||0)+' pot citi acum de pe dispozitive activate. '+
       (data.awaiting_wallet_activation||0)+' necesită activarea securizată a inboxului.';
