@@ -2249,8 +2249,8 @@ def add_staff_member(req: StaffCreateRequest, credentials: HTTPAuthorizationCred
     biz = db.query(BusinessAccount).filter(BusinessAccount.email == payload.get("sub")).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
-    if len(req.pin) != 4 or not req.pin.isdigit():
-        raise HTTPException(status_code=400, detail="PIN-ul trebuie să aibă exact 4 cifre")
+    if not re.fullmatch(r"\d{4}",req.pin) or req.pin=="1234" or req.pin==biz.staff_pin:
+        raise HTTPException(status_code=422,detail="PIN de 4 cifre, diferit de 1234 si de PIN-ul administratorului")
     existing_pin = db.query(StaffMember).filter(StaffMember.business_id == biz.id, StaffMember.pin == req.pin, StaffMember.active == 1).first()
     if existing_pin:
         raise HTTPException(status_code=400, detail="Acest PIN este deja folosit de alt angajat")
@@ -2442,8 +2442,8 @@ def add_biz_staff_direct(business_id: int, req: StaffCreateRequest, credentials:
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
-    if len(req.pin) != 4 or not req.pin.isdigit():
-        raise HTTPException(status_code=400, detail="PIN-ul trebuie să aibă exact 4 cifre")
+    if not re.fullmatch(r"\d{4}",req.pin) or req.pin=="1234" or req.pin==biz.staff_pin:
+        raise HTTPException(status_code=422,detail="PIN de 4 cifre, diferit de 1234 si de PIN-ul administratorului")
     existing = db.query(StaffMember).filter(StaffMember.business_id == business_id, StaffMember.pin == req.pin, StaffMember.active == 1).first()
     if existing:
         raise HTTPException(status_code=400, detail="Acest PIN este deja folosit de alt angajat")
