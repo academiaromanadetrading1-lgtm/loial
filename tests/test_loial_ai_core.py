@@ -15,6 +15,8 @@ from sqlalchemy.pool import StaticPool
 from loial_industries import canonical, profile, weekly_request
 from loial_analytics import summarize_sales, customer_segments, sector_summary
 from loial_business_ai import install_loial_ai, parse_sales_csv
+from loial_email import email_enabled, unsubscribe_token, parse_unsubscribe_token
+from loial_marketing import render, eligible_segment
 
 def test_rideshare_matches_uber_bolt_and_no_pastry_fields():
     assert canonical("Sofer Uber / Bolt") == "rideshare"
@@ -166,3 +168,40 @@ def test_campaign_approval_never_sends(app_client):
     confirmed=client.post("/api/loial-ai/campaigns/"+str(item_id)+"/approve",headers=headers)
     assert confirmed.json()["status"] == "approved_not_sent"
     assert confirmed.json()["sent"] == 0
+
+
+def test_template_renders_without_sending():
+    preview = render("remaining", {"business": "Atelier", "name":"Alex",
+                                   "stamps": 3, "target": 6, "remaining":3})
+    assert "3" in preview["text"]
+    assert preview["sent"] is False
+    assert render("reactivation", {"business":"Atelier", "name":"Alex",
+                                   "offer":"Reducere"} )["requires_marketing_permission"]
+
+def test_unsubscribe_token_is_bound_to_specific_business_and_customer():
+    key = "super-long-private-test-key-for-jwt-and-links"
+    token = unsubscribe_token(1, 15, key)
+    assert parse_unsubscribe_token(token, key) == (1, 15)
+    assert parse_unsubscribe_token(token + "wrong", key) is None
+    assert parse_unsubscribe_token(token, "other-signing-secret") is None
+
+def test_email_dispatch_is_off_by_default(app_client):
+    client, auth = app_client
+    headers = auth("owner1@test.invalid")
+    campaign = client.post("/api/loial-ai/campaigns", headers=headers,
+      json={"objective":"Test", "audience":"all","offer":"Test"}).json()
+    client.post("/api/loial-ai/campaigns/"+str(campaign["id"])+"/approve", headers=headers)
+    blocked = client.post("/api/loial-ai/campaigns/"+str(campaign["id"])+"/send",
+      headers=headers, json={"confirmation":"TRIMITE"})
+    assert blocked.status_code == 503
+
+def test_campaign_and_customer_history_are_isolated(app_client):
+    client, auth = app_client
+    headers1 = auth("owner1@test.invalid")
+    headers2 = auth("owner2@test.invalid")
+    first = client.get("/api/loial-ai/customers", headers=headers1).json()
+    second = client.get("/api/loial-ai/customers", headers=headers2).json()
+    assert first["items"][0]["name"] == "Client Taxi"
+    assert second["items"][0]["name"] == "Client Garaj"
+    assert client.get("/api/loial-ai/customers/2/purchases",headers=headers1).status_code == 404
+    assert client.get("/api/loial-ai/customers/1/purchases",headers=headers2).status_code == 404
