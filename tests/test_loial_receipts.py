@@ -13,6 +13,7 @@ from loial_business_ai import BaseAI, install_loial_ai
 from loial_inbox import InboxBase, issue_wallet_access
 from loial_receipts import install_receipts, ReceiptBase, Receipt
 from loial_wallet_sync import BaseSync, WalletSyncItem
+from loial_apple_updates import AppleBase
 
 @pytest.fixture
 def setup_receipts():
@@ -51,6 +52,7 @@ def setup_receipts():
     InboxBase.metadata.create_all(engine)
     ReceiptBase.metadata.create_all(engine)
     BaseSync.metadata.create_all(engine)
+    AppleBase.metadata.create_all(engine)
     BaseAI.metadata.create_all(engine)
     factory=sessionmaker(bind=engine)
     app=FastAPI()
