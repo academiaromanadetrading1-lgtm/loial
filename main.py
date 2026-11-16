@@ -2819,3 +2819,37 @@ def admin_update_network_rule(req: NetworkRuleUpdateRequest, db: Session = Depen
 @app.get("/ambasador")
 def serve_ambasador_page():
     return FileResponse("ambasador.html")
+@app.delete("/api/admin/business/{biz_id}")
+def admin_delete_business(biz_id: int, db: Session = Depends(get_db)):
+    biz = db.query(BusinessAccount).filter(BusinessAccount.id == biz_id).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Afacere negăsită")
+    db.query(StaffMember).filter(StaffMember.business_id == biz_id).delete()
+    db.query(Customer).filter(Customer.business_id == biz_id).delete()
+    db.query(Sale).filter(Sale.business_id == biz_id).delete()
+    db.delete(biz)
+    db.commit()
+    return {"status": "deleted"}
+
+
+@app.delete("/api/admin/ambassador/{agent_id}")
+def admin_delete_ambassador(agent_id: int, db: Session = Depends(get_db)):
+    agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Ambasador negăsit")
+    db.query(BusinessAccount).filter(BusinessAccount.agent_id == agent_id).update({"agent_id": None, "ref_code": ""})
+    db.query(Sale).filter(Sale.agent_id == agent_id).delete()
+    db.query(Commission).filter(Commission.agent_id == agent_id).delete()
+    db.delete(agent)
+    db.commit()
+    return {"status": "deleted"}
+
+@app.delete("/api/admin/customer/{wallet_uuid}")
+def admin_delete_customer(wallet_uuid: str, db: Session = Depends(get_db)):
+    db.query(Customer).filter(
+        (Customer.wallet_uuid == wallet_uuid) | (Customer.uuid == wallet_uuid)
+    ).delete(synchronize_session=False)
+    db.commit()
+    return {"status": "deleted"}
+
+
