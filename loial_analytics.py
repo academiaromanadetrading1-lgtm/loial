@@ -132,3 +132,44 @@ def sector_summary(sector, rows, operational=None):
         if "active_bays" in operational and money(operational["active_bays"]) > 0:
             extras["revenue_per_bay"] = round(float(revenue / money(operational["active_bays"])), 2)
     return dict(basic, sector_metrics=extras)
+
+
+def manager_findings(summary, sector):
+    """Constatari explicite din date confirmate, nu predictii sau cauzalitate presupusa."""
+    products = summary.get("products") or []
+    notes = []
+    if not products:
+        notes.append({"type": "missing", "text":
+            "Incarca vanzarile pe produse sau servicii pentru a compara contributia si cererea."})
+    else:
+        highest_revenue = max(products, key=lambda p: p["revenue"])
+        notes.append({"type": "observation", "text":
+            "Produsul sau serviciul cu cele mai mari venituri din datele disponibile este " +
+            highest_revenue["product"] + "."})
+        known = [p for p in products if p["contribution"] is not None]
+        if known:
+            best = max(known, key=lambda p: p["contribution"])
+            notes.append({"type": "observation", "text":
+                "Cea mai mare contributie totala cunoscuta o are " + best["product"] +
+                ". Compara cererea si capacitatea inainte de a promova acest produs."})
+        if len(known) < len(products):
+            notes.append({"type": "missing", "text":
+                "Pentru o parte dintre produse lipsesc costurile variabile; comparația completa a marjelor nu este posibila."})
+        if len(products) > 1:
+            least_revenue = min(products, key=lambda p: p["revenue"])
+            notes.append({"type": "check", "text":
+                "Verifica evolutia in timp si stocul pentru " + least_revenue["product"] +
+                ", care are cele mai mici venituri in importul disponibil. Vanzarile mici nu dovedesc singure ca produsul trebuie eliminat."})
+    metrics = summary.get("sector_metrics") or {}
+    needed = {
+        "rideshare": ("online_hours", "kilometres", "platform_fees", "fuel_energy"),
+        "atelier_auto": ("billed_hours", "worked_hours"),
+        "self_wash": ("wash_cycles", "active_bays"),
+    }
+    if sector in needed and not metrics:
+        notes.append({"type": "missing", "text":
+            "Pentru acest domeniu sunt necesari si indicatori operationali: " +
+            ", ".join(needed[sector]) + "."})
+    notes.append({"type": "limitation", "text":
+        "Recomandarile se bazeaza doar pe perioadele si costurile introduse; profitul net si efectul campaniilor necesita date suplimentare."})
+    return notes
