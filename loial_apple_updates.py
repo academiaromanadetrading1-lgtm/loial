@@ -14,7 +14,7 @@ from email.utils import formatdate
 from typing import Optional
 
 from cryptography.fernet import Fernet, InvalidToken
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import BigInteger, Column, Integer, String, UniqueConstraint
 from sqlalchemy.orm import declarative_base
@@ -186,7 +186,7 @@ def install_apple_pass_updates(app,engine,factory,BusinessAccount,Customer,Sales
         return Response(status_code=200)
 
     @api.get("/v1/devices/{device_id}/registrations/{pass_type}")
-    def updates(device_id:str,pass_type:str,passes_updated_since:Optional[str]=None,
+    def updates(device_id:str,pass_type:str,passes_updated_since:Optional[str]=Query(None,alias="passesUpdatedSince"),
                 db=Depends(db_session)):
         if not apple_updates_ready() or pass_type!=os.getenv("LOIAL_APPLE_PASS_TYPE_ID"):
             raise HTTPException(status_code=404,detail="Pass type unavailable")
