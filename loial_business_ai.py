@@ -342,7 +342,9 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         p = account_profile(db, biz)
         customers = db.query(Customer).filter(Customer.business_id == biz.id).all()
         manual = db.query(AIMetric).filter(AIMetric.business_id == biz.id).order_by(AIMetric.id.desc()).limit(60).all()
-        operational = {x.name: x.value for x in manual}
+        operational = {}
+        for x in reversed(manual):
+            operational[x.name] = x.value
         calculated = sector_summary(p.sector, rows(db, biz), operational)
         return {"industry": profile(p.sector)["label"], "currency": p.currency,
                 "sales": calculated, "abc": abc_products(calculated["products"]),
