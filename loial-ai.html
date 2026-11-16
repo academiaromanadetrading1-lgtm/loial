@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Loial AI • Consultantul afacerii</title>
+<style>
+:root{--green:#2d6a4f;--ink:#11271d;--light:#f4f8f5;--line:#dfeae2;--soft:#e8f4eb;--muted:#607568;--white:#fff}
+*{box-sizing:border-box}body{margin:0;background:var(--light);font-family:Inter,system-ui,Arial,sans-serif;color:var(--ink);font-size:14px}
+header{background:var(--white);border-bottom:1px solid var(--line);padding:15px max(18px,calc((100% - 1280px)/2));display:flex;align-items:center;justify-content:space-between;gap:10px}
+.brand{font-weight:850;font-size:19px;color:var(--green);text-decoration:none}.back{color:var(--green);font-weight:700;text-decoration:none}
+.layout{max-width:1280px;margin:20px auto;padding:0 16px;display:grid;grid-template-columns:310px minmax(0,1fr) 290px;gap:16px;align-items:start}
+.card{background:#fff;border:1px solid var(--line);border-radius:17px;padding:18px;min-width:0;box-shadow:0 5px 24px rgba(19,51,31,.035)}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:15px;margin:0 0 11px}p{margin:6px 0;color:var(--muted);line-height:1.5}
+.muted{color:var(--muted);font-size:12px}label{display:block;font-weight:700;margin:10px 0 6px}input,select,textarea{font:inherit;width:100%;padding:10px 11px;border:1px solid #cedcd1;border-radius:9px;background:white;color:var(--ink)}
+textarea{resize:vertical;min-height:70px}button,.btn{cursor:pointer;border:1px solid var(--green);border-radius:10px;background:var(--green);color:white;font:inherit;font-weight:700;padding:10px 12px;text-align:center;text-decoration:none}
+button:disabled{opacity:.55;cursor:not-allowed}.ghost{background:#fff;color:var(--green)}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #71b88c;outline-offset:2px}
+.topic{display:flex;gap:6px;align-items:center;text-align:left;margin:7px 0;width:100%;background:#fff;color:var(--ink);border-color:var(--line);font-weight:650}
+.topic.active{border-color:var(--green);background:var(--soft);color:var(--green)}
+.chat{height:min(66vh,650px);min-height:330px;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:8px 2px 15px}
+.bubble{max-width:89%;padding:12px 14px;border-radius:15px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.bubble.assistant{align-self:flex-start;background:#eef4ee}.bubble.user{align-self:flex-end;background:#daf0df}.bubble.meta{align-self:center;font-size:12px;background:#fff;color:#54705b;border:1px dashed #c2d9ca}
+.compose{display:flex;align-items:end;gap:9px}.compose textarea{min-height:52px;max-height:115px;flex:1}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.actions button{font-size:12px}
+.panel{margin-bottom:14px}.status{padding:10px 12px;border-radius:10px;background:var(--soft);color:#204e34;font-size:12px;margin:10px 0}
+.error{background:#fff0ef;color:#a73327}.tiny{font-size:11px;color:var(--muted)}.report{font-size:12px;white-space:pre-wrap;line-height:1.65;max-height:380px;overflow:auto}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row>*{flex:1}.row button{flex:0 0 auto}
+.file-list{font-size:12px;color:var(--muted);max-height:145px;overflow:auto}.file-row{display:flex;gap:5px;align-items:center;margin:7px 0}
+.file-row button{font-size:11px;padding:5px 8px}
+hr{border:0;border-top:1px solid var(--line);margin:16px 0}
+@media(max-width:1100px){.layout{grid-template-columns:250px minmax(0,1fr)}.right{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}}
+@media(max-width:720px){.layout{display:flex;flex-direction:column;margin:10px auto;padding:0 10px}.card,.right{width:100%}.right{display:block}.chat{height:48vh}.brand{font-size:16px}.topics-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.topic{margin:0;font-size:12px}.compose button{padding:10px}}
+</style>
+</head>
+<body>
+<header><a class="brand" href="/platform.html">◉ LOIAL • AI BUSINESS</a><a class="back" href="/platform.html">← Panou firmă</a></header>
+<main class="layout">
+<aside class="card">
+<h2>Consultantul afacerii tale</h2>
+<p>Loial îți explică vânzările, costurile, clienții și oportunitățile, adaptat activității tale.</p>
+<div class="status" id="connection">Se verifică accesul la Loial Business...</div>
+<label for="sector">Tip de activitate</label>
+<select id="sector"></select>
+<label for="details">Cum funcționează afacerea ta?</label>
+<textarea id="details" placeholder="Ex.: Lucrez cu Uber și Bolt, am o mașină electrică și țin evidența kilometrilor."></textarea>
+<button class="ghost" style="width:100%;margin:8px 0 15px" id="saveProfile">Salvează profilul</button>
+<h2>Ce vrei să analizăm?</h2>
+<div id="topics" class="topics-grid"></div>
+</aside>
+<section class="card">
+<h1>Loial AI</h1>
+<p id="headline">Consultant managerial, prin conversații exclusiv text</p>
+<div class="chat" id="chat" aria-live="polite"></div>
+<div class="compose">
+<textarea id="message" aria-label="Mesaj către Loial AI" placeholder="Scrie întrebarea ta..."></textarea>
+<button id="send">Trimite</button>
+</div>
+<p class="tiny">Loial folosește datele confirmate ale firmei. Când lipsesc informații, le solicită. Recomandările nu înlocuiesc contabilul.</p>
+</section>
+<aside class="right">
+<section class="card panel">
+<h2>Documente și capturi</h2>
+<p>Încarcă facturi, fotografii, screenshoturi, PDF, Excel sau CSV. Verifică întotdeauna datele extrase.</p>
+<input type="file" id="attachment" accept=".jpg,.jpeg,.png,.webp,.pdf,.xlsx,.csv,image/*" aria-label="Document de analizat">
+<button id="upload" style="width:100%;margin-top:10px">Încarcă și prelucrează</button>
+<div class="file-list" id="files"></div>
+</section>
+<section class="card panel">
+<h2>Raport și solicitare săptămânală</h2>
+<div class="actions">
+<button class="ghost" id="weekly">Ce date îți trebuie?</button>
+<button class="ghost" id="reportBtn">Vezi raportul</button>
+</div>
+<div class="report" id="report"></div>
+</section>
+<section class="card panel">
+<h2>Campanie de marketing</h2>
+<label for="objective">Ce vrei să obții?</label>
+<input id="objective" placeholder="Ex.: Reactivarea clienților inactivi">
+<label for="audience">Public vizat</label>
+<select id="audience">
+<option value="inactive_31_90">Inactivi 31–90 zile</option>
+<option value="inactive_8_30">Inactivi 8–30 zile</option>
+<option value="inactive_91_365">Inactivi 91–365 zile</option>
+<option value="active_0_7">Clienți activi</option>
+<option value="all">Toți clienții eligibili</option>
+</select>
+<label for="offer">Ofertă / mesaj</label>
+<textarea id="offer" placeholder="Ex.: Revino pentru o surpriză la următoarea vizită."></textarea>
+<button id="draftCampaign" style="width:100%">Pregătește mesajul</button>
+<div class="report" id="campaignPreview"></div>
+<p class="tiny">Mesajele nu se trimit automat. Trimiterea necesită consimțământ și configurarea serviciului email.</p>
+</section>
+<section class="card panel">
+<h2>Exporturi</h2>
+<div class="actions">
+<button class="ghost" data-export="customers.csv">Clienți CSV</button>
+<button class="ghost" data-export="sales.csv">Vânzări CSV</button>
+<button class="ghost" data-export="ads-consented.csv">Publicitate</button>
+</div>
+<p class="tiny">Audiențele publicitare includ numai clienți cu consimțământul necesar înregistrat.</p>
+</section>
+</aside>
+</main>
+<script>
+const API='/api/loial-ai';
+const token=localStorage.getItem('token') || '';
+const $=x=>document.getElementById(x);
+let currentTopic='general', canUse=false, currentIndustry='general';
+function status(message,error=false){$('connection').textContent=message;$('connection').classList.toggle('error',error);}
+async function api(path,opts={}){
+  const res=await fetch(API+path,{...opts,headers:{'Authorization':'Bearer '+token,...(opts.body instanceof FormData?{}:{'Content-Type':'application/json'}),...(opts.headers||{})}});
+  let data;
+  try{data=await res.json();}catch(e){throw new Error('Răspuns neașteptat de la server ('+res.status+')');}
+  if(!res.ok)throw new Error(data.detail||data.message||'Eroare '+res.status);
+  return data;
+}
+function bubble(role,text){
+  const b=document.createElement('div');b.className='bubble '+role;b.textContent=text;
+  $('chat').appendChild(b);$('chat').scrollTop=$('chat').scrollHeight;
+}
+function setTopic(key,label){currentTopic=key;
+  document.querySelectorAll('.topic').forEach(x=>x.classList.toggle('active',x.dataset.topic===key));
+  $('message').value=''; $('message').placeholder='Întreabă Loial: '+label;
+  $('message').focus();
+}
+async function init(){
+  if(!token){status('Autentifică-te ca administrator Business.',true);return;}
+  try{
+    const c=await api('/context');
+    canUse=true;currentIndustry=c.industry.key;status(c.ai_connected?'Loial AI este conectat':'Analizele și importurile sunt disponibile; conversația AI necesită activarea furnizorului');
+    $('headline').textContent=c.business+' • '+c.industry.label+' • '+c.currency;
+    $('sector').replaceChildren();
+    c.sectors.forEach(s=>{const opt=document.createElement('option');opt.value=s.key;opt.textContent=s.label;$('sector').appendChild(opt);});
+    $('sector').value=currentIndustry;
+    $('details').value=c.description||'';
+    c.topics.forEach(t=>{const b=document.createElement('button');b.type='button';b.className='topic';b.dataset.topic=t.key;b.textContent=t.label;
+      b.addEventListener('click',()=>setTopic(t.key,t.label));$('topics').appendChild(b);});
+    const h=await api('/history');if(h.length){h.forEach(x=>bubble(x.role,x.text));}else{bubble('assistant','Bun venit! Spune-mi ce tip de activitate ai sau alege o temă din stânga. Te voi întreba doar ce date sunt necesare pentru analiză.');}
+    await loadFiles();
+  }catch(e){status(e.message,true);}
+}
+async function send(){
+  if(!canUse)return;
+  const text=$('message').value.trim();if(!text)return;
+  $('send').disabled=true;$('message').value='';bubble('user',text);
+  try{const r=await api('/chat',{method:'POST',body:JSON.stringify({text,topic:currentTopic})});bubble('assistant',r.answer);}
+  catch(e){bubble('meta','Eroare: '+e.message);}
+  finally{$('send').disabled=false;}
+}
+$('send').addEventListener('click',send);
+$('message').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
+$('saveProfile').addEventListener('click',async()=>{
+  if(!canUse)return;
+  try{const s=await api('/profile',{method:'PUT',body:JSON.stringify({sector:$('sector').value,description:$('details').value,currency:'RON'})});
+    currentIndustry=s.industry.key;status('Profil salvat: '+s.industry.label);}
+  catch(e){status(e.message,true);}
+});
+async function loadFiles(){
+  const files=await api('/documents');$('files').replaceChildren();
+  for(const x of files){
+    const div=document.createElement('div');div.className='file-row';
+    const name=document.createElement('span');name.textContent=x.name+' • '+(x.confirmed?'confirmat':'neconfirmat');div.appendChild(name);
+    if(x.type==='sales'&&!x.confirmed){
+      const b=document.createElement('button');b.textContent='Confirmă';b.className='ghost';
+      b.onclick=async()=>{if(!confirm('Ai verificat că datele din fișier corespund vânzărilor reale și că prețurile sunt consecvente?'))return;
+        try{await api('/documents/'+x.id+'/confirm',{method:'POST'});await loadFiles();bubble('meta','Vânzările au fost confirmate și incluse în rapoarte.');}
+        catch(e){status(e.message,true);}};
+      div.appendChild(b);
+    }
+    $('files').appendChild(div);
+  }
+}
+$('upload').onclick=async()=>{
+  if(!canUse||!$('attachment').files.length)return;
+  $('upload').disabled=true;status('Documentul este prelucrat...');
+  try{
+    const form=new FormData();form.append('file',$('attachment').files[0]);
+    const data=await api('/documents',{method:'POST',body:form});
+    const preview=data.preview||{};
+    bubble('meta','Document primit: '+(data.kind||'')+'. '+(data.message||'Verifică fișierul.')+
+      (preview.rows?.length?'\nExemplu date: '+JSON.stringify(preview.rows.slice(0,2)): ''));
+    $('attachment').value='';await loadFiles();status('Document prelucrat. Confirmă valorile înainte de utilizare.');
+  }catch(e){status(e.message,true);}finally{$('upload').disabled=false;}
+};
+$('weekly').onclick=async()=>{try{const r=await api('/weekly');bubble('assistant',r.message);}catch(e){status(e.message,true);}};
+$('reportBtn').onclick=async()=>{
+  try{
+    const r=await api('/report'),s=r.sales;
+    const lines=['Activitate: '+r.industry,'Venituri confirmate: '+s.total_revenue+' '+r.currency,
+      'Contribuție cunoscută: '+(s.total_contribution===null?'nu poate fi calculată':s.total_contribution+' '+r.currency),
+      'Produse/servicii: '+s.products.length,'Clienți: '+Object.values(r.customers).reduce((a,b)=>a+b,0),'',
+      'Produse/servicii ordonate după venit:'];
+    s.products.slice(0,10).forEach(p=>lines.push('• '+p.product+': '+p.revenue+' '+r.currency));
+    lines.push('','Limitări:',...r.limitations.map(x=>'• '+x));
+    $('report').textContent=lines.join('\n');
+    bubble('meta','Raportul a fost actualizat în panoul din dreapta.');
+  }catch(e){status(e.message,true);}
+};
+$('draftCampaign').onclick=async()=>{
+  try{
+    const r=await api('/campaigns',{method:'POST',body:JSON.stringify({
+      objective:$('objective').value||'Informarea clientilor',audience:$('audience').value,offer:$('offer').value})});
+    $('campaignPreview').textContent='Campanie '+r.id+' • NEEXPEDIATĂ\nSubiect: '+r.subject+'\n\n'+r.text;
+  }catch(e){status(e.message,true);}
+};
+document.querySelectorAll('[data-export]').forEach(button=>button.onclick=async()=>{
+  try{
+    const res=await fetch(API+'/exports/'+button.dataset.export,{headers:{Authorization:'Bearer '+token}});
+    if(!res.ok){const x=await res.json();throw new Error(x.detail||'Export nereușit');}
+    const blob=await res.blob();const href=URL.createObjectURL(blob);
+    const link=document.createElement('a');link.href=href;link.download='loial_'+button.dataset.export;link.click();
+    setTimeout(()=>URL.revokeObjectURL(href),5000);
+  }catch(e){status(e.message,true);}
+});
+init();
+</script>
+</body>
+</html>
