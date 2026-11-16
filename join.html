@@ -159,6 +159,14 @@
   .amb-stat span { font-size: 11px; color: #475d52; font-weight: 600; }
 
   .hidden { display: none; }
+  .inbox-item { padding:12px 0;border-bottom:1px solid #dce6e0;text-align:left; }
+  .inbox-item strong {display:block;color:#1b4332;font-size:13px}
+  .inbox-item p {font-size:12.5px;line-height:1.55;color:#475d52;white-space:pre-wrap;margin:7px 0}
+  .inbox-item.unread {background:#edf7ef;margin:0 -8px;padding:12px 8px;border-radius:9px}
+  .inbox-action {font-size:12px;background:#fff;border:1px solid var(--brand);color:var(--brand);padding:7px 12px;border-radius:8px;cursor:pointer}
+  .preference {display:flex;align-items:center;gap:9px;text-align:left;font-size:12px;margin:10px 0}
+  .preference input {width:18px;height:18px;min-width:18px;margin:0;accent-color:var(--brand)}
+  @media(max-width:440px){.top-tab{font-size:11px;padding:9px 3px}}
 </style>
 </head>
 <body>
@@ -166,6 +174,7 @@
   <div class="top-tabs" id="walletTabs">
     <button type="button" class="top-tab active" id="tabBtnCard" onclick="switchTab('card')">Cardul curent</button>
     <button type="button" class="top-tab" id="tabBtnWallet" onclick="switchTab('wallet')">Portofel (<span id="walletCount">1</span>)</button>
+    <button type="button" class="top-tab" id="tabBtnInbox" onclick="switchTab('inbox')">💬 Mesaje <span id="inboxUnread"></span></button>
     <button type="button" class="top-tab" id="tabBtnAmb" onclick="switchTab('ambassador')">🤝 Ambasador</button>
   </div>
 
@@ -190,7 +199,7 @@
         <form id="enrollForm">
           <input type="text" id="nameInput" placeholder="Prenumele tău (obligatoriu)..." required autocomplete="given-name">
           <input type="email" id="emailInput" placeholder="Email (opțional)" autocomplete="email">
-          <label class="consent-choice"><input id="consentEmail" type="checkbox"><span>Sunt de acord să primesc oferte prin email de la această afacere. Mă pot dezabona oricând.</span></label>
+          <label class="consent-choice"><input id="consentInApp" type="checkbox"><span>Vreau să primesc oferte și noutăți direct în portofelul Loial de la această afacere. Pot opri oricând ofertele din secțiunea Mesaje.</span></label>
           <label class="consent-choice"><input id="consentAds" type="checkbox"><span>Sunt de acord ca această afacere să folosească emailul meu pentru audiențe publicitare personalizate (Meta/Google), conform informării de confidențialitate.</span></label>
           <button type="submit" class="btn-main">Activează cardul meu instant →</button>
         </form>
@@ -218,6 +227,25 @@
     </div>
     <div class="pass-body" id="walletCardsList">
       <p style="font-size:13.5px;color:#475d52;">Activează mai întâi cardul tău pentru a vedea toate afacerile din portofel.</p>
+    </div>
+  </div>
+
+  <!-- MESAJE PRIMITE IN LOIAL, FARA EMAIL -->
+  <div class="wallet-pass hidden" id="panelInbox">
+    <div class="pass-top" style="background:linear-gradient(135deg,#1b4332,#2d6a4f);">
+      <div class="pass-brand">PORTOFELUL MEU LOIAL</div>
+      <div class="pass-biz">Mesajele tale</div>
+      <div class="pass-reward">Oferte, ștampile și recompense, direct în Loial</div>
+    </div>
+    <div class="pass-body">
+      <div id="inboxStatus" style="font-size:12px;color:#475d52;margin-bottom:9px;"></div>
+      <div id="inboxItems"></div>
+      <button type="button" class="btn-save" onclick="loadLoialInbox()">↻ Actualizează mesajele</button>
+      <div style="border-top:1px solid #dce6e0;margin-top:17px;padding-top:14px;">
+        <strong style="font-size:13px;">Preferințe pentru oferte</strong>
+        <p style="font-size:11.5px;color:#475d52;margin:5px 0 8px;">Poți alege de la ce firme primești mesaje comerciale. Notificările despre card și ștampile rămân disponibile.</p>
+        <div id="inboxPreferences"></div>
+      </div>
     </div>
   </div>
 
@@ -280,10 +308,13 @@
     document.getElementById('tabBtnCard').classList.toggle('active', tab === 'card');
     document.getElementById('tabBtnWallet').classList.toggle('active', tab === 'wallet');
     document.getElementById('tabBtnAmb').classList.toggle('active', tab === 'ambassador');
+    document.getElementById('tabBtnInbox').classList.toggle('active', tab === 'inbox');
     document.getElementById('panelCard').classList.toggle('hidden', tab !== 'card');
     document.getElementById('panelWallet').classList.toggle('hidden', tab !== 'wallet');
     document.getElementById('panelAmbassador').classList.toggle('hidden', tab !== 'ambassador');
+    document.getElementById('panelInbox').classList.toggle('hidden', tab !== 'inbox');
     if (tab === 'wallet' || tab === 'ambassador') loadUniversalWallet();
+    if (tab === 'inbox') loadLoialInbox();
   }
 
   function applyBrandTheme(name, color) {
@@ -319,7 +350,7 @@
     const response = await fetch('/api/enroll-sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ business_id: bizId, name, email, uuid: globalWalletUuid, consent_marketing_email: !!options.marketing, consent_personalized_ads: !!options.ads })
+      body: JSON.stringify({ business_id: bizId, name, email, uuid: globalWalletUuid, consent_marketing_email: false, consent_loial_offers: !!options.inApp, consent_personalized_ads: !!options.ads })
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
@@ -352,18 +383,19 @@
       e.preventDefault();
       const nameVal = document.getElementById('nameInput').value.trim();
       const emailVal = document.getElementById('emailInput').value.trim();
-      const marketing = document.getElementById('consentEmail').checked;
+      const inApp = document.getElementById('consentInApp').checked;
       const ads = document.getElementById('consentAds').checked;
       if (!nameVal) return;
-      if (!emailVal && (marketing || ads)) {
-        alert('Introdu adresa de email pentru a activa opțiunile de comunicare.');
+      if (!emailVal && ads) {
+        alert('Pentru audiențele publicitare este necesară o adresă de email. Mesajele Loial nu necesită email.');
         return;
       }
       const button = activeForm.querySelector('button[type="submit"]');
       button.disabled = true;
       try {
         // Afișăm codul QR numai după confirmarea înregistrării de către server.
-        await synchronizeCard(nameVal, emailVal, { marketing, ads });
+        const result = await synchronizeCard(nameVal, emailVal, { inApp, ads });
+        if (result.inbox_access) localStorage.setItem('loial_wallet_inbox_token', result.inbox_access);
         savedProfile = { uuid: globalWalletUuid, name: nameVal, email: emailVal };
         localStorage.setItem('loial_universal_profile', JSON.stringify(savedProfile));
         document.getElementById('reminderBanner').textContent =
@@ -485,6 +517,68 @@
       row.appendChild(d);
     }
   }
+
+  // QR-ul afișat angajaților NU conține cheia de acces la mesaje.
+  async function inboxRequest(path, options={}) {
+    const token = localStorage.getItem('loial_wallet_inbox_token') || '';
+    if (!token) throw Error('Accesul privat la mesaje nu este activat pe acest dispozitiv.');
+    const response = await fetch('/api/loial-inbox'+path,{
+      ...options, headers:{'X-Loial-Wallet-Token': token,
+        ...(options.body?{'Content-Type':'application/json'}:{}), ...(options.headers||{})}
+    });
+    const result = await response.json().catch(()=>({}));
+    if(!response.ok) throw Error(result.detail||'Mesajele nu sunt disponibile.');
+    return result;
+  }
+  async function loadLoialInbox() {
+    const box=document.getElementById('inboxItems');
+    const status=document.getElementById('inboxStatus');
+    try {
+      const data = await inboxRequest('/me');
+      status.textContent=data.unread+' mesaje necitite';
+      document.getElementById('inboxUnread').textContent=data.unread?'('+data.unread+')':'';
+      box.replaceChildren();
+      if(!data.messages.length)box.textContent='Nu ai primit încă mesaje.';
+      for (const m of data.messages){
+        const item=document.createElement('div');item.className='inbox-item'+(m.read?'':' unread');
+        const company=document.createElement('strong');company.textContent=m.business_name+' · '+m.subject;
+        const body=document.createElement('p');body.textContent=m.text;
+        const timestamp=document.createElement('small');timestamp.textContent=new Date(m.created_at).toLocaleString('ro-RO');
+        item.append(company,body,timestamp);
+        if(!m.read){
+          const button=document.createElement('button');button.type='button';button.className='inbox-action';
+          button.textContent='Marchează ca citit';
+          button.onclick=async()=>{try{await inboxRequest('/read/'+m.delivery_id,{method:'POST'});await loadLoialInbox();}catch(e){status.textContent=e.message;}};
+          item.appendChild(button);
+        }
+        box.appendChild(item);
+      }
+      const prefs=await inboxRequest('/preferences');
+      const prefBox=document.getElementById('inboxPreferences');prefBox.replaceChildren();
+      for(const p of prefs){
+        const label=document.createElement('label');label.className='preference';
+        const toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=p.offers_enabled;
+        const name=document.createElement('span');name.textContent=p.business_name+' · oferte în Loial';
+        toggle.onchange=async()=>{try{
+          await inboxRequest('/preferences',{method:'POST',body:JSON.stringify({business_id:p.business_id,enabled:toggle.checked})});
+        }catch(e){toggle.checked=!toggle.checked;status.textContent=e.message;}};
+        label.append(toggle,name);prefBox.appendChild(label);
+      }
+    } catch(err) {
+      status.textContent=err.message;
+      if(!localStorage.getItem('loial_wallet_inbox_token')) {
+        box.textContent='Pentru protejarea mesajelor personale, portofelele mai vechi au nevoie de verificarea titularului înainte de activarea inboxului privat. Cardul și ștampilele funcționează în continuare.';
+      }
+    }
+  }
+  // Mesajele nu se trimit prin SMS sau email; clientul le vede în portofel.
+  setInterval(()=>{
+    if (!document.hidden && localStorage.getItem('loial_wallet_inbox_token')) {
+      const open=!document.getElementById('panelInbox').classList.contains('hidden');
+      if(open)loadLoialInbox();
+      else inboxRequest('/me').then(x=>{document.getElementById('inboxUnread').textContent=x.unread?'('+x.unread+')':'';}).catch(()=>{});
+    }
+  },45000);
 
   function saveCardImageDirect() {
     const img = document.getElementById('qrImg');
