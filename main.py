@@ -1919,6 +1919,8 @@ def qr_scan_stamp(req: QRScanRequest, db: Session = Depends(get_db)):
     from loial_wallet_sync import queue_google_refresh
     queue_service_event(db,biz,customer,kind="stamp",event_key=uuid.uuid4().hex)
     queue_google_refresh(db,biz.id,customer.wallet_uuid or customer.uuid)
+    from loial_apple_updates import mark_customer_pass_changed
+    mark_customer_pass_changed(db,biz.id,customer.wallet_uuid or customer.uuid)
     db.commit()
     return {"stamps": customer.stamps, "name": customer.name, "business_id": biz.id}
 
@@ -2346,6 +2348,8 @@ def qr_scan_with_staff(request: Request, req: QRScanRequest, db: Session = Depen
     from loial_wallet_sync import queue_google_refresh
     queue_service_event(db,biz,customer,kind="stamp",event_key=uuid.uuid4().hex)
     queue_google_refresh(db,biz.id,customer.wallet_uuid or customer.uuid)
+    from loial_apple_updates import mark_customer_pass_changed
+    mark_customer_pass_changed(db,biz.id,customer.wallet_uuid or customer.uuid)
     db.commit()
     return {
         "stamps": customer.stamps,
@@ -2521,6 +2525,8 @@ def redeem_customer_reward(request: Request, req: RedeemRequest, db: Session = D
     queue_service_event(db, biz, customer, kind="redeem", event_key=uuid.uuid4().hex)
     from loial_wallet_sync import queue_google_refresh
     queue_google_refresh(db,biz.id,customer.wallet_uuid or customer.uuid)
+    from loial_apple_updates import mark_customer_pass_changed
+    mark_customer_pass_changed(db,biz.id,customer.wallet_uuid or customer.uuid)
     db.commit()
     return {"status": "redeemed", "name": customer.name, "stamps": 0}
 class InstantEnrollRequest(BaseModel):
@@ -2745,6 +2751,8 @@ def scan_universal_card(request: Request, req: UniversalScanRequest, db: Session
                         event_key=uuid.uuid4().hex)
     from loial_wallet_sync import queue_google_refresh
     queue_google_refresh(db,biz.id,customer.wallet_uuid or customer.uuid)
+    from loial_apple_updates import mark_customer_pass_changed
+    mark_customer_pass_changed(db,biz.id,customer.wallet_uuid or customer.uuid)
     db.commit()
     return {
         "name": customer.name,
@@ -3087,6 +3095,14 @@ install_loial_identity(app, engine, SessionLocal, BusinessAccount, SalesAgent,
 install_premium_wallet(app, engine, SessionLocal, BusinessAccount, Customer,
                        SalesAgent, Sale, SECRET_KEY, ALGORITHM,
                        get_ambassador_tier, BusinessAmbassadorLink)
+
+# Serviciul standard Apple PassKit permite re-descarcarea cardurilor modificate.
+from loial_premium_wallet import premium_card, signed_apple_pkpass, apple_pass_json
+from loial_apple_updates import install_apple_pass_updates
+install_apple_pass_updates(app, engine, SessionLocal, BusinessAccount, Customer,
+                           SalesAgent, Sale, apple_pass_json, signed_apple_pkpass,
+                           premium_card, get_ambassador_tier)
+
 
 # Bon QR unic, verificare la nivel de tranzactie si asociere cu cumparaturile clientului.
 from loial_business_ai import AIDocument
