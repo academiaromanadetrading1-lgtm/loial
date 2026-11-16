@@ -262,6 +262,9 @@
 
  <script>
   const token = localStorage.getItem('token');
+  function authorizedFetch(url, options = {}) {
+    return fetch(url, { ...options, headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token } });
+  }
   const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
   let bizId = localStorage.getItem('biz_id');
 
@@ -332,7 +335,7 @@
   }
 
   async function loadDashboard() {
-    const res = await fetch(`/api/biz-full/${bizId}`);
+    const res = await authorizedFetch(`/api/biz-full/${bizId}`);
     if (!res.ok) return;
     const data = await res.json();
     localStorage.setItem('loial_admin_cache_' + bizId, JSON.stringify(data));
@@ -359,7 +362,7 @@
       errEl.textContent = 'Introdu numele angajatului și un PIN din 4 cifre.';
       return;
     }
-    const res = await fetch(`/api/biz-full/${bizId}/staff`, {
+    const res = await authorizedFetch(`/api/biz-full/${bizId}/staff`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, pin })
@@ -376,14 +379,14 @@
   }
 
   async function removeStaff(staffId) {
-    await fetch(`/api/biz-full/${bizId}/staff/${staffId}`, { method: 'DELETE' });
+    await authorizedFetch(`/api/biz-full/${bizId}/staff/${staffId}`, { method: 'DELETE' });
     loadDashboard();
   }
 
   async function saveOfferSettings() {
     const btn = document.getElementById('saveOfferBtn');
     btn.textContent = 'Se salvează...';
-    const res = await fetch(`/api/biz-full/${bizId}/offer`, {
+    const res = await authorizedFetch(`/api/biz-full/${bizId}/offer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -406,7 +409,7 @@
   }
 
     async function loadSuperAdmin() {
-    const res = await fetch('/api/admin/overview');
+    const res = await authorizedFetch('/api/admin/overview');
     if (!res.ok) return;
     const data = await res.json();
     document.getElementById('adminMonthBadge').textContent = 'Luna: ' + data.month;
@@ -465,14 +468,14 @@
   }
 
   async function toggleProPlan(id) {
-    await fetch(`/api/admin/business/${id}/toggle-pro`, { method: 'POST' });
+    await authorizedFetch(`/api/admin/business/${id}/toggle-pro`, { method: 'POST' });
     loadSuperAdmin();
   }
 
   async function saveNetworkRule() {
     const btn = document.getElementById('saveRuleBtn');
     btn.textContent = 'Se salvează...';
-    await fetch('/api/admin/network-rule', {
+    await authorizedFetch('/api/admin/network-rule', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -490,7 +493,7 @@
   async function sendManualBonus(walletUuid, name) {
     const msg = prompt(`Scrie mesajul bonusului Loial pentru ${name}:`, 'Felicitări! Ai primit un voucher cadou din partea rețelei Loial.space!');
     if (!msg) return;
-    await fetch('/api/admin/network-bonus/manual', {
+    await authorizedFetch('/api/admin/network-bonus/manual', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ wallet_uuid: walletUuid, bonus_text: msg })
@@ -500,19 +503,19 @@
 
     async function deleteBiz(id, name) {
     if (!confirm(`Sigur vrei să ștergi definitiv firma de test "${name}" și să eliberezi email-ul?`)) return;
-    await fetch(`/api/admin/business/${id}`, { method: 'DELETE' });
+    await authorizedFetch(`/api/admin/business/${id}`, { method: 'DELETE' });
     loadSuperAdmin();
   }
 
   async function deleteAmb(id, name) {
     if (!confirm(`Sigur vrei să ștergi definitiv ambasadorul de test "${name}"?`)) return;
-    await fetch(`/api/admin/ambassador/${id}`, { method: 'DELETE' });
+    await authorizedFetch(`/api/admin/ambassador/${id}`, { method: 'DELETE' });
     loadSuperAdmin();
   }
 
   async function deleteCust(walletUuid, name) {
     if (!confirm(`Sigur vrei să ștergi clientul de test "${name}"?`)) return;
-    await fetch(`/api/admin/customer/${walletUuid}`, { method: 'DELETE' });
+    await authorizedFetch(`/api/admin/customer/${walletUuid}`, { method: 'DELETE' });
     loadSuperAdmin();
   }
    
