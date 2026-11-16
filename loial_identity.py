@@ -27,6 +27,12 @@ class BusinessWalletLink(IdentityBase):
     wallet_uuid = Column(String(120), nullable=False)
     linked_at = Column(String(40), nullable=False)
 
+class NewAmbassador(BaseModel):
+    display_name: str = Field(default="", max_length=100)
+
+class AmbassadorName(BaseModel):
+    display_name: str = Field(min_length=2, max_length=100)
+
 class AmbassadorProof(BaseModel):
     password: str = Field(min_length=1, max_length=200)
 
@@ -74,6 +80,7 @@ def install_loial_identity(app, engine, session_factory, BusinessAccount,
         tier=tier_func(completed)
         return {"name":agent.name,"id":agent.id,"ref_code":agent.qr_code,
                 "rank":tier["rank"],"active_businesses":completed,
+                "monthly_rate":tier["monthly_rate"],
                 "referral_url":"https://loial.space/register.html?ref="+agent.qr_code}
 
     @router.get("/me")
@@ -109,7 +116,7 @@ def install_loial_identity(app, engine, session_factory, BusinessAccount,
                 "customer_wallet_linked":bool(wallet)}
 
     @router.post("/ambassador/activate")
-    def activate(biz=Depends(business),db:Session=Depends(session)):
+    def activate(req:NewAmbassador,biz=Depends(business),db:Session=Depends(session)):
         link=db.query(BusinessAmbassadorLink).filter(
             BusinessAmbassadorLink.business_id==biz.id).first()
         if link:
@@ -121,7 +128,7 @@ def install_loial_identity(app, engine, session_factory, BusinessAccount,
             raise HTTPException(status_code=409,detail="Exista deja cont de ambasador pe acest email. Confirma parola contului existent pentru asociere.")
         ref="LOIAL-"+secrets.token_hex(5).upper()
         random_password=secrets.token_urlsafe(48)
-        agent=SalesAgent(name=biz.name[:100],email=biz.email,
+        agent=SalesAgent(name=(req.display_name.strip() or biz.name)[:100],email=biz.email,
                          password=pwd_context.hash(random_password),
                          phone="",role="ambassador",rank="Ambasador",qr_code=ref,
                          status="active",active=True,payout_method="wise",
@@ -148,6 +155,17 @@ def install_loial_identity(app, engine, session_factory, BusinessAccount,
                 linked_at=datetime.now(timezone.utc).isoformat()))
         db.commit()
         return {"status":"linked","ambassador":public_ambassador(existing,db)}
+
+    @router.put("/ambassador/name")
+    def set_ambassador_name(req:AmbassadorName,biz=Depends(business),db:Session=Depends(session)):
+        link=db.query(BusinessAmbassadorLink).filter(
+            BusinessAmbassadorLink.business_id==biz.id).first()
+        agent=db.query(SalesAgent).filter(SalesAgent.id==link.agent_id).first() if link else None
+        if not agent:
+            raise HTTPException(status_code=404,detail="Activeaza mai intai statutul de ambasador")
+        agent.name=req.display_name.strip()
+        db.commit()
+        return {"status":"updated","ambassador":public_ambassador(agent,db)}
 
     @router.post("/customer/link")
     def link_customer(req:LinkWallet,biz=Depends(business),db:Session=Depends(session)):
