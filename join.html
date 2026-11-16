@@ -310,30 +310,63 @@
   document.getElementById('qrImg').src = `/api/qr-link?url=${scanUrl}&color=${cleanColor}&initial=${initial}`;
 }
 
-  if (savedProfile && savedProfile.name) {
-    showCardInstant(globalWalletUuid, savedProfile.name, 0);
-    loadUniversalWallet();
+  async function synchronizeCard(name, email) {
+    const response = await fetch('/api/enroll-sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ business_id: bizId, name, email, uuid: globalWalletUuid })
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(typeof error.detail === 'string' ? error.detail : `HTTP ${response.status}`);
+    }
+    return response.json();
   }
 
-   const activeForm = document.getElementById('enrollForm') || document.querySelector('form');
+  if (savedProfile && savedProfile.name) {
+    // Un profil salvat într-o versiune anterioară poate să nu existe încă în baza de date.
+    synchronizeCard(savedProfile.name, savedProfile.email || '')
+      .then(() => {
+        showCardInstant(globalWalletUuid, savedProfile.name, 0);
+        loadUniversalWallet();
+      })
+      .catch((error) => {
+        document.getElementById('enrollView').classList.remove('hidden');
+        document.getElementById('cardView').classList.add('hidden');
+        document.getElementById('nameInput').value = savedProfile.name;
+        document.getElementById('emailInput').value = savedProfile.email || '';
+        document.getElementById('reminderBanner').textContent =
+          'Cardul nu este încă sincronizat. Apasă Activare pentru a reîncerca.';
+        console.error('Loial enroll-sync:', error);
+      });
+  }
+
+  const activeForm = document.getElementById('enrollForm');
   if (activeForm) {
-    activeForm.onsubmit = (e) => {
+    activeForm.onsubmit = async (e) => {
       e.preventDefault();
-      const nameEl = document.getElementById('nameInput') || activeForm.querySelector('input[type="text"]');
-      const emailEl = document.getElementById('emailInput') || activeForm.querySelector('input[type="email"]');
-      const nameVal = nameEl ? nameEl.value.trim() : '';
-      const emailVal = emailEl ? emailEl.value.trim() : '';
+      const nameVal = document.getElementById('nameInput').value.trim();
+      const emailVal = document.getElementById('emailInput').value.trim();
       if (!nameVal) return;
-
-      savedProfile = { uuid: globalWalletUuid, name: nameVal, email: emailVal };
-      localStorage.setItem('loial_universal_profile', JSON.stringify(savedProfile));
-      showCardInstant(globalWalletUuid, nameVal, 0);
-
-      fetch('/api/enroll-sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ business_id: bizId, name: nameVal, email: emailVal, uuid: globalWalletUuid })
-      }).then(() => loadUniversalWallet()).catch(() => {});
+      const button = activeForm.querySelector('button[type="submit"]');
+      button.disabled = true;
+      try {
+        // Afișăm codul QR numai după confirmarea înregistrării de către server.
+        await synchronizeCard(nameVal, emailVal);
+        savedProfile = { uuid: globalWalletUuid, name: nameVal, email: emailVal };
+        localStorage.setItem('loial_universal_profile', JSON.stringify(savedProfile));
+        document.getElementById('reminderBanner').textContent =
+          '💡 Codul tău QR universal funcționează la orice afacere Loial';
+        showCardInstant(globalWalletUuid, nameVal, 0);
+        loadUniversalWallet();
+      } catch (error) {
+        document.getElementById('reminderBanner').textContent =
+          'Nu s-a putut activa cardul. Verifică conexiunea și încearcă din nou.';
+        alert('Cardul nu a putut fi activat: ' + (error.message || 'Eroare de conexiune'));
+        console.error('Loial activation:', error);
+      } finally {
+        button.disabled = false;
+      }
     };
   }
 
@@ -353,7 +386,7 @@
 
     setInterval(async () => {
       try {
-        const r = await fetch('/api/customer-status/' + uuid);
+        const r = await fetch('/api/customer-status/' + encodeURIComponent(uuid) + '?business_id=' + bizId);
         if (r.ok) {
           const st = await r.json();
           if (st.stamps !== knownStamps) {
