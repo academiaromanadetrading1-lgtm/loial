@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>Dezabonare email • Loial</title>
+<style>body{background:#f4f8f5;color:#11271d;font:16px system-ui,sans-serif;margin:0;padding:28px}main{max-width:480px;background:white;border:1px solid #dde7df;border-radius:16px;margin:10vh auto;padding:28px}h1{font-size:23px}p{line-height:1.6}button{background:#2d6a4f;color:#fff;border:0;border-radius:10px;padding:13px 18px;font:inherit;cursor:pointer}#status{color:#2d6a4f;margin-top:14px}</style>
+</head><body><main><h1>Preferințe pentru mesaje comerciale</h1>
+<p>Poți opri emailurile de marketing ale comerciantului care te-a contactat. Cardul de fidelitate nu va fi șters.</p>
+<button id="unsubscribe">Dezabonează-mă de la emailurile comerciale</button><div id="status" role="status"></div></main>
+<script>
+const token=new URLSearchParams(location.search).get('token')||'';
+document.getElementById('unsubscribe').onclick=async()=>{
+  const btn=document.getElementById('unsubscribe');btn.disabled=true;
+  const status=document.getElementById('status');
+  if(!token){status.textContent='Linkul nu este valid.';return;}
+  try{
+    const res=await fetch('/api/loial-ai/email/unsubscribe',{method:'POST',
+       headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
+    const data=await res.json();
+    if(!res.ok)throw Error(data.detail||'Nu am putut procesa dezabonarea.');
+    status.textContent=data.message||'Dezabonare confirmată.';
+  }catch(e){status.textContent=e.message;btn.disabled=false;}
+};
+</script></body></html>
