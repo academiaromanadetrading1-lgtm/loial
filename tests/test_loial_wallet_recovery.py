@@ -129,25 +129,25 @@ def test_new_request_invalidates_previous_secret(fixture):
     new=code_for(request(client,header(),1))
     assert old!=new
     assert client.post("/api/loial-wallet-recovery/claim",json={
-        "code":old,"new_wallet_uuid":"W-NEW-DEVICE-123456","new_private_token":"S"*48
+        "code":old,"new_wallet_uuid":"W-NEW-DEVICE-123456789","new_private_token":"S"*48
     }).status_code==404
 
 
 def test_existing_verified_destination_requires_private_secret(fixture):
     client,db,Customer,header=fixture
     with db() as sess:
-        sess.add(WalletInboxAccess(wallet_uuid="W-DESTINATION",
+        sess.add(WalletInboxAccess(wallet_uuid="W-DESTINATION-DEVICE-01",
                  token_hash=access_hash("T"*48),created_at="2026-11-17"))
         sess.commit()
     code=code_for(request(client,header(),1))
-    payload={"code":code,"new_wallet_uuid":"W-DESTINATION","new_private_token":"F"*48}
+    payload={"code":code,"new_wallet_uuid":"W-DESTINATION-DEVICE-01","new_private_token":"F"*48}
     assert client.post("/api/loial-wallet-recovery/claim",json=payload).status_code==409
     payload["new_private_token"]="T"*48
     authorized=client.post("/api/loial-wallet-recovery/claim",json=payload)
     assert authorized.status_code==200,authorized.text
     with db() as sess:
         assert sess.query(WalletInboxAccess).filter(
-            WalletInboxAccess.wallet_uuid=="W-DESTINATION").count()==1
+            WalletInboxAccess.wallet_uuid=="W-DESTINATION-DEVICE-01").count()==1
 
 
 def test_recovery_requires_unpredictable_code(fixture):
@@ -156,5 +156,5 @@ def test_recovery_requires_unpredictable_code(fixture):
     assert client.get("/api/loial-wallet-recovery/preview",
                       params={"code":fake}).status_code==404
     assert client.post("/api/loial-wallet-recovery/claim",json={
-      "code":fake,"new_wallet_uuid":"W-OTHER-LONG-RANDOM","new_private_token":"S"*48
+      "code":fake,"new_wallet_uuid":"W-OTHER-LONG-RANDOM-DEVICE","new_private_token":"S"*48
     }).status_code==404
