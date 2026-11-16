@@ -539,7 +539,7 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
     log_auth_event(email, True, ip)
     token = create_access_token({"sub": email, "role": role})
     biz_id_val = business.id if business else None
-      response.set_cookie(key="loial_token", value=token, httponly=True, max_age=86400, samesite="lax")
+    response.set_cookie(key="loial_token", value=token, httponly=True, max_age=86400, samesite="lax")
     return {
         "access_token": token,
         "token_type": "bearer",
