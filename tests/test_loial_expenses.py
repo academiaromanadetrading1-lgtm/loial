@@ -78,6 +78,10 @@ def test_confirmation_requires_owner_review_and_same_business_document(env):
     assert saved.json()["ai_calls"]==0
     assert client.post("/api/loial-expenses/confirm",headers=auth(),
                        json=payload(doc)).status_code==409
+    same_ref_other_supplier=payload(None)
+    same_ref_other_supplier["supplier"]="Alt furnizor"
+    assert client.post("/api/loial-expenses/confirm",headers=auth(),
+                       json=same_ref_other_supplier).status_code==200
 
 def test_mixed_vat_bases_and_currencies_not_summed_together(env):
     client,db,auth,doc=env
