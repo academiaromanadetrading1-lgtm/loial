@@ -506,19 +506,19 @@ def root(request: Request):
     return FileResponse("index.html")
 
 @app.post("/auth/login")
-@limiter.limit("10/minute")
-def login(request: Request, req: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+def login(request: Request, response: Response, req: LoginRequest, db: Session = Depends(get_db)):
     email = sanitize_input(req.email, 100)
     ip = request.client.host if request.client else "unknown"
-    
+
     user = db.query(User).filter(User.email == email).first()
     agent = db.query(SalesAgent).filter(SalesAgent.email == email).first()
     business = db.query(BusinessAccount).filter(BusinessAccount.email == email).first()
-    
+
     authenticated = None
     role = "pending"
     name = email
-    
+
     if user and pwd_context.verify(req.password, user.password):
         authenticated = user
         role = user.role or "admin"
@@ -531,22 +531,22 @@ def login(request: Request, req: LoginRequest, db: Session = Depends(get_db)):
         authenticated = business
         role = "business"
         name = business.name
-    
-        if not authenticated:
-            log_auth_event(email, False, ip)
-            raise HTTPException(status_code=401, detail="Email sau parolă incorectă")
-    
-        log_auth_event(email, True, ip)
-        token = create_access_token({"sub": email, "role": role})
-        biz_id_val = business.id if business else None
-        response = JSONResponse(content={
-            "access_token": token,
-            "token_type": "bearer",
-            "business_id": biz_id_val,
-            "user": {"email": email, "name": name, "role": role}
-        })
-        response.set_cookie(key="loial_token", value=token, httponly=True, max_age=86400, samesite="lax")
-        return response
+
+    if not authenticated:
+        log_auth_event(email, False, ip)
+        raise HTTPException(status_code=401, detail="Email sau parolă incorectă")
+
+    log_auth_event(email, True, ip)
+    token = create_access_token({"sub": email, "role": role})
+    biz_id_val = business.id if business else None
+    response.set_cookie(key="loial_token", value=token, httponly=True, max_age=86400, samesite="lax")
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "business_id": biz_id_val,
+        "user": {"email": email, "name": name, "role": role}
+    }
+
 
 
 @app.post("/auth/logout")
