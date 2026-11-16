@@ -2737,7 +2737,18 @@ def scan_universal_card(request: Request, req: UniversalScanRequest, db: Session
 
 
 @app.get("/api/wallet-profile/{wallet_uuid}")
-def get_universal_wallet_profile(wallet_uuid: str, db: Session = Depends(get_db)):
+def get_universal_wallet_profile(wallet_uuid: str, request: Request, db: Session = Depends(get_db)):
+    # QR-ul vizibil angajatului identifica doar cardul pentru scanare.
+    # Profilul, afacerile vizitate si stampilele sunt private titularului.
+    from loial_inbox import WalletInboxAccess, access_hash
+    private_token=(request.headers.get("X-Loial-Wallet-Token") or "").strip()
+    if len(wallet_uuid)>120 or len(private_token)<40 or len(private_token)>180:
+        raise HTTPException(status_code=401,detail="Verificarea portofelului este necesara")
+    verified=db.query(WalletInboxAccess).filter(
+        WalletInboxAccess.wallet_uuid==wallet_uuid,
+        WalletInboxAccess.token_hash==access_hash(private_token)).first()
+    if not verified:
+        raise HTTPException(status_code=401,detail="Acces privat invalid sau neactivat")
     cards = db.query(Customer).filter(
         (Customer.wallet_uuid == wallet_uuid) | (Customer.uuid == wallet_uuid)
     ).all()
