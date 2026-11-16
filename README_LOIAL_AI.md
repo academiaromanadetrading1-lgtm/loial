@@ -2,7 +2,7 @@
 
 ## Obiectiv comercial
 Loial este un consultant managerial conversațional prin chat exclusiv text și documente atașate.
-Pachetul Business este gândit pentru 65 EUR/lună + TVA, cu AI inclus.
+Pachetul Business este gândit pentru 65 EUR/lună + TVA, cu AI inclus. Activarea facturării și costul real pe firmă necesită validare comercială.
 Nu trimite SMS/WhatsApp: eventualii furnizori sunt contractați separat de firma client.
 Sistemul este multi-industrie; nu presupune că orice antreprenor vinde produse în magazin.
 
@@ -42,8 +42,14 @@ Administrarea profilului și setul de întrebări sunt independente de baza codu
 - Fara date de contact de la platformele Uber/Bolt si fara drept de a contacta pasageri automat.
 - Trimiterea la volume foarte mari trebuie verificata la testele de performanta;
   nu exista cote comerciale lunare, dar sunt necesare protectii anti-abuz.
-- Integrarea cu POS/bon fiscal QR, RAG academic complet, notificari saptamanale cron server-side,
-  validarea imaginilor si analizele avansate raman proiecte distincte.
+- Bonul Loial cu QR unic este implementat pentru tranzactii inregistrate de firma, cu revendicare
+  o singura data, legare la produse si retururi. Conectarea automata la POS/casa de marcat
+  si imprimarea QR-ului pe bonul fiscal depind de sistemul fiscal concret.
+- Cererile saptamanale automate sunt implementate pe server, in chatul Business, cu un
+  eveniment per firma/saptamana si fara serviciu extern. Contin datele confirmate;
+  nu inventeaza vanzari in perioade fara documente.
+- RAG academic complet, analiza multimodala a PDF-urilor scanate, recuperarea securizata
+  a portofelelor vechi si testarile cu case reale necesita inca dezvoltare si validare.
 - Consimtamantul pentru publicitate Meta/Google este diferit de acordul pentru ofertele Loial.
 - Inainte de deploy: rotire chei istorice Stripe/Wise/SendGrid/JWT, secret JWT nou,
   backup al bazei /data/loial.db, verificarea planurilor si fluxului de scanare QR.
@@ -90,15 +96,9 @@ GET /api/loial-ai/message-templates
 GET /api/loial-ai/message-templates/{key}/preview
 POST /api/loial-ai/campaigns
 GET /api/loial-ai/campaigns
-POST /api/loial-ai/campaigns/{id}/approve
-GET /api/loial-ai/campaigns/{id}/audience
 GET /api/loial-ai/exports/customers.csv
 GET /api/loial-ai/exports/sales.csv
 GET /api/loial-ai/exports/ads-consented.csv
-POST /api/loial-ai/campaigns/{id}/send
-POST /api/loial-ai/email/unsubscribe
-GET /api/loial-ai/message-templates
-GET /api/loial-ai/customers
 
 ## Siguranță și guvernanță
 Datele de marketing și datele de fidelizare au scopuri diferite. Exportul publicitar
@@ -130,10 +130,17 @@ formulele de implementare sau raționamentul intern al modelului.
   semnate pe server, fara a include secretul privat al clientului in adresa.
   Ruta GET /api/premium-wallet/apple/claim foloseste MIME application/vnd.apple.pkpass
   si Cache-Control private, no-store; necesita test practic pe iPhone.
-- Cardul Apple/Google creat reflecta situatia la momentul emiterii; actualizarea
-  automata a stampilelor pe cardul deja instalat necesita urmatoarea etapa
-  (Apple PassKit web service/APNs, Google Wallet object updates).
-  Portofelul web Loial continua sa arate datele actualizate.
+- Google Wallet: in cod exista o coada de actualizare a stampilelor, autentificare OAuth2
+  cu contul oficial, GET al obiectului de fidelitate si PATCH doar pentru soldul stampilelor.
+  Acest mecanism este dezactivat implicit (LOIAL_GOOGLE_WALLET_SYNC_ENABLED=0) pana la
+  configurarea si verificarea emitentului. Nu s-au trimis apeluri reale Google.
+- Apple Wallet: implementat web service PassKit pentru dispozitive/verificare token,
+  inregistrare cu push token criptat, listarea cardurilor modificate si redescare
+  .pkpass resemnat. Se activeaza numai cu URL HTTPS, secret, certificat si cheie de
+  criptare. Componenta de notificari APNs catre dispozitivele inregistrate nu este
+  finalizata si necesita contul Apple real. Fara APNs, actualizarea automata
+  imediata pe iPhone nu este garantata.
+- Portofelul web Loial afiseaza datele de fidelitate direct din baza aplicatiei.
 - API: GET /api/premium-wallet/availability,
   GET /api/premium-wallet/customer/cards,
   GET /api/premium-wallet/customer/{business_id}/apple,
@@ -163,3 +170,44 @@ Google API auth: https://developers.google.com/wallet/retail/loyalty-cards/getti
 Dispozitivul creeaza un secret privat inainte de inscriere si il pastreaza separat
 de QR; daca cererea se intrerupe, poate relua inrolarea cu acelasi secret.
 Un portofel mai vechi fara acel secret nu poate fi preluat doar cunoscand QR-ul.
+
+## Actualizare calup: rapoarte saptamanale, bon QR, securitate
+- LOIAL_WEEKLY_JOBS_ENABLED=1 (implicit): thread de server cu verificare ora de ora,
+  tabele SQL cu unicitate (firma, saptamana ISO), solicitare in chatul administratorului.
+  Pentru CI poate fi oprit cu 0. Nu sunt trimise emailuri/SMS.
+- Bon Loial QR: POST /api/loial-receipts/issue (JWT Business, numar bon si linii),
+  GET /api/loial-receipts/preview (QR cu token unic), POST /api/loial-receipts/claim
+  (token bon + token privat wallet), POST /api/loial-receipts/refund (JWT Business),
+  GET /api/loial-receipts/recent.
+- Pagina pentru client: /loial-receipt.html; generare QR si retur din /loial-ai.html.
+- Emiterea bonului nu inlocuieste casa de marcat sau bonul fiscal.
+  Sistemul trebuie sa primeasca linii detaliate de vanzare din software-ul comerciantului
+  ori prin introducere manuala. QR-ul fiscal obligatoriu nu este folosit ca sursa SKU.
+- Daca bonul e returnat, liniile sale sunt excluse din analize si exporturile active;
+  stampila deja acordata necesita revizuire, nu e retrasa automat daca poate fi cheltuita.
+- Firmele noi au PIN principal de 4 cifre generat criptografic, nu 1234. Butonul
+  de schimbare este in panoul firmei; PIN-ul vechi 1234 este blocat in scanarile
+  principale pana la rotirea lui de catre administrator. Rutele de scan au rate limits.
+- Am inlocuit inserarea directa a unor nume de clienti si firme in HTML in panoul
+  administratorului pentru a reduce riscul injectiilor.
+- Google Wallet: GET inainte de PATCH pentru un card deja salvat; fara emiterea
+  intempestiva de carduri si fara apeluri cand opt-in nu este configurat.
+- Apple PassKit: /api/passkit/v1/devices/.../registrations/... si
+  /api/passkit/v1/passes/... pentru serviciul de actualizare; autentificare
+  per serial cu HMAC si tokenuri de push criptate, teste cu dispozitive simulate.
+- Testare izolata: Python + sintaxa JavaScript + pornire FastAPI real pe SQLite temporar.
+  Nu sunt accesate date reale, producția sau API-uri financiare.
+
+### Ce ramane pentru productie
+1. Rotirea tuturor secretelor istorice publicate in repository si configurarea unui nou JWT_SECRET_KEY.
+2. Backup, migrare testata a bazei persistente si validare pe STAGING.
+3. Recuperare securizata a cardurilor legacy care nu au token privat de dispozitiv.
+4. Sincronizare completa cu POS-ul comerciantului si compatibilitate pentru imprimarea
+   QR-ului pe bon, acolo unde hardware-ul permite.
+5. Cont oficial Apple/Google, certificate si test pe dispozitive; implementarea APNs
+   daca se doreste schimbarea automata imediata a cardurilor Apple instalate.
+6. Audit de marketing/consimtamant, protectii anti-abuz la volume mari, limite de cost AI,
+   proceduri GDPR si masurarea conversiei campaniilor.
+7. Verificarea rapoartelor manageriale cu date contabile reale, inclusiv tratamentul TVA
+   si comparabilitatea preturilor cu costurile; nu se calculeaza profit net din date incomplete.
+8. Acceptarea explicita pentru deploy dupa criteriile de lansare.
