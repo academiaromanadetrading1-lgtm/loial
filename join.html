@@ -130,6 +130,8 @@
     outline: none;
   }
   input:focus, select:focus { border-color: var(--brand); background: #ffffff; }
+  .consent-choice { display:flex;align-items:flex-start;gap:8px;margin:10px 0;text-align:left;font-size:11.5px;line-height:1.45;color:#475d52; }
+  .consent-choice input[type="checkbox"] {width:17px;height:17px;min-width:17px;margin:1px 0 0;padding:0;accent-color:var(--brand);}
 
   .btn-main { width: 100%; padding: 14px; border: none; border-radius: 12px; background: var(--brand); color: #ffffff; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; font-family: inherit; }
   .btn-save { width: 100%; padding: 13px; border: 1.5px solid #dce6e0; border-radius: 12px; background: #f6f9f7; color: #111f18; font-size: 13.5px; font-weight: 700; cursor: pointer; margin-top: 6px; font-family: inherit; }
@@ -187,7 +189,9 @@
         <p style="font-size:13.5px;color:#475d52;margin-bottom:10px;">Activează-ți portofelul universal în 3 secunde (fără aplicații):</p>
         <form id="enrollForm">
           <input type="text" id="nameInput" placeholder="Prenumele tău (obligatoriu)..." required autocomplete="given-name">
-          <input type="email" id="emailInput" placeholder="Email (opțional – pentru bonusuri Loial & Ambasador)" autocomplete="email">
+          <input type="email" id="emailInput" placeholder="Email (opțional)" autocomplete="email">
+          <label class="consent-choice"><input id="consentEmail" type="checkbox"><span>Sunt de acord să primesc oferte prin email de la această afacere. Mă pot dezabona oricând.</span></label>
+          <label class="consent-choice"><input id="consentAds" type="checkbox"><span>Sunt de acord ca această afacere să folosească emailul meu pentru audiențe publicitare personalizate (Meta/Google), conform informării de confidențialitate.</span></label>
           <button type="submit" class="btn-main">Activează cardul meu instant →</button>
         </form>
       </div>
@@ -310,11 +314,11 @@
   document.getElementById('qrImg').src = `/api/qr-link?url=${scanUrl}&color=${cleanColor}&initial=${initial}`;
 }
 
-  async function synchronizeCard(name, email) {
+  async function synchronizeCard(name, email, options = {}) {
     const response = await fetch('/api/enroll-sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ business_id: bizId, name, email, uuid: globalWalletUuid })
+      body: JSON.stringify({ business_id: bizId, name, email, uuid: globalWalletUuid, consent_marketing_email: !!options.marketing, consent_personalized_ads: !!options.ads })
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
@@ -325,7 +329,7 @@
 
   if (savedProfile && savedProfile.name) {
     // Un profil salvat într-o versiune anterioară poate să nu existe încă în baza de date.
-    synchronizeCard(savedProfile.name, savedProfile.email || '')
+    synchronizeCard(savedProfile.name, '')
       .then(() => {
         showCardInstant(globalWalletUuid, savedProfile.name, 0);
         loadUniversalWallet();
@@ -347,12 +351,18 @@
       e.preventDefault();
       const nameVal = document.getElementById('nameInput').value.trim();
       const emailVal = document.getElementById('emailInput').value.trim();
+      const marketing = document.getElementById('consentEmail').checked;
+      const ads = document.getElementById('consentAds').checked;
       if (!nameVal) return;
+      if (!emailVal && (marketing || ads)) {
+        alert('Introdu adresa de email pentru a activa opțiunile de comunicare.');
+        return;
+      }
       const button = activeForm.querySelector('button[type="submit"]');
       button.disabled = true;
       try {
         // Afișăm codul QR numai după confirmarea înregistrării de către server.
-        await synchronizeCard(nameVal, emailVal);
+        await synchronizeCard(nameVal, emailVal, { marketing, ads });
         savedProfile = { uuid: globalWalletUuid, name: nameVal, email: emailVal };
         localStorage.setItem('loial_universal_profile', JSON.stringify(savedProfile));
         document.getElementById('reminderBanner').textContent =
