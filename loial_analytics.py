@@ -209,3 +209,68 @@ def manager_findings(summary, sector):
     notes.append({"type": "limitation", "text":
         "Recomandarile se bazeaza doar pe perioadele si costurile introduse; profitul net si efectul campaniilor necesita date suplimentare."})
     return notes
+
+
+def break_even_analysis(rows, fixed_costs, period, vat_basis_confirmed=False):
+    """Deterministic CVP assessment; no AI estimated costs or unverified VAT assumptions.
+
+    Mixed portfolios get ONLY a revenue break-even estimate, never a misleading
+    count of interchangeable items. Single-product portfolios can get units too.
+    """
+    from decimal import ROUND_CEILING
+    if not isinstance(period,str) or len(period)!=7 or period[4]!="-":
+        raise ValueError("Perioada trebuie YYYY-MM")
+    try:
+        date.fromisoformat(period+"-01")
+    except ValueError:
+        raise ValueError("Perioada este invalida")
+    costs=money(fixed_costs)
+    if costs<0:
+        raise ValueError("Costurile fixe nu pot fi negative")
+    result={"period":period,"method":"cost_volume_profit",
+            "status":"insufficient_data","estimated_break_even_revenue":None,
+            "estimated_break_even_units":None,"observed_revenue":None,
+            "currency_basis":"net_of_vat" if vat_basis_confirmed else "unknown",
+            "caveats":["Analiza depinde de perioada, costurile si mixul de vanzari confirmate."]}
+    if not vat_basis_confirmed:
+        result["caveats"].append(
+          "Confirma ca preturile de vanzare si costurile sunt introduse pe baze comparabile fara TVA.")
+        return result
+    if not rows:
+        result["caveats"].append("Lipsesc vanzarile confirmate pentru perioada aleasa.")
+        return result
+    summary=summarize_sales(rows)
+    result["observed_revenue"]=summary["total_revenue"]
+    if not summary["margin_data_complete"]:
+        result["caveats"].append("Lipsesc costurile variabile pentru unele produse sau servicii.")
+        return result
+    revenue=money(summary["total_revenue"])
+    contribution=money(summary["total_contribution"])
+    if revenue<=0:
+        result["caveats"].append("Veniturile confirmate nu permit calculul unui prag.")
+        return result
+    if contribution<=0:
+        result["status"]="negative_contribution"
+        result["caveats"].append(
+          "Contributia este zero sau negativa: mixul observat nu acopera costurile fixe pe masura ce volumul creste.")
+        return result
+    required_revenue=(costs*revenue/contribution).quantize(Decimal(".01"),
+                                                        rounding=ROUND_CEILING)
+    result["estimated_break_even_revenue"]=float(required_revenue)
+    result["observed_contribution"]=float(contribution)
+    result["status"]="estimated"
+    result["sales_gap_to_break_even"]=round(float(required_revenue-revenue),2)
+    if len(summary["products"])==1:
+        product=summary["products"][0]
+        qty=money(product["quantity"])
+        if qty>0:
+            per_unit=contribution/qty
+            if per_unit>0:
+                result["estimated_break_even_units"]=int((costs/per_unit).to_integral_value(
+                    rounding=ROUND_CEILING))
+    else:
+        result["caveats"].append(
+          "Estimarea pentru mai multe produse presupune pastrarea mixului observat; nu convertim produsele diferite intr-un numar fictiv de unitati.")
+    result["caveats"].append(
+      "Aceasta este o estimare manageriala a acoperirii costurilor fixe, nu profit net raportat contabil.")
+    return result
