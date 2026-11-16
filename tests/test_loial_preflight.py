@@ -1,0 +1,50 @@
+"""No-credential preflight regression checks; never touches production."""
+import json
+from loial_preflight import preflight
+
+def sample_env():
+    return {
+        "LOIAL_DATABASE_URL":"sqlite:////data/loial.db",
+        "JWT_SECRET_KEY":"aBcDeFgHiJkLmNoPqRsTuVwXyZ9876543210!#$%*_+-abcdefghi",
+        "ALLOWED_ORIGINS":"https://loial.space",
+        "LOIAL_APPLE_PILOT_ENABLED":"0",
+        "LOIAL_GOOGLE_LOYALTY_CLASS_ID":"123456789012.loial_pilot",
+        "LOIAL_GOOGLE_WALLET_SERVICE_ACCOUNT_JSON":json.dumps({
+            "client_email":"pilot@loial-project.iam.gserviceaccount.com",
+            "private_key":"-----BEGIN PRIVATE KEY-----\nFAKE\n-----END PRIVATE KEY-----"
+        }),
+        "LOIAL_GOOGLE_WALLET_SYNC_ENABLED":"0",
+        "LOIAL_DEV_SEED_DATA":"0"
+    }
+
+def test_preflight_remains_manual_even_when_config_seems_ready():
+    report=preflight(sample_env(),stage="production")
+    assert report["automatic_checks_passed"] is True
+    assert report["safe_to_deploy_automatically"] is False
+    assert "credential_rotation_manual" in report["manual_approvals_required"]
+    assert "google_publishing_manual" in report["manual_approvals_required"]
+
+def test_missing_google_does_not_block_staging_but_blocks_launch():
+    env=sample_env()
+    env.pop("LOIAL_GOOGLE_WALLET_SERVICE_ACCOUNT_JSON")
+    env["LOIAL_GOOGLE_LOYALTY_CLASS_ID"]=""
+    assert "google_issuer" not in preflight(env,"staging")["blockers"]
+    assert "google_issuer" in preflight(env,"production")["blockers"]
+    assert "google_class_id" in preflight(env,"production")["blockers"]
+
+def test_apple_and_weak_secrets_cannot_pass_launch_checks():
+    env=sample_env()
+    env["LOIAL_APPLE_PILOT_ENABLED"]="1"
+    env["JWT_SECRET_KEY"]="demo"
+    env["ALLOWED_ORIGINS"]="*"
+    env["LOIAL_DEV_SEED_DATA"]="1"
+    result=preflight(env,"production")
+    for key in ("apple_postponed","jwt_secret","allowed_origins","no_demo_bootstrap"):
+        assert key in result["blockers"]
+
+def test_preflight_does_not_return_private_keys():
+    env=sample_env()
+    private=env["LOIAL_GOOGLE_WALLET_SERVICE_ACCOUNT_JSON"]
+    output=json.dumps(preflight(env,"production"))
+    assert private not in output
+    assert "FAKE" not in output
