@@ -422,9 +422,9 @@
       card.classList.remove('unlocked');
     }
 
-    const row = document.getElementById('stampsRow');
+       const row = document.getElementById('stampsRow');
     row.innerHTML = '';
-    const displayMax = target;
+    const displayMax = total;
     row.style.gridTemplateColumns = displayMax <= 6 ? `repeat(${displayMax}, 1fr)` : 'repeat(6, 1fr)';
 
     for (let i = 1; i <= displayMax; i++) {
