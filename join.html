@@ -355,7 +355,8 @@
   let globalWalletUuid = localStorage.getItem('loial_universal_uuid');
   if (!globalWalletUuid) {
     const legacy = JSON.parse(localStorage.getItem('loial_card_' + bizId) || 'null');
-    globalWalletUuid = (legacy && legacy.uuid) ? legacy.uuid : ('W-' + Math.random().toString(36).substring(2, 10).toUpperCase());
+    // 122+ biți de entropie: UUID public nu este credențial, dar evităm coliziunile.
+    globalWalletUuid = (legacy && legacy.uuid) ? legacy.uuid : ('W-' + crypto.randomUUID());
     localStorage.setItem('loial_universal_uuid', globalWalletUuid);
   }
 
