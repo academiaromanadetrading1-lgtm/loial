@@ -126,6 +126,10 @@ formulele de implementare sau raționamentul intern al modelului.
   loyaltyObjects pentru client, genericObjects pentru ambasador. Clasele
   issuerId.classSuffix trebuie create si aprobate de emitent, iar contul sa
   primeasca acces de publicare. Nu se emite link daca lipseste configurarea.
+- Apple Wallet pe Safari utilizeaza linkuri temporare de emitere (90 secunde),
+  semnate pe server, fara a include secretul privat al clientului in adresa.
+  Ruta GET /api/premium-wallet/apple/claim foloseste MIME application/vnd.apple.pkpass
+  si Cache-Control private, no-store; necesita test practic pe iPhone.
 - Cardul Apple/Google creat reflecta situatia la momentul emiterii; actualizarea
   automata a stampilelor pe cardul deja instalat necesita urmatoarea etapa
   (Apple PassKit web service/APNs, Google Wallet object updates).
@@ -154,3 +158,8 @@ ca sunt certificate Apple si fara a crea un cont Google Wallet real.
 Apple: https://developer.apple.com/help/account/capabilities/create-wallet-identifiers-and-certificates
 Google: https://developers.google.com/wallet/retail/loyalty-cards/getting-started/issuer-onboarding
 Google API auth: https://developers.google.com/wallet/retail/loyalty-cards/getting-started/auth/rest
+
+### Robustete enrolare
+Dispozitivul creeaza un secret privat inainte de inscriere si il pastreaza separat
+de QR; daca cererea se intrerupe, poate relua inrolarea cu acelasi secret.
+Un portofel mai vechi fara acel secret nu poate fi preluat doar cunoscand QR-ul.
