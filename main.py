@@ -48,7 +48,7 @@ WISE_PROFILE_ID = os.getenv("WISE_PROFILE_ID", "")
 SENDGRID_KEY = os.getenv("SENDGRID_API_KEY", "")
 WALLET_TEAM_ID = os.getenv("APPLE_TEAM_ID", "")
 WALLET_PASS_TYPE = os.getenv("APPLE_PASS_TYPE_ID", "pass.app.loial.loyalty")
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+ALLOWED_ORIGINS = [origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "https://loial.space").split(",") if origin.strip()]
 
 app = FastAPI(title="Loial Loyalty API", version="2.2")
 limiter = Limiter(key_func=get_remote_address)
@@ -87,7 +87,9 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "loial-secret-key-change-in-production-2026")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "").strip()
+if len(SECRET_KEY) < 32:
+    raise RuntimeError("Configurare obligatorie: JWT_SECRET_KEY unic, minimum 32 caractere in secret manager")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("TOKEN_EXPIRE_MINUTES", "1440"))
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
