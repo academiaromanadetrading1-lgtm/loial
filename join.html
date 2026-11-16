@@ -184,7 +184,7 @@
     text-overflow:ellipsis;overflow:hidden;max-width:96%;letter-spacing:.03em;margin-top:5px}
   .metal-meta {display:flex;justify-content:space-between;gap:10px;margin-top:8px;
     font-size:9px;letter-spacing:.09em;color:#cfbd91;text-transform:uppercase}
-  .wallet-add-row {display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 6px}
+  .wallet-add-row {display:grid;grid-template-columns:1fr;gap:8px;margin:12px 0 6px}
   .wallet-add-row button {padding:11px 8px;border:1px solid #c5b485;border-radius:10px;
     background:#15171c;color:#f5e5b9;font-weight:700;font-size:12px;cursor:pointer}
   .wallet-add-row button:disabled {opacity:.45;cursor:not-allowed}
@@ -255,7 +255,7 @@
         </div>
         <div class="stamps-row" id="stampsRow"></div>
         <div class="wallet-add-row">
-          <button id="appleMemberButton" type="button" onclick="addCustomerToWallet('apple')" disabled>Apple Wallet</button>
+          <button id="appleMemberButton" type="button" onclick="addCustomerToWallet('apple')" disabled style="display:none">Apple Wallet</button>
           <button id="googleMemberButton" type="button" onclick="addCustomerToWallet('google')" disabled>Google Wallet</button>
         </div>
         <div class="wallet-availability" id="memberWalletAvailability"></div>
@@ -333,7 +333,7 @@
               <span>PARTENER LOIAL</span></div></div>
         </div>
         <div class="wallet-add-row">
-          <button id="appleAmbButton" type="button" onclick="addAmbassadorToWallet('apple')" disabled>Apple Wallet</button>
+          <button id="appleAmbButton" type="button" onclick="addAmbassadorToWallet('apple')" disabled style="display:none">Apple Wallet</button>
           <button id="googleAmbButton" type="button" onclick="addAmbassadorToWallet('google')" disabled>Google Wallet</button>
         </div>
         <div class="wallet-availability" id="ambWalletAvailability">Autentifică-te ca ambasador pentru a adăuga acest card în Wallet.</div>
@@ -713,13 +713,13 @@
     document.getElementById('memberWalletAvailability').textContent=!privateWallet
       ?'Pentru a adăuga în Wallet, acest dispozitiv trebuie verificat ca titular al cardului.'
       :(!ready.apple_ready&&!ready.google_customer_ready
-        ?'Cardul Black Metal este activ în Loial. Integrarea oficială Apple/Google Wallet necesită configurarea emitentului.'
-        :'Alege portofelul disponibil pe telefonul tău.');
+        ?'Cardul Black Metal este activ în Loial. Integrarea oficială Google Wallet necesită configurarea emitentului.'
+        :'Adaugă cardul premium direct în Google Wallet.');
     if(premiumAmbassadorAuthenticated){
       document.getElementById('ambWalletAvailability').textContent=
         ready.apple_ready||ready.google_ambassador_ready
           ?'Cardul de ambasador este pregătit pentru portofelele configurate.'
-          :'Cardul premium este vizibil în Loial; Apple/Google Wallet necesită credențiale de emitent.';
+          :'Cardul premium este vizibil în Loial; Google Wallet necesită credențiale de emitent.';
     }
   }
   async function actualWalletTransfer(path,headers,kind) {
