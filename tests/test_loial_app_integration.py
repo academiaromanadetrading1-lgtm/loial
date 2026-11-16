@@ -127,6 +127,29 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             messages=client.get("/api/loial-inbox/me",
                 headers={"X-Loial-Wallet-Token":"T"*48}).json()["messages"]
             assert sum(x["kind"]=="service" for x in messages)>=4
+            # Historical API aliases must not bypass the idempotent stamp ledger.
+            for name, route in (("legacy", "/api/scan"),
+                                ("v2", "/api/scan-v2")):
+                unique="W-INTEGRATION-"+name.upper()
+                enrolled=client.post("/api/enroll-sync",json={
+                    "business_id":business_id,"uuid":unique,"name":"Client "+name,
+                    "wallet_claim_token":("Q" if name=="legacy" else "R")*48
+                })
+                assert enrolled.status_code==200,enrolled.text
+                original={"pin":new_pin,"business_id":business_id,
+                          "customer_uuid":unique,"idempotency_key":"test-"+name+"-purchase"}
+                once=client.post(route,json=original)
+                assert once.status_code==200,once.text
+                assert once.json()["stamps"]==1
+                again=client.post(route,json=original)
+                assert again.status_code==200,again.text
+                assert again.json()["duplicate_ignored"] is True
+                different={**original,"idempotency_key":"test-"+name+"-immediate"}
+                assert client.post(route,json=different).status_code==409
+            from loial_scans import StampAward
+            with main.SessionLocal() as db:
+                all_awards=db.query(StampAward).all()
+                assert len(all_awards)==4 # two universal, two compatibility aliases
             # No external provider or recipient data is needed for this scenario.
     finally:
         main.engine.dispose()
