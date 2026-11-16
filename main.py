@@ -2334,7 +2334,27 @@ def get_manifest():
 def generate_raw_qr_png(code_text: str, color: str = "#2d6a4f", initial: str = "L"):
     png_bytes = create_premium_qr_bytes(code_text, color=color, initial=initial)
     return Response(content=png_bytes, media_type="image/png")
+    
+class RedeemRequest(BaseModel):
+    pin: str
+    business_id: int
+    customer_uuid: str
 
+@app.post("/api/redeem-reward")
+def redeem_customer_reward(req: RedeemRequest, db: Session = Depends(get_db)):
+    biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Afacere negăsită")
+    staff = db.query(StaffMember).filter(StaffMember.business_id == biz.id, StaffMember.pin == req.pin, StaffMember.active == 1).first()
+    if not staff and req.pin != (biz.staff_pin or "1234"):
+        raise HTTPException(status_code=401, detail="PIN incorect")
+    customer = db.query(Customer).filter(Customer.uuid == req.customer_uuid, Customer.business_id == biz.id).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Client negăsit")
+    customer.stamps = 0
+    customer.last_visit = datetime.now().isoformat()
+    db.commit()
+    return {"status": "redeemed", "name": customer.name, "stamps": 0}
 class InstantEnrollRequest(BaseModel):
     business_id: int
     name: str
