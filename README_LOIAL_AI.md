@@ -211,3 +211,43 @@ Un portofel mai vechi fara acel secret nu poate fi preluat doar cunoscand QR-ul.
 7. Verificarea rapoartelor manageriale cu date contabile reale, inclusiv tratamentul TVA
    si comparabilitatea preturilor cu costurile; nu se calculeaza profit net din date incomplete.
 8. Acceptarea explicita pentru deploy dupa criteriile de lansare.
+
+
+## Calup de consolidare — fidelizare, audit, confidentialitate si decizii manageriale
+
+- Toate cele trei rute de scanare (`/api/scan`, `/api/scan-v2`, `/api/scan-universal`)
+  folosesc un singur mecanism de acordare a stampilelor. Identificatorul unei
+  operatiuni permite reluarea in siguranta; retrimiterea aceleiasi cereri nu
+  acorda alta stampila. O noua operatie pentru acelasi card in 12 secunde este
+  blocata pentru prevenirea dublelor scanari accidentale.
+- Jurnalul `loial_stamp_awards` inregistreaza stampile manuale, bonuri revendicate,
+  recompense folosite si corectii pentru retururi. Administratorul poate vedea
+  istoricul propriului business in `GET /api/loial-scans/history` si in panoul firmei.
+  Nu poate citi jurnalul altui comerciant.
+- La returnarea unui bon, Loial elimina liniile sale din analiza vanzarilor,
+  exporturi si audientele campaniilor bazate pe cumpararea unui anumit produs.
+  Stampila este retrasa automat numai daca bonul respectiv constituie ultima
+  operatie de fidelizare si recompensa nu a fost consumata. Altfel,
+  administratorul este notificat ca trebuie sa verifice manual situatia.
+- Informatiile personale din `/api/wallet-profile/{wallet_uuid}` necesita acum
+  secretul privat `X-Loial-Wallet-Token`, nu doar QR-ul vizibil angajatului.
+  Portofelele legacy fara secret nu pot consulta istoricul pana la o procedura
+  verificata de recuperare. Aceasta ramane blocaj pentru migratia in productie.
+- Analiza manageriala: ABC clasifica in clasa A inclusiv articolul care trece pragul
+  de 80%, nu il transfera gresit in B/C. Loial diferentiaza contributia totala,
+  contributia per unitate si rata contributiei atunci cand sunt cunoscute
+  costurile, avertizand asupra produselor cu contributie negativa. Nu deduce
+  profit net fara cheltuielile si perioada corespunzatoare.
+- 56 teste izolate plus un test de pornire si traseu complet FastAPI pe SQLite
+  temporar au trecut in GitHub Actions la ultima rulare de validare a calupului.
+  Acestea nu inlocuiesc testul pe telefoane reale sau cu o casa de marcat.
+
+### Verificari obligatorii ramase inainte de deploy
+- Migrare si recuperare verificata a portofelelor existente, fara bazare exclusiv pe QR.
+- Teste de concurenta multi-worker la scanari si importuri, plus backup/restore.
+- Rotirea tuturor secretelor istorice publicate si verificarea configurarii secretelor.
+- Configurarea oficiala Apple/Google Wallet, APNs pentru notificarea actualizarilor
+  Apple, teste pe iOS/Android si validarea emitentului.
+- Test cu casa de marcat/POS concret si politica de reconciliere a retururilor.
+- Testarea UX si a proceselor GDPR, documentarea consimtamintelor si audit extern
+  al izolarii multi-tenant. Publicarea ramane separata de acest PR draft.
