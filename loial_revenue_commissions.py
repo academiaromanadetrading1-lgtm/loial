@@ -263,8 +263,18 @@ def apply_verified_invoice(db,invoice,Agent,Business):
     earlier=db.query(PaidMerchantInvoice).filter(
         PaidMerchantInvoice.business_id==business.id,
         PaidMerchantInvoice.id!=record.id,
-        PaidMerchantInvoice.eligible==1,
-        PaidMerchantInvoice.refunded==0).count()
+        PaidMerchantInvoice.eligible==1).count()
+    # Only one renewal commission per merchant per billing month.
+    if earlier:
+        already_this_month=db.query(PaidMerchantInvoice).filter(
+            PaidMerchantInvoice.business_id==business.id,
+            PaidMerchantInvoice.id!=record.id,
+            PaidMerchantInvoice.eligible==1,
+            PaidMerchantInvoice.period==record.period).count()
+        if already_this_month:
+            record.review_reason="second_invoice_same_merchant_month_no_extra_commission"
+            return {"invoice_id":record.id,"eligible":True,
+                    "credited":0,"note":"no_duplicate_monthly_commission"}
     activation=(earlier==0)
     kind="activation" if activation else "recurring"
     amount=ACTIVATION_EUR_CENTS if activation else tier(1)["rate_cents"]
@@ -458,12 +468,13 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm):
                 if event_type.startswith("charge.dispute") or event_type in (
                     "invoice.voided","credit_note.created"):
                     # Disputes and credit notes can be partial; hold for manual review.
+                    paid_any=False
                     for c in db.query(AmbassadorCommission).filter(
-                        AmbassadorCommission.invoice_id==row.id,
-                        AmbassadorCommission.status=="pending").all():
-                        c.status="held"
+                        AmbassadorCommission.invoice_id==row.id).all():
+                        if c.status in ("pending","approved"):c.status="held"
+                        if c.status=="paid":paid_any=True
                     row.review_reason="billing_dispute_or_credit_note_review"
-                    outcome={"manual_review":True}
+                    outcome={"manual_review":True,"paid_commissions_require_recovery":paid_any}
                 elif is_full:
                     outcome=reverse_invoice(db,row)
                 else:
