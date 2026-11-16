@@ -55,10 +55,10 @@ def apple_ready():
     return all(bool(os.getenv(x,"").strip()) for x in names)
 
 def google_ready(role):
-    account=os.getenv("LOIAL_GOOGLE_WALLET_SERVICE_ACCOUNT_JSON","")
+    from loial_google_issuer import configured_issuer,valid_class_id
     class_id=os.getenv("LOIAL_GOOGLE_LOYALTY_CLASS_ID" if role=="customer"
                        else "LOIAL_GOOGLE_AMBASSADOR_CLASS_ID","")
-    return bool(account and class_id)
+    return bool(configured_issuer() and valid_class_id(class_id))
 
 def localized(value,lang="ro"):
     return {"defaultValue":{"language":lang,"value":value[:100]}}
@@ -71,13 +71,21 @@ def google_pass_payload(card,issuer,class_id):
     common={"id":obj_id,"classId":class_id,"state":"ACTIVE",
             "barcode":{"type":"QR_CODE","value":card["qr_value"]}}
     if card["role"]=="customer":
+        remaining=max(0,card["target"]-card["stamps"])
         common.update({"accountId":hashlib.sha256(card["id"].encode()).hexdigest()[:12].upper(),
                        "accountName":card["holder"],
-                       "loyaltyPoints":{"label":"Stampile","balance":{"int":card["stamps"]}}})
+                       "loyaltyPoints":{"label":"Ștampile","balance":{"int":card["stamps"]}},
+                       "secondaryLoyaltyPoints":{"label":"Până la premiu",
+                                                 "balance":{"int":remaining}},
+                       "textModulesData":[
+                          {"id":"status","header":"Statut","body":card["status"]},
+                          {"id":"merchant","header":"Afacere","body":card["entity"]}]})
         payload={"loyaltyObjects":[common]}
     else:
         common.update({"genericType":"GENERIC_TYPE_UNSPECIFIED",
                        "hexBackgroundColor":BLACK,
+                       "logo":{"sourceUri":{"uri":"https://loial.space/api/premium-wallet/brand.png"},
+                               "contentDescription":localized("Loial Black Metal")},
                        "cardTitle":localized("LOIAL • BLACK METAL"),
                        "header":localized(card["holder"]),
                        "subheader":localized(card["status"]),
@@ -86,12 +94,12 @@ def google_pass_payload(card,issuer,class_id):
     return {"iss":issuer,"aud":"google","typ":"savetowallet",
             "iat":int(time.time()),"origins":[],"payload":payload}
 
-def google_save_url(card):
+def google_save_url(card,class_id_override=None):
     try:
         account=json.loads(os.environ["LOIAL_GOOGLE_WALLET_SERVICE_ACCOUNT_JSON"])
         issuer=account["client_email"]
         key=account["private_key"]
-        class_id=os.environ["LOIAL_GOOGLE_LOYALTY_CLASS_ID"
+        class_id=class_id_override or os.environ["LOIAL_GOOGLE_LOYALTY_CLASS_ID"
                            if card["role"]=="customer" else "LOIAL_GOOGLE_AMBASSADOR_CLASS_ID"]
         if not issuer.endswith(".gserviceaccount.com"):
             raise ValueError("Google service account invalid")
@@ -273,9 +281,26 @@ def install_premium_wallet(app,engine,session_factory,BusinessAccount,Customer,
 
     @router.get("/availability")
     def availability():
-        return {"apple_ready":apple_ready(),"google_customer_ready":google_ready("customer"),
-                "google_ambassador_ready":google_ready("ambassador"),
-                "notice":"Cardurile nu sunt carduri bancare; pentru walleturile native se cer certificatele emitentului."}
+        google_customers=google_ready("customer")
+        google_ambassadors=google_ready("ambassador")
+        return {"apple_ready":apple_ready() and os.getenv("LOIAL_APPLE_PILOT_ENABLED","0")=="1",
+                "google_customer_ready":google_customers,
+                "google_ambassador_ready":google_ambassadors,
+                "pilot":"google_wallet_first_100_businesses",
+                "notice":"Google Wallet este prioritar. Cardurile Black Metal sunt carduri de fidelitate, nu bancare."}
+
+    @router.get("/brand.png")
+    def wallet_issuer_brand():
+        \"\"\"Public Google-hosted logo, no private wallet or subscriber information.\"\"\"
+        image=Image.new("RGB",(256,256),(13,14,17))
+        draw=ImageDraw.Draw(image)
+        draw.rounded_rectangle((9,9,246,246),radius=40,outline=(216,190,122),width=6)
+        draw.ellipse((36,30,219,213),outline=(216,190,122),width=11)
+        draw.line([(75,120),(113,158),(177,84)],fill=(243,230,190),width=13)
+        stream=io.BytesIO()
+        image.save(stream,format="PNG",optimize=True)
+        return Response(content=stream.getvalue(),media_type="image/png",
+                        headers={"Cache-Control":"public, max-age=86400","X-Content-Type-Options":"nosniff"})
 
     @router.get("/customer/cards")
     def customer_cards(wallet_record=Depends(wallet),db:Session=Depends(session)):
@@ -353,9 +378,14 @@ def install_premium_wallet(app,engine,session_factory,BusinessAccount,Customer,
         if not google_ready("customer"):
             raise HTTPException(status_code=503,detail="Google Wallet nu este inca configurat pentru emitere")
         try:
-            return {"url":google_save_url(card)}
-        except ValueError as e:
+            from loial_google_issuer import loyalty_class_id_for_business,ensure_google_class
+            class_id=loyalty_class_id_for_business(business_id)
+            ensure_google_class("loyalty",class_id,card["entity"])
+            return {"url":google_save_url(card,class_id_override=class_id)}
+        except (ValueError,RuntimeError) as e:
             raise HTTPException(status_code=503,detail=str(e))
+        except Exception:
+            raise HTTPException(status_code=503,detail="Google Wallet API indisponibil. Incearca din nou.")
 
     @router.get("/customer/{business_id}/apple")
     def customer_apple(business_id:int,wallet_record=Depends(wallet),db:Session=Depends(session)):
@@ -381,9 +411,14 @@ def install_premium_wallet(app,engine,session_factory,BusinessAccount,Customer,
         if not google_ready("ambassador"):
             raise HTTPException(status_code=503,detail="Google Wallet nu este inca configurat pentru emitere")
         try:
+            from loial_google_issuer import ensure_google_class
+            class_id=os.environ["LOIAL_GOOGLE_AMBASSADOR_CLASS_ID"]
+            ensure_google_class("generic",class_id)
             return {"url":google_save_url(ambassador_card(agent,db))}
-        except ValueError as e:
+        except (ValueError,RuntimeError) as e:
             raise HTTPException(status_code=503,detail=str(e))
+        except Exception:
+            raise HTTPException(status_code=503,detail="Google Wallet API indisponibil. Incearca din nou.")
 
     @router.get("/ambassador/apple")
     def ambassador_apple(agent=Depends(ambassador),db:Session=Depends(session)):
