@@ -2461,8 +2461,13 @@ def redeem_customer_reward(req: RedeemRequest, db: Session = Depends(get_db)):
     ).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Cardul clientului nu există la această afacere")
+    target = getattr(biz, "stamps_required", None) or 6
+    if (customer.stamps or 0) < target:
+        raise HTTPException(status_code=409, detail="Recompensa nu este inca disponibila")
     customer.stamps = 0
     customer.last_visit = datetime.now().isoformat()
+    from loial_inbox import queue_service_event
+    queue_service_event(db, biz, customer, kind="redeem", event_key=uuid.uuid4().hex)
     db.commit()
     return {"status": "redeemed", "name": customer.name, "stamps": 0}
 class InstantEnrollRequest(BaseModel):
@@ -2682,7 +2687,8 @@ def scan_universal_card(req: UniversalScanRequest, db: Session = Depends(get_db)
             was_away = (datetime.now() - datetime.fromisoformat(previous_visit)).days >= 30
         except (ValueError, TypeError):
             pass
-    queue_service_event(db, biz, customer, kind="stamp", returning=was_away)
+    queue_service_event(db, biz, customer, kind="stamp", returning=was_away,
+                        event_key=uuid.uuid4().hex)
     db.commit()
     return {
         "name": customer.name,
