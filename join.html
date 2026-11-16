@@ -290,7 +290,7 @@
     document.getElementById('passTop').style.background = `linear-gradient(135deg, ${currentBrandColor} 0%, #111f18 100%)`;
   }
 
-  fetch('/api/biz-full/' + bizId)
+  fetch('/api/loial-public/' + bizId)
     .then(r => r.json())
     .then(d => {
       applyBrandTheme(d.name, d.card_color);
