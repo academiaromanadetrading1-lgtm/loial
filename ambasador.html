@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Devino Ambasador Loial.space – Câștigă venit lunar recurent</title>
+<link rel="preconnect" href="https://googleapis.com">
+<link rel="preconnect" href="https://gstatic.com" crossorigin>
+<link href="https://googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f9f7;
+    --surface: #ffffff;
+    --primary: #2d6a4f;
+    --gold: #d97706;
+    --gold-light: #fef3c7;
+    --text: #111f18;
+    --muted: #475d52;
+    --border: #dce6e0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+
+  header {
+    background: #ffffff; border-bottom: 1px solid var(--border);
+    padding: 16px 28px; display: flex; justify-content: space-between; align-items: center;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; color: var(--text); text-decoration: none; }
+  .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, #2d6a4f, #52b788); color: #fff; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .btn-back { padding: 8px 16px; border: 1px solid var(--border); border-radius: 10px; background: #ffffff; color: var(--muted); font-weight: 600; font-size: 13.5px; text-decoration: none; }
+
+  .container { max-width: 1040px; margin: 36px auto; padding: 0 20px; }
+
+  .hero-amb {
+    background: linear-gradient(135deg, #111f18 0%, #1b4332 100%);
+    color: #ffffff; border-radius: 28px; padding: 44px 36px; text-align: center;
+    box-shadow: 0 20px 45px rgba(17, 31, 24, 0.14); margin-bottom: 32px;
+  }
+  .pill-gold {
+    display: inline-block; background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b;
+    color: #fbbf24; font-size: 12.5px; font-weight: 800; padding: 6px 14px; border-radius: 999px;
+    margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .hero-amb h1 { font-size: clamp(26px, 4vw, 40px); font-weight: 800; line-height: 1.2; margin-bottom: 14px; }
+  .hero-amb p { font-size: 16px; color: #d1fae5; max-width: 720px; margin: 0 auto 24px; }
+  .btn-gold-cta {
+    display: inline-block; padding: 15px 28px; border: none; border-radius: 14px;
+    background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff;
+    font-size: 16px; font-weight: 800; cursor: pointer; text-decoration: none;
+    box-shadow: 0 8px 22px rgba(217, 119, 6, 0.38);
+  }
+
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 32px; }
+  @media (max-width: 820px) { .grid-3 { grid-template-columns: 1fr; } }
+
+  .tier-card {
+    background: #ffffff; border: 1.5px solid var(--border); border-radius: 22px; padding: 24px;
+    box-shadow: 0 8px 20px rgba(17, 31, 24, 0.04);
+  }
+  .tier-card.highlight { border-color: #f59e0b; box-shadow: 0 12px 28px rgba(245, 158, 11, 0.14); }
+  .tier-tag { display: inline-block; font-size: 11.5px; font-weight: 800; padding: 4px 10px; border-radius: 8px; background: #e8f3ed; color: var(--primary); margin-bottom: 10px; }
+  .tier-card.highlight .tier-tag { background: var(--gold-light); color: #92400e; }
+  .tier-card h3 { font-size: 19px; font-weight: 800; margin-bottom: 6px; }
+  .tier-price { font-size: 26px; font-weight: 800; color: var(--primary); margin: 10px 0; }
+  .tier-card.highlight .tier-price { color: var(--gold); }
+  .tier-card p { font-size: 13.5px; color: var(--muted); }
+
+  .grid-2 { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 24px; align-items: start; }
+  @media (max-width: 860px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  .card { background: #ffffff; border: 1px solid var(--border); border-radius: 24px; padding: 28px; box-shadow: 0 10px 26px rgba(17, 31, 24, 0.05); margin-bottom: 24px; }
+  .card h2 { font-size: 21px; font-weight: 800; margin-bottom: 10px; }
+
+  .calc-box { background: #f6f9f7; border: 1px solid var(--border); border-radius: 18px; padding: 20px; margin-top: 14px; }
+  input[type="range"] { width: 100%; accent-color: var(--primary); margin: 12px 0; cursor: pointer; }
+  .calc-results { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+  .calc-stat { background: #ffffff; border: 1px solid var(--border); border-radius: 14px; padding: 14px; text-align: center; }
+  .calc-stat strong { display: block; font-size: 22px; color: var(--primary); }
+  .calc-stat span { font-size: 12px; color: var(--muted); font-weight: 600; }
+
+  label { display: block; font-size: 12.5px; font-weight: 700; color: var(--muted); margin-top: 12px; margin-bottom: 4px; }
+  input[type="text"], input[type="email"], input[type="password"], select {
+    width: 100%; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: 11px;
+    background: #f6f9f7; color: var(--text); font-size: 14px; font-family: inherit;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--primary); background: #ffffff; }
+
+  .btn-primary {
+    width: 100%; padding: 15px; border: none; border-radius: 12px;
+    background: linear-gradient(135deg, #2d6a4f, #40916c); color: #ffffff;
+    font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 16px; font-family: inherit;
+  }
+  .btn-secondary {
+    width: 100%; padding: 12px; border: 1.5px solid var(--border); border-radius: 12px;
+    background: #ffffff; color: var(--text); font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-top: 10px; font-family: inherit;
+  }
+
+  .qr-box { text-align: center; background: #f6f9f7; border: 1.5px solid var(--primary); border-radius: 18px; padding: 18px; margin: 16px 0; }
+  .qr-box img { width: 170px; height: 170px; border-radius: 10px; background: #ffffff; padding: 8px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="logo"><div class="logo-icon">L</div> LOIAL.SPACE</a>
+  <a href="/" class="btn-back">← Înapoi la pagina principală</a>
+</header>
+
+<div class="container">
+  <div class="hero-amb">
+    <div class="pill-gold">Program de Parteneriat & Venit Recurent</div>
+    <h1>Construiește-ți un venit lunar recomandând Loial afacerilor locale</h1>
+    <p>
+      Indiferent dacă ești contabil, creator de site-uri, agent de vânzări, student sau client fidel, poți ajuta cafenelele, saloanele, service-urile auto și magazinele să își fidelizeze clienții — iar tu câștigi lună de lună pentru a-ți plăti mai ușor rata la mașină, chiria, facultatea sau facturile.
+    </p>
+    <a href="#contAmbasador" class="btn-gold-cta">Creează-ți contul de Ambasador acum →</a>
+  </div>
+
+  <div class="grid-3">
+    <div class="tier-card">
+      <span class="tier-tag">Nivel 1 • 1 – 25 firme active</span>
+      <h3>Ambasador Loial</h3>
+      <div class="tier-price">20 EUR + 5 EUR/lună</div>
+      <p>Primești <strong>20 EUR</strong> în prima lună pentru fiecare firmă plătitoare adusă, apoi <strong>5 EUR lună de lună</strong> per firmă, cât timp aceasta folosește Loial ProBusiness.</p>
+    </div>
+
+    <div class="tier-card highlight">
+      <span class="tier-tag">Nivel 2 • 26 – 50 firme active</span>
+      <h3>Ambasador Manager</h3>
+      <div class="tier-price">20 EUR + 10 EUR/lună</div>
+      <p>La peste 25 de firme active urci automat la rangul de <strong>Ambasador Manager</strong> și primești <strong>10 EUR/lună per firmă</strong> (plus 20 EUR în prima lună pentru fiecare firmă nouă).</p>
+    </div>
+
+    <div class="tier-card">
+      <span class="tier-tag">Nivel 3 • 51+ firme active</span>
+      <h3>Ambasador Senior 50+</h3>
+      <div class="tier-price">20 EUR + 15 EUR/lună</div>
+      <p>La peste 50 de firme active primești <strong>15 EUR lună de lună</strong> pentru fiecare firmă plătitoare din portofoliul tău, plus <strong>20 EUR</strong> la fiecare activare nouă.</p>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div>
+      <div class="card">
+        <h2>Calculator de venituri lunare</h2>
+        <p style="font-size:13.5px;color:var(--muted);">Mută cursorul pentru a vedea cât câștigi în funcție de numărul de firme active aduse:</p>
+        <div class="calc-box">
+          <div style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;">
+            <span>Firme plătitoare aduse:</span>
+            <span id="calcCountLabel" style="color:var(--primary);">20 firme</span>
+          </div>
+          <input type="range" id="bizSlider" min="1" max="80" value="20" oninput="updateCalc()">
+          <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:8px;">
+            Rang atins: <span id="calcRankLabel">Ambasador Loial (5 EUR/lună/firmă)</span>
+          </div>
+          <div class="calc-results">
+            <div class="calc-stat">
+              <strong id="calcMonth1">400 EUR</strong>
+              <span>Bonus total activări (Luna 1)</span>
+            </div>
+            <div class="calc-stat">
+              <strong id="calcRecurring">100 EUR / lună</strong>
+              <span>Venit recurent lunar (Luna 2+)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>De ce este ușor de recomandat?</h2>
+        <p style="font-size:14px;color:var(--muted);margin-bottom:10px;">
+          • <strong>Orice firmă începe 100% GRATUIT</strong> până la primii 50 de clienți, fără card bancar și fără obligații.
+        </p>
+        <p style="font-size:14px;color:var(--muted);margin-bottom:10px;">
+          • <strong>Plăți lunare transparente prin Wise Business / IBAN:</strong> îți setezi contul direct în panoul tău și primești comisioanele lunar.
+        </p>
+        <p style="font-size:14px;color:var(--muted);">
+          • <strong>Tu arăți doar codul QR sau trimiți link-ul:</strong> patronul își face cardul în 3 minute, iar sistemul îl leagă automat de contul tău.
+        </p>
+      </div>
+    </div>
+
+    <div class="card" id="contAmbasador">
+      <div id="enrollPanel">
+        <span class="tier-tag">Cont Gratuit Partener</span>
+        <h2>Creează-ți sau deschide contul de Ambasador</h2>
+        <p style="font-size:13.5px;color:var(--muted);margin-bottom:10px;">
+          Completează datele de mai jos pentru a genera instant link-ul și codul tău QR de Ambasador:
+        </p>
+        <form id="ambForm">
+          <label>Nume complet</label>
+          <input type="text" id="ambName" required placeholder="Ex: Andrei Popescu">
+
+          <label>Email</label>
+          <input type="email" id="ambEmail" required placeholder="nume@email.ro">
+
+          <label>Telefon (opțional)</label>
+          <input type="text" id="ambPhone" placeholder="07xx xxx xxx">
+
+          <label>Parolă cont</label>
+          <input type="password" id="ambPassword" required minlength="6" placeholder="Minim 6 caractere">
+
+          <label>Cum dorești să primești plățile lunare?</label>
+          <select id="ambMethod">
+            <option value="wise">Wise Business / Cont Wise (Email sau @wisetag)</option>
+            <option value="iban">Transfer Bancar (IBAN EUR / RON)</option>
+            <option value="revolut">Revolut (@tag sau Telefon)</option>
+          </select>
+
+          <label>Detalii plată (Email Wise / IBAN / Revolut)</label>
+          <input type="text" id="ambDetails" required placeholder="Ex: email@wise.com sau RO49AAAA...">
+
+          <button type="submit" class="btn-primary" id="ambSubmitBtn">Activează contul de Ambasador →</button>
+        </form>
+      </div>
+
+      <div id="dashboardPanel" class="hidden">
+        <span class="tier-tag" id="dashRankBadge">Rang: Ambasador</span>
+        <h2 id="dashWelcome">Panou Ambasador</h2>
+        <p style="font-size:13.5px;color:var(--muted);" id="dashEmailLabel"></p>
+
+        <div class="calc-results">
+          <div class="calc-stat">
+            <strong id="dashActiveBiz">0 firme</strong>
+            <span>Firme plătitoare active</span>
+          </div>
+          <div class="calc-stat">
+            <strong id="dashMonthlyRate">5 EUR / lună</strong>
+            <span>Tarif lunar per firmă</span>
+          </div>
+        </div>
+
+        <div class="qr-box">
+          <p style="font-size:13px;font-weight:700;margin-bottom:8px;">Codul tău QR de Ambasador (arată-l patronilor):</p>
+          <img id="dashQrImg" src="" alt="QR Ambasador">
+          <p style="font-size:12px;color:var(--muted);margin-top:6px;">Cod partener: <strong id="dashRefCode"></strong></p>
+        </div>
+
+        <label>Link-ul tău unic de recomandare (trimite-l pe WhatsApp / Email):</label>
+        <input type="text" id="dashRefUrl" readonly style="font-weight:700;color:var(--primary);">
+        <button type="button" class="btn-primary" id="copyBtn" onclick="copyRefUrl()">📋 Copiază link-ul de Ambasador</button>
+        <button type="button" class="btn-secondary" onclick="logoutAmb()">Ieșire / Schimbă contul</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function updateCalc() {
+    const n = parseInt(document.getElementById('bizSlider').value) || 1;
+    document.getElementById('calcCountLabel').textContent = n + (n === 1 ? ' firmă' : ' firme');
+    let rate = 5;
+    let rank = 'Ambasador Loial (5 EUR/lună/firmă)';
+    if (n >= 51) {
+      rate = 15;
+      rank = 'Ambasador Senior 50+ (15 EUR/lună/firmă)';
+    } else if (n >= 26) {
+      rate = 10;
+      rank = 'Ambasador Manager (10 EUR/lună/firmă)';
+    }
+    document.getElementById('calcRankLabel').textContent = rank;
+    document.getElementById('calcMonth1').textContent = (n * 20) + ' EUR';
+    document.getElementById('calcRecurring').textContent = (n * rate) + ' EUR / lună';
+  }
+  updateCalc();
+
+  const savedAmb = JSON.parse(localStorage.getItem('loial_ambassador_session') || 'null');
+  if (savedAmb && savedAmb.email) {
+    renderAmbDashboard(savedAmb);
+    refreshAmbData(savedAmb);
+  }
+
+  document.getElementById('ambForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('ambSubmitBtn');
+    btn.textContent = 'Se activează contul...';
+    btn.disabled = true;
+
+    const payload = {
+      name: document.getElementById('ambName').value.trim(),
+      email: document.getElementById('ambEmail').value.trim(),
+      phone: document.getElementById('ambPhone').value.trim(),
+      password: document.getElementById('ambPassword').value,
+      payout_method: document.getElementById('ambMethod').value,
+      payout_details: document.getElementById('ambDetails').value.trim()
+    };
+
+    try {
+      const res = await fetch('/api/ambassador/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('loial_ambassador_session', JSON.stringify(data));
+        renderAmbDashboard(data);
+      }
+    } catch (err) {}
+    btn.textContent = 'Activează contul de Ambasador →';
+    btn.disabled = false;
+  };
+
+  async function refreshAmbData(amb) {
+    try {
+      const res = await fetch('/api/ambassador/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: amb.name, email: amb.email, payout_method: amb.payout_method || 'wise', payout_details: amb.payout_details || '' })
+      });
+      if (res.ok) {
+        const fresh = await res.json();
+        localStorage.setItem('loial_ambassador_session', JSON.stringify(fresh));
+        renderAmbDashboard(fresh);
+      }
+    } catch (e) {}
+  }
+
+  function renderAmbDashboard(data) {
+    document.getElementById('enrollPanel').classList.add('hidden');
+    document.getElementById('dashboardPanel').classList.remove('hidden');
+    document.getElementById('dashRankBadge').textContent = 'Rang: ' + data.rank;
+    document.getElementById('dashWelcome').textContent = 'Salut, ' + data.name + '!';
+    document.getElementById('dashEmailLabel').textContent = `${data.email} • Plată prin: ${(data.payout_method || 'wise').toUpperCase()} (${data.payout_details || 'nesetat'})`;
+    document.getElementById('dashActiveBiz').textContent = data.active_businesses + ' firme';
+    document.getElementById('dashMonthlyRate').textContent = data.monthly_rate + ' EUR / lună';
+    document.getElementById('dashQrImg').src = data.qr_image;
+    document.getElementById('dashRefCode').textContent = data.ref_code;
+    document.getElementById('dashRefUrl').value = data.referral_url;
+  }
+
+  function copyRefUrl() {
+    const val = document.getElementById('dashRefUrl').value;
+    navigator.clipboard.writeText(val).then(() => {
+      const btn = document.getElementById('copyBtn');
+      btn.textContent = '✓ Link copiat! Trimite-l pe WhatsApp sau Email';
+      setTimeout(() => { btn.textContent = '📋 Copiază link-ul de Ambasador'; }, 2500);
+    });
+  }
+
+  function logoutAmb() {
+    localStorage.removeItem('loial_ambassador_session');
+    document.getElementById('dashboardPanel').classList.add('hidden');
+    document.getElementById('enrollPanel').classList.remove('hidden');
+  }
+</script>
+</body>
+</html>
