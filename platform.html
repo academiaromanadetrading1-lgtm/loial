@@ -136,7 +136,7 @@
         </div>
         <p id="rolesStatus" class="role-caption">Se verifică identitățile disponibile...</p>
         <div class="profile-actions">
-          <button id="rolesAppleWallet" class="btn-secondary" onclick="saveAmbassadorWallet('apple')" disabled>Apple Wallet</button>
+          <button id="rolesAppleWallet" class="btn-secondary" onclick="saveAmbassadorWallet('apple')" disabled style="display:none">Apple Wallet</button>
           <button id="rolesGoogleWallet" class="btn-secondary" onclick="saveAmbassadorWallet('google')" disabled>Google Wallet</button>
         </div>
       </div>
@@ -399,7 +399,7 @@
       document.getElementById('rolesGoogleWallet').disabled=
         !(verifiedAmbassador&&premiumWalletReady.google_ambassador_ready);
       if(!premiumWalletReady.apple_ready&&!premiumWalletReady.google_ambassador_ready)
-        document.getElementById('rolesStatus').textContent+=' Emiterea Apple/Google Wallet va fi disponibilă după configurarea certificatelor.';
+        document.getElementById('rolesStatus').textContent+=' Google Wallet va fi disponibil după configurarea emitentului Loial.';
     }catch(e){document.getElementById('rolesStatus').textContent=e.message;}
   }
 
