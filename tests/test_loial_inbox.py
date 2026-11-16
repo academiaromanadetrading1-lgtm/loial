@@ -194,3 +194,35 @@ def test_invalid_wallet_access_rejected(env):
     client, _, _, _, _, _, _, _ = env
     assert client.get("/api/loial-inbox/me").status_code == 401
     assert client.get("/api/loial-inbox/me",headers={"X-Loial-Wallet-Token":"A"*43}).status_code == 401
+
+
+def test_resending_same_request_does_not_duplicate_messages(env):
+    client, _, _, _, _, tokens, boss, wallet = env
+    payload={"subject":"Revizie","text":"Program nou la atelier",
+             "audience":"all","idempotency_key":"test-idempotent-001"}
+    a=client.post("/api/loial-inbox/send",headers=boss("boss1@example.test"),json=payload)
+    b=client.post("/api/loial-inbox/send",headers=boss("boss1@example.test"),json=payload)
+    assert a.status_code==200
+    assert b.status_code==200
+    assert b.json()["status"]=="already_delivered"
+    assert a.json()["message_id"]==b.json()["message_id"]
+    entries=client.get("/api/loial-inbox/me",headers=wallet(tokens[0])).json()["messages"]
+    assert len(entries)==1
+    payload["text"]="Alt mesaj"
+    invalid=client.post("/api/loial-inbox/send",headers=boss("boss1@example.test"),json=payload)
+    assert invalid.status_code==409
+
+def test_one_targeted_customer_does_not_receive_other_customer_messages(env):
+    client, _, _, _, _, tokens, boss, wallet = env
+    payload={"subject":"Personal","text":"Vino la atelier",
+             "audience":"all","customer_ids":[2]}
+    sent=client.post("/api/loial-inbox/send",headers=boss("boss1@example.test"),json=payload)
+    assert sent.status_code==200
+    assert sent.json()["sent"]==0   # Clientul 2 nu a acceptat ofertele
+    enabled=client.post("/api/loial-inbox/preferences",headers=wallet(tokens[1]),
+                        json={"business_id":1,"enabled":True})
+    assert enabled.status_code==200
+    sent2=client.post("/api/loial-inbox/send",headers=boss("boss1@example.test"),json=payload)
+    assert sent2.json()["sent"]==1
+    assert client.get("/api/loial-inbox/me",headers=wallet(tokens[0])).json()["messages"]==[]
+    assert len(client.get("/api/loial-inbox/me",headers=wallet(tokens[1])).json()["messages"])==1
