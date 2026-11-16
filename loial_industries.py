@@ -33,7 +33,7 @@ PROFILES = {
     "atelier_auto": {
         "label": "Service / atelier auto",
         "units": ["comenzi de reparatie", "ore de manopera", "piese"],
-        "metrics": ["venit pe ora productiva", "marja pe piese", "ocuparea posturilor", "ore facturate", "reveniri"],
+        "metrics": ["venit pe ora productiva", "marja manopera", "marja pe piese", "ocuparea posturilor", "ore facturate", "reveniri"],
         "documents": ["comenzi de reparatie", "ore lucrate si facturate", "facturi piese", "cheltuieli fixe ale atelierului"],
         "questions": ["Cate posturi de lucru ai?", "Cat facturezi pe ora?", "Separi piesele de manopera?", "Ai reveniri sau lucrari in garantie?"],
         "insights": ["servicii profitabile", "timp nefacturat", "rotatia pieselor si reviziile recurente"],
