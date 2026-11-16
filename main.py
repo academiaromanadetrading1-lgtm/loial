@@ -2470,7 +2470,10 @@ def redeem_customer_reward(request: Request, req: RedeemRequest, db: Session = D
     customer.stamps = 0
     customer.last_visit = datetime.now().isoformat()
     from loial_inbox import queue_service_event
-    queue_service_event(db, biz, customer, kind="redeem", event_key=uuid.uuid4().hex)
+    from loial_scans import record_award
+    redeem_key=uuid.uuid4().hex
+    record_award(db,biz.id,customer.id,"redeem:"+redeem_key,"redeem",0)
+    queue_service_event(db, biz, customer, kind="redeem", event_key=redeem_key)
     from loial_wallet_sync import queue_google_refresh
     queue_google_refresh(db,biz.id,customer.wallet_uuid or customer.uuid)
     from loial_apple_updates import mark_customer_pass_changed
