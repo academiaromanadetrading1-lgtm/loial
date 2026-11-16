@@ -282,9 +282,8 @@
     if (!bizId) {
       logout();
     } else {
-      const cacheKey = 'loial_admin_cache_' + bizId;
-      const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
-      if (cached) renderDashboardData(cached);
+      // Evitam persistenta locala a datelor comerciale private si a PIN-urilor.
+      localStorage.removeItem('loial_admin_cache_' + bizId);
       loadDashboard();
     }
   }
@@ -338,7 +337,7 @@
     const res = await authorizedFetch(`/api/biz-full/${bizId}`);
     if (!res.ok) return;
     const data = await res.json();
-    localStorage.setItem('loial_admin_cache_' + bizId, JSON.stringify(data));
+    // Nu pastram date despre clienti sau PIN-uri in localStorage.
     renderDashboardData(data);
   }
 
@@ -520,6 +519,9 @@
   }
    
   async function logout() {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('loial_admin_cache_')) localStorage.removeItem(key);
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('biz_id');
