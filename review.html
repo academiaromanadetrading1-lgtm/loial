@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Părerea ta contează - Loial</title>
-<link href="https://googleapis.com" rel="stylesheet">
+
 <style>
   body { font-family: 'Inter', system-ui, sans-serif; background: #f6f9f7; color: #111f18; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 16px; }
   .box { background: #ffffff; border: 1px solid #dce6e0; border-radius: 24px; text-align: center; padding: 36px; max-width: 400px; width: 100%; box-shadow: 0 20px 40px rgba(17, 31, 24, 0.06); }
@@ -25,45 +25,72 @@
   <div class="stars" id="stars">
     <span class="star" data-r="1">★</span><span class="star" data-r="2">★</span><span class="star" data-r="3">★</span><span class="star" data-r="4">★</span><span class="star" data-r="5">★</span>
   </div>
+  <p>Poți publica o recenzie sinceră pe Google sau trimite feedback privat. Alegerea îți aparține, indiferent de calificativ.</p>
+  <a class="btn hidden" id="publicReview" target="_blank" rel="noopener noreferrer" style="display:none;box-sizing:border-box;text-decoration:none">Lasă o recenzie pe Google</a>
   <div id="feedbackForm" class="hidden">
     <textarea id="msg" rows="3" placeholder="Spune-ne ce putem îmbunătăți pentru data viitoare..."></textarea>
-    <button class="btn" onclick="submitFeedback()">Trimite feedback-ul</button>
+    <button class="btn" id="sendFeedback" onclick="submitFeedback()">Trimite feedback-ul</button>
   </div>
+  <p id="feedbackError" role="alert" class="hidden"></p>
   <p id="thanks" class="hidden" style="color:#2d6a4f;font-weight:700;margin-top:16px;">✓ Mulțumim pentru feedback!</p>
 </div>
 <script>
 const bizId = location.pathname.split('/').pop();
 let rating = 0;
-let googleUrl = null;
-
-fetch('/api/business-public/' + bizId)
-  .then(r => r.json())
+const publicReview = document.getElementById('publicReview');
+const feedbackForm = document.getElementById('feedbackForm');
+const feedbackError = document.getElementById('feedbackError');
+const sendFeedback = document.getElementById('sendFeedback');
+fetch('/api/business-public/' + encodeURIComponent(bizId))
+  .then(r => { if (!r.ok) throw Error('not available'); return r.json(); })
   .then(data => {
-    document.getElementById('bizName').textContent = data.name || 'Afacere Parteneră';
-    googleUrl = data.google_review_url;
+    document.getElementById('bizName').textContent = data.name || 'Afacere parteneră';
+    try {
+      const url = new URL(data.google_review_url);
+      const host = url.hostname.toLowerCase();
+      if (url.protocol === 'https:' && ['google.com','www.google.com','maps.google.com','maps.app.goo.gl','g.page','search.google.com'].includes(host) && !url.username && !url.password) {
+        publicReview.href = url.href;
+        publicReview.style.display = 'inline-block';
+        publicReview.classList.remove('hidden');
+      }
+    } catch (_) {}
+  }).catch(() => {
+    document.getElementById('bizName').textContent = 'Afacere indisponibilă';
   });
-
 document.querySelectorAll('.star').forEach(s => {
-  s.onclick = () => {
-    rating = parseInt(s.dataset.r);
-    document.querySelectorAll('.star').forEach((st, i) => st.classList.toggle('active', i < rating));
-    if (rating >= 4) {
-      if (googleUrl) location.href = googleUrl;
-      else { document.getElementById('thanks').classList.remove('hidden'); document.getElementById('stars').style.display = 'none'; }
-    } else {
-      document.getElementById('feedbackForm').classList.remove('hidden');
-    }
+  s.setAttribute('role','button');
+  s.tabIndex = 0;
+  s.setAttribute('aria-label', s.dataset.r + ' din 5 stele');
+  s.setAttribute('aria-pressed','false');
+  const select = () => {
+    rating = Number(s.dataset.r);
+    document.querySelectorAll('.star').forEach((st,i) => {
+      st.classList.toggle('active',i < rating);
+      st.setAttribute('aria-pressed',String(Number(st.dataset.r) === rating));
+    });
+    feedbackForm.classList.remove('hidden');
   };
+  s.onclick = select;
+  s.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(); } };
 });
-
 async function submitFeedback() {
-  await fetch('/api/private-feedback', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ business_id: parseInt(bizId), rating: rating, message: document.getElementById('msg').value })
-  });
-  document.getElementById('feedbackForm').classList.add('hidden');
-  document.getElementById('thanks').classList.remove('hidden');
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5 || sendFeedback.disabled) return;
+  sendFeedback.disabled = true;
+  feedbackError.classList.add('hidden');
+  try {
+    const response = await fetch('/api/private-feedback', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({business_id:Number(bizId),rating:rating,message:document.getElementById('msg').value})
+    });
+    if (!response.ok) throw Error('request failed');
+    feedbackForm.classList.add('hidden');
+    document.getElementById('thanks').classList.remove('hidden');
+    document.getElementById('stars').style.display = 'none';
+  } catch (_) {
+    feedbackError.textContent = 'Feedbackul nu a fost confirmat. Încearcă din nou.';
+    feedbackError.classList.remove('hidden');
+    sendFeedback.disabled = false;
+  }
 }
 </script>
 <script src="/loial-i18n.js"></script>
