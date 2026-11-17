@@ -558,6 +558,18 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                       ("In acest moment nu am vanzari confirmate." if not sales["sales_lines"]
                        else "Incarcarile confirmate arata venituri de " + str(sales["total_revenue"]) + " " + p.currency + ".") +
                       " Chatul generativ va fi activ dupa configurarea furnizorului AI si a bugetului.")
+        if not active and req.language!="ro":
+            guided={
+                "en":"The generative AI provider is not connected. Your saved profile is available. To calculate profitability, add confirmed sales, variable costs and fixed expenses for the same period. I will not assume missing figures.",
+                "de":"Der generative KI-Anbieter ist nicht verbunden. Ihr gespeichertes Profil ist verfügbar. Für die Rentabilitätsberechnung erfassen Sie bestätigte Umsätze, variable Kosten und Fixkosten für denselben Zeitraum. Fehlende Zahlen werden nicht geschätzt.",
+                "fr":"Le fournisseur d’IA générative n’est pas connecté. Votre profil enregistré est disponible. Pour calculer la rentabilité, ajoutez les ventes confirmées, les coûts variables et les charges fixes de la même période. Les chiffres manquants ne seront pas inventés.",
+                "it":"Il fornitore di IA generativa non è collegato. Il profilo salvato è disponibile. Per calcolare la redditività, aggiungi vendite confermate, costi variabili e costi fissi dello stesso periodo. Non verranno inventati dati mancanti.",
+                "es":"El proveedor de IA generativa no está conectado. Tu perfil guardado está disponible. Para calcular la rentabilidad, añade ventas confirmadas, costes variables y costes fijos del mismo período. No se inventarán cifras que falten.",
+                "nl":"De aanbieder van generatieve AI is niet verbonden. Uw opgeslagen profiel is beschikbaar. Voeg voor de rentabiliteit bevestigde verkopen, variabele kosten en vaste kosten van dezelfde periode toe. Ontbrekende cijfers worden niet verzonnen.",
+                "pl":"Dostawca generatywnej AI nie jest połączony. Zapisany profil jest dostępny. Aby obliczyć rentowność, dodaj potwierdzoną sprzedaż, koszty zmienne i koszty stałe z tego samego okresu. Brakujące wartości nie będą wymyślane.",
+                "hu":"A generatív AI szolgáltató nincs csatlakoztatva. A mentett profil elérhető. A jövedelmezőség kiszámításához add meg az azonos időszak igazolt értékesítéseit, változó és fix költségeit. A hiányzó adatokat nem találom ki."
+            }
+            answer=guided.get(req.language,answer)
         db.add(AIMessage(business_id=biz.id, role="assistant", topic=req.topic,
                          content=answer[:12000], created_at=now()))
         db.commit()
