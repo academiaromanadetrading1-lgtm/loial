@@ -153,3 +153,51 @@ def test_recurring_portfolio_rates_at_26_and_51_verified_merchants():
     assert result["recurring_rate_cents"]==1500
     assert all(x.amount_cents==1500 for x in db.query(
         AmbassadorCommission).all())
+
+
+def test_verified_probusiness_activation_and_renewal():
+    from loial_multilocation import direct_plan
+    db,state=db_fixture()
+    def book_pro(invoice_id,month):
+        inv=invoice(invoice_id,month)
+        inv["amount_paid"]=27000
+        inv["lines"]["data"][0]["price"]["id"]="price_loial_270"
+        result=process_paid_invoice(db,inv,state,db.get(Business,11),Agent,
+            "price_loial_270",PaidMerchantInvoice,AmbassadorCommission,
+            SponsorRelationship,tier,recompute_recurring,expected_cents=27000)
+        db.commit()
+        return result
+    try:
+        assert book_pro("in_pro_first",11)["first"] is True
+        assert book_pro("in_pro_renew",12)["first"] is False
+        assert book_pro("in_pro_renew",12)["duplicate"] is True
+        assert sorted((x.agent_id,x.kind,x.amount_cents) for x in
+                      db.query(AmbassadorCommission).all())==[
+            (1,"sponsor",4000),(2,"activation",8000),(2,"recurring",2000)]
+        row=db.query(PaidMerchantInvoice).filter_by(
+            external_invoice_id="in_pro_renew").one()
+        assert row.review_reason=="stripe_verified_probusiness"
+        assert state.last_paid_invoice=="in_pro_renew"
+        # Move the paid period relative to the test clock, not real billing.
+        state.paid_until=(datetime.now(timezone.utc)+timedelta(days=1)).isoformat()
+        assert direct_plan(db,11,state)=="probusiness"
+        row.refunded=1
+        db.flush()
+        assert direct_plan(db,11,state)!="probusiness"
+    finally:
+        db.close()
+
+
+def test_wrong_customer_and_second_invoice_same_month_do_not_pay():
+    db,state=db_fixture()
+    try:
+        wrong=invoice("in_wrong_customer")
+        wrong["customer"]="cus_other"
+        assert book(db,state,wrong)=={"review":"customer_mismatch"}
+        assert book(db,state,invoice("in_valid"))["credited"]
+        assert book(db,state,invoice("in_same_month"))=={
+            "review":"duplicate_business_billing_month"}
+        assert db.query(PaidMerchantInvoice).count()==1
+        assert db.query(AmbassadorCommission).count()==2
+    finally:
+        db.close()
