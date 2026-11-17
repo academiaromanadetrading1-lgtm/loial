@@ -117,9 +117,10 @@
   <div class="card" id="wiseBillingCard">
     <span class="step-tag">ABONAMENT LOIAL PROBUSINESS</span>
     <h2>67 EUR / lună, fără TVA adăugat</h2>
-    <p style="font-size:13px;color:var(--text-muted)">Plata se efectuează în Wise Business. Abonamentul va fi activat numai după verificarea efectivă a încasării.</p>
+    <p style="font-size:13px;color:var(--text-muted)">Abonamentul se plătește lunar prin Stripe. Accesul se activează după încasarea verificată și poate fi suspendat după 3 zile de neplată.</p>
     <p id="wiseReference" style="font-weight:700;margin-top:10px"></p>
-    <a id="wisePayButton" class="btn-primary" href="#" target="_blank" rel="noopener noreferrer" style="display:none;width:max-content">Plătește abonamentul 67 EUR</a>
+    <button id="stripePayButton" class="btn-primary" type="button" onclick="startStripeCheckout()" style="width:max-content">Activează ProBusiness – 67 EUR/lună</button>
+    <button id="stripePortalButton" class="btn-secondary" type="button" onclick="manageStripeBilling()" style="display:none;width:max-content">Gestionează abonamentul Stripe</button>
     <p id="wisePayHint" style="font-size:12px;color:var(--text-muted)">Linkul de plată Wise este în curs de configurare.</p>
   </div>
   <div id="loialAiEntry" style="background:#fff;border:1px solid #dfeae2;border-radius:15px;padding:16px 20px;margin:0 0 18px;display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;">
@@ -359,7 +360,7 @@
       <div id="adminActivity" aria-live="polite" style="font-size:13px;line-height:1.7"></div>
     </div>
     <div class="card">
-      <h2>1. Firme înscrise & Confirmare Wise (67 EUR/lună, fără TVA adăugat)</h2>
+      <h2>1. Firme înscrise & Abonamente Stripe (67 EUR/lună, fără TVA adăugat)</h2>
       <table>
         <thead>
           <tr><th>Firmă</th><th>Email</th><th>Adusă de</th><th>Clienți</th><th>Plan</th><th>Acțiune</th></tr>
@@ -412,25 +413,34 @@
 
  <script>
   const token = localStorage.getItem('token');
-  async function loadWiseCheckout(){
-    const label=document.getElementById('wiseReference');
+  async function loadStripeSubscription(){
     const hint=document.getElementById('wisePayHint');
-    const button=document.getElementById('wisePayButton');
+    const button=document.getElementById('stripePayButton');
+    const portal=document.getElementById('stripePortalButton');
     try{
-      const response=await authorizedFetch('/api/loial/checkout');
-      if(!response.ok)throw Error('Autentificarea firmei este necesară.');
-      const result=await response.json();
-      label.textContent='Referința firmei pentru identificarea plății: '+result.payment_reference;
-      if(result.available && result.payment_url){
-        button.href=result.payment_url;
-        button.style.display='inline-block';
-        hint.textContent='Include referința în detaliile plății, dacă Wise permite. Activarea se confirmă ulterior de LOIAL.';
-      }else{
-        button.style.display='none';
-        hint.textContent='Linkul de plată Wise Business nu este configurat încă.';
-      }
+      const response=await authorizedFetch('/api/loial-stripe/me');
+      if(!response.ok)throw Error('Autentifică-te în contul firmei.');
+      const data=await response.json();
+      const active=!!data.subscription.active;
+      button.style.display=active?'none':'inline-block';
+      portal.style.display=data.status==='not_started'?'none':'inline-block';
+      hint.textContent=active
+        ?'Abonament activ'+(data.paid_until?' până la '+data.paid_until.slice(0,10):'')+
+          (data.subscription.status==='grace_period'?' • perioada de remediere a plății':'')
+        :'Abonamentul este inactiv. Confirmarea plății se face automat prin Stripe.';
+      document.getElementById('wiseReference').textContent='Status: '+data.status;
     }catch(error){hint.textContent=error.message;}
   }
+  async function stripeLink(path){
+    const response=await authorizedFetch('/api/loial-stripe/'+path,{method:'POST'});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw Error(data.detail||'Stripe indisponibil');
+    if(!/^https:\/\//.test(data.url||''))throw Error('Link Stripe invalid');
+    window.location.assign(data.url);
+  }
+  async function startStripeCheckout(){try{await stripeLink('checkout');}catch(e){alert(e.message);}}
+  async function manageStripeBilling(){try{await stripeLink('portal');}catch(e){alert(e.message);}}
+  loadStripeSubscription();
   function authorizedFetch(url, options = {}) {
     return fetch(url, { ...options, headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token } });
   }
@@ -871,7 +881,7 @@
         <td><strong>${escapeHtml((b.plan||'').toUpperCase())}</strong></td>
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
           <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" onclick="confirmWisePlan(${b.id})" ${b.plan === 'probusiness' ? 'disabled' : ''}>
-            ${b.plan === 'probusiness' ? 'Plată înregistrată' : 'Confirmă Wise (67€)'}
+            ${b.plan === 'probusiness' ? 'Plată înregistrată' : 'Verifică încasarea Stripe'}
           </button>
           <button type="button" class="btn-danger" data-admin-action="deleteBiz" data-id="${Number(b.id)}" data-name="${escapeHtml(b.name)}">🗑️ Șterge</button>
         </td>
