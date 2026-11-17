@@ -41,7 +41,7 @@ def preflight(env=None,stage="production"):
         "Apple Wallet issuance must stay disabled before the first 100 firms")
     add("google_class_id",bool(re.fullmatch(r"[0-9]{6,}\.[A-Za-z0-9._-]+",
         env.get("LOIAL_GOOGLE_LOYALTY_CLASS_ID",""))),
-        "Google Loyalty Class ID configured",severity="blocker" if strict else "warning")
+        "Google Loyalty Class ID configured",severity="warning")
     account_raw=env.get("LOIAL_GOOGLE_WALLET_SERVICE_ACCOUNT_JSON","")
     configured=False
     try:
@@ -51,7 +51,7 @@ def preflight(env=None,stage="production"):
     except (ValueError,TypeError,AttributeError):
         pass
     add("google_issuer",configured,"Google Wallet issuer service account configured",
-        severity="blocker" if strict else "warning")
+        severity="warning")
     add("google_wallet_sync",env.get("LOIAL_GOOGLE_WALLET_SYNC_ENABLED","0")!="1" or configured,
         "Automatic Google card updates require issuer credentials")
     add("no_demo_bootstrap",env.get("LOIAL_DEV_SEED_DATA","0")!="1",
@@ -63,9 +63,8 @@ def preflight(env=None,stage="production"):
     add("credential_rotation_manual",False,
         "Manually verify historical exposed secrets were rotated before deployment",
         severity="manual")
-    add("google_publishing_manual",False,
-        "Verify Google Wallet publishing access approved in the issuer console",
-        severity="manual")
+    add("google_publishing_manual",True,
+        "Google Wallet is deferred; independent PWA is launch target",severity="warning")
     add("backup_restore_manual",False,
         "Back up the existing SQLite database and verify an isolated restore",
         severity="manual")
