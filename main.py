@@ -1893,10 +1893,8 @@ def business_can_enroll_new_customers(db, business_id):
     Existing members can keep their own wallet. The free tier accepts up to
     50 registered customers; Stripe/LOIAL reconciliation controls paid access.
     """
-    from loial_stripe_billing import LoialSubscription, entitlements
-    state=db.query(LoialSubscription).filter(
-        LoialSubscription.business_id==business_id).first()
-    if entitlements(state)["active"]:
+    from loial_stripe_billing import effective_entitlements
+    if effective_entitlements(db,business_id)["active"]:
         return True
     count=db.query(Customer).filter(Customer.business_id==business_id).count()
     return count<50
@@ -2953,14 +2951,19 @@ def admin_super_overview(credentials: HTTPAuthorizationCredentials = Depends(sec
 
     businesses = db.query(BusinessAccount).order_by(BusinessAccount.id.desc()).all()
     biz_list = []
+    from loial_stripe_billing import effective_entitlements
+    from loial_manual_admin import manual_grant
     for b in businesses:
+        access=effective_entitlements(db,b.id)
         c_count = db.query(Customer).filter(Customer.business_id == b.id).count()
         agent = db.query(SalesAgent).filter(SalesAgent.id == b.agent_id).first() if b.agent_id else None
         biz_list.append({
             "id": b.id,
             "name": b.name,
             "email": b.email,
-            "plan": b.plan or "free",
+            "plan": "probusiness" if access["active"] else "free",
+            "manual_grant":manual_grant(db,b.id),
+            "access_status":access["status"],
             "customers_count": c_count,
             "ref_code": getattr(b, "ref_code", "") or "",
             "ambassador_name": agent.name if agent else "Direct",
@@ -3061,47 +3064,108 @@ def admin_super_overview(credentials: HTTPAuthorizationCredentials = Depends(sec
     }
 
 
-@app.post("/api/admin/business/{biz_id}/toggle-pro")
-def admin_toggle_business_pro(biz_id: int, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
-    raise HTTPException(status_code=410, detail="Activarea fara incasare verificata a fost retrasa; foloseste confirmarea Wise.")
-    require_platform_admin(credentials, db)
-    biz = db.query(BusinessAccount).filter(BusinessAccount.id == biz_id).first()
-    if not biz:
-        raise HTTPException(status_code=404, detail="Afacere negăsită")
+class ManualPlanRequest(BaseModel):
+    active: bool
+    reason: str = "Acces acordat manual de administrator"
 
-    current_month = datetime.now().strftime("%Y-%m")
-    if biz.plan == "probusiness":
-        biz.plan = "free"
-        biz.max_customers = 50
-        sale = db.query(Sale).filter(Sale.business_id == biz.id).first()
-        if sale:
-            sale.status = "cancelled"
-    else:
-        biz.plan = "probusiness"
-        biz.max_customers = 999999
-        if biz.agent_id:
-            sale = db.query(Sale).filter(Sale.business_id == biz.id).first()
-            if not sale:
-                db.add(Sale(
-                    agent_id=biz.agent_id,
-                    business_id=biz.id,
-                    business_name=biz.name,
-                    business_email=biz.email,
-                    plan="probusiness",
-                    amount=67.0,
-                    commission=20.0,
-                    status="completed",
-                    activated_month=current_month,
-                    completed_at=datetime.now().isoformat(),
-                    month=current_month
-                ))
-            else:
-                sale.status = "completed"
-                if not sale.activated_month:
-                    sale.activated_month = current_month
-
+@app.put("/api/admin/business/{biz_id}/manual-plan")
+def admin_manual_plan(biz_id:int,req:ManualPlanRequest,
+                      credentials: HTTPAuthorizationCredentials=Depends(security),
+                      db:Session=Depends(get_db)):
+    actor=require_platform_admin(credentials,db)
+    if actor.role!="admin":
+        raise HTTPException(403,"Doar administratorul platformei")
+    biz=db.get(BusinessAccount,biz_id)
+    if not biz:raise HTTPException(404,"Firma negasita")
+    reason=req.reason.strip()
+    if not 3<=len(reason)<=300:raise HTTPException(422,"Motivul necesita 3–300 caractere")
+    from loial_manual_admin import ManualBusinessGrant, audit, utc_now
+    from loial_stripe_billing import effective_entitlements
+    row=db.get(ManualBusinessGrant,biz_id)
+    if not row:
+        row=ManualBusinessGrant(business_id=biz_id)
+        db.add(row)
+    row.active=int(req.active)
+    row.reason=reason
+    row.actor_id=actor.id
+    row.updated_at=utc_now().isoformat()
+    db.flush()
+    access=effective_entitlements(db,biz_id)
+    biz.plan="probusiness" if access["active"] else "free"
+    biz.max_customers=999999 if access["active"] else 50
+    audit(db,actor,"manual_plan_grant" if req.active else "manual_plan_revoke",biz_id,reason)
     db.commit()
-    return {"status": "updated", "plan": biz.plan}
+    return {"plan":biz.plan,"manual_grant":req.active,"access_status":access["status"]}
+
+@app.post("/api/admin/business/{biz_id}/toggle-pro")
+def retired_toggle(biz_id:int,credentials:HTTPAuthorizationCredentials=Depends(security),
+                   db:Session=Depends(get_db)):
+    require_platform_admin(credentials,db)
+    raise HTTPException(410,"Foloseste accesul manual din panoul de administrare.")
+
+class ManualAmbassadorRequest(BaseModel):
+    email:str
+    wallet_uuid:Optional[str]=None
+
+@app.post("/api/admin/ambassador/invite")
+def admin_invite_ambassador(req:ManualAmbassadorRequest,
+                            credentials:HTTPAuthorizationCredentials=Depends(security),
+                            db:Session=Depends(get_db)):
+    actor=require_platform_admin(credentials,db)
+    if actor.role!="admin":raise HTTPException(403,"Doar administratorul platformei")
+    email=req.email.strip().lower()
+    if len(email)>100 or not re.fullmatch(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+",email):
+        raise HTTPException(422,"Email invalid")
+    if db.query(SalesAgent).filter(func.lower(SalesAgent.email)==email).first():
+        raise HTTPException(409,"Exista deja un cont de ambasador pentru acest email")
+    biz=db.query(BusinessAccount).filter(func.lower(BusinessAccount.email)==email).first()
+    user=db.query(User).filter(func.lower(User.email)==email).first()
+    customer=db.query(Customer).filter(func.lower(Customer.email)==email).first()
+    if req.wallet_uuid:
+        customer=db.query(Customer).filter(
+            (Customer.wallet_uuid==req.wallet_uuid)|(Customer.uuid==req.wallet_uuid)).first()
+        if not customer:raise HTTPException(404,"Card negasit")
+        if customer.email and customer.email.strip().lower()!=email:
+            raise HTTPException(422,"Emailul nu coincide cu cel al titularului")
+    if biz:
+        name,source=biz.name,"business:"+str(biz.id)
+    elif user:
+        name,source=user.name,"user:"+str(user.id)
+    elif customer:
+        name,source=customer.name,"customer:"+str(customer.id)
+    else:
+        raise HTTPException(404,"Membrul nu are un cont sau card LOIAL existent")
+    from loial_manual_admin import issue_invite
+    token=issue_invite(db,email,(name or "Ambasador LOIAL")[:120],source,actor)
+    db.commit()
+    return {"status":"invited","expires_hours":24,
+            "activation_url":"https://loial.space/ambasador.html#activate="+token}
+
+class ManualAmbassadorClaim(BaseModel):
+    activation_token:str
+    password:str
+
+@app.post("/api/ambassador/activate-invite")
+@limiter.limit("5/minute")
+def activate_manual_ambassador(request:Request,req:ManualAmbassadorClaim,
+                               db:Session=Depends(get_db)):
+    if len(req.password)<10 or len(req.password.encode("utf-8"))>72:
+        raise HTTPException(422,"Parola necesita minimum 10 caractere si maximum 72 bytes")
+    from loial_manual_admin import claim_invite
+    row=claim_invite(db,req.activation_token)
+    if not row:raise HTTPException(400,"Invitatie invalida, expirata sau deja folosita")
+    if db.query(SalesAgent).filter(func.lower(SalesAgent.email)==row.email).first():
+        db.rollback()
+        raise HTTPException(409,"Contul de ambasador exista deja; autentifica-te")
+    agent=SalesAgent(name=row.name,email=row.email,password=pwd_context.hash(req.password),
+        role="ambassador",rank="Ambasador",qr_code="LOIAL-"+uuid.uuid4().hex[:12].upper(),
+        status="active",active=True,payout_method="wise",payout_details="",
+        created_at=datetime.now().isoformat())
+    db.add(agent)
+    db.flush()
+    token=create_access_token({"sub":agent.email,"role":"ambassador","agent_id":agent.id})
+    db.commit()
+    return {"access_token":token}
 
 
 class NetworkBonusManualRequest(BaseModel):
@@ -3298,6 +3362,8 @@ install_friend_referrals(app,engine,SessionLocal)
 from loial_revenue_commissions import install_revenue
 install_revenue(app,engine,SessionLocal,SalesAgent,BusinessAccount,User,SECRET_KEY,ALGORITHM,pwd_context)
 # Stripe = subscriptions and automatic access; Wise = ambassador payouts only.
+from loial_manual_admin import GrantBase
+GrantBase.metadata.create_all(bind=engine)
 from loial_stripe_billing import install_stripe_billing
 from loial_revenue_commissions import (PaidMerchantInvoice,AmbassadorCommission,
     SponsorRelationship,tier,recompute_recurring)
