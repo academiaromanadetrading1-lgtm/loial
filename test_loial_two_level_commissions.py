@@ -51,7 +51,7 @@ class DirectRecruiterTests(unittest.TestCase):
             billing_reason="subscription_create",
             subscription=f"sub_business{business_id}",
             payment_intent=f"pi_{invoice_id}",
-            amount_paid=7865, total_excluding_tax=6500,
+            amount_paid=6700, total_excluding_tax=6700,
             created=int(datetime(2026, month, 17,
                 tzinfo=timezone.utc).timestamp()))
 
