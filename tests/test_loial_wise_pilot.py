@@ -104,3 +104,24 @@ def test_spreadsheet_export_formula_injection_is_neutralized():
         assert excel_literal(malicious).startswith("'")
     assert excel_literal("Ambasador LOIAL")=="Ambasador LOIAL"
     assert excel_literal(67.0)==67.0
+
+
+def test_payable_ledger_excludes_refunded_ineligible_and_held(env):
+    from loial_revenue_commissions import payable_commissions
+    credit(env,11,"WISE-APPROVAL-001")
+    credit(env,12,"WISE-APPROVAL-002")
+    assert payable_commissions(env,"2026-11","pending").count()==4
+    refunded=env.query(PaidMerchantInvoice).filter_by(business_id=11).one()
+    refunded.refunded=1
+    env.flush()
+    assert payable_commissions(env,"2026-11","pending").count()==2
+    remaining=payable_commissions(env,"2026-11","pending").all()
+    remaining[0].status="held"
+    remaining[1].status="approved"
+    env.flush()
+    assert payable_commissions(env,"2026-11","pending").count()==0
+    assert payable_commissions(env,"2026-11","approved").count()==1
+    invoice=env.query(PaidMerchantInvoice).filter_by(business_id=12).one()
+    invoice.eligible=0
+    env.flush()
+    assert payable_commissions(env,"2026-11","approved").count()==0
