@@ -71,6 +71,16 @@ header{padding:14px max(24px,calc((100% - 1392px)/2));flex-wrap:wrap}
 .chart-fill{position:absolute;top:0;bottom:0;background:#78ad8d;border-radius:5px}.chart-fill.baseline{background:#9dc8ae}.chart-fill.target{background:#26543c}.chart-fill.negative{background:#4d8065; background-image:repeating-linear-gradient(135deg,transparent,transparent 5px,#ffffff40 5px,#ffffff40 8px)}
 .chart-axis{position:absolute;top:0;bottom:0;width:1px;background:#a5baac}
 @media(max-width:760px){.chat-card .bubble.rich-answer{padding:12px;max-width:100%;width:100%}.chat-table-wrap th,.chat-table-wrap td{padding:8px;font-size:12px}.chat-chart{padding:10px}}
+/* Mirror the actual wallet inbox message card, including its typography. */
+.campaign-wallet-preview{max-width:390px;margin:16px auto 12px;padding:14px;background:#eef1ee;border:1px solid #dbe5de;border-radius:20px;color:#19251e}
+.campaign-wallet-preview .wallet-caption{font:700 12px/1.5 system-ui,-apple-system,Arial;color:#20573c;margin:0 0 9px}
+.campaign-wallet-preview .wallet-panel{background:white;border:1px solid #dbe5de;border-radius:17px;padding:19px;font:15px/1.5 system-ui,-apple-system,Arial}
+.campaign-wallet-preview .wallet-heading{font:700 1.5em/1.5 system-ui,-apple-system,Arial;margin:.83em 0;color:#19251e}
+.campaign-wallet-preview .wallet-message{margin-top:8px;border:1px solid #dde5dc;background:#f9faf8;border-radius:13px;padding:14px;font:12px/1.5 system-ui,-apple-system,Arial;color:#657368;overflow-wrap:anywhere}
+.campaign-wallet-preview .wallet-message strong{display:block;font-weight:700}
+.campaign-wallet-preview .wallet-message p{font:inherit;color:inherit;margin:1em 0;white-space:normal}
+.campaign-wallet-preview .wallet-note{font:12px/1.5 system-ui,-apple-system,Arial;color:#54655b;margin:9px 0 0}
+.campaign-wallet-preview[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -235,6 +245,17 @@ Ex.: Revizie auto;1;220;65"></textarea>
 <button class="ghost" id="draftCampaign">Propunere cu AI</button>
 <button class="ghost" id="previewAudience">Vezi destinatarii</button>
 </div>
+<section id="walletMessagePreview" class="campaign-wallet-preview" aria-label="Previzualizare mesaj" hidden>
+  <div class="wallet-caption" id="walletPreviewCaption">Așa vede clientul mesajul</div>
+  <div class="wallet-panel">
+    <div class="wallet-heading" id="walletPreviewHeading">Mesaje primite în Loial</div>
+    <article class="wallet-message" aria-live="polite">
+      <strong id="walletPreviewTitle" data-no-translate></strong>
+      <p id="walletPreviewBody" data-no-translate></p>
+    </article>
+  </div>
+  <p class="wallet-note" id="walletPreviewNote">Previzualizare • Nu trimite niciun mesaj.</p>
+</section>
 <button id="sendCampaign" style="width:100%;margin-top:9px">Trimite acum în Loial</button>
 <div class="report" id="campaignPreview" style="margin-top:11px"></div>
 <p class="tiny">Mesajul apare în portofelul Loial al destinatarilor eligibili. Nu se folosește emailul. Clientul poate opri ofertele din preferințele portofelului.</p>
@@ -687,6 +708,7 @@ $('useTemplate').onclick=async()=>{
     const x=await api('/message-templates/'+$('template').value+'/preview');
     $('subject').value=x.subject;
     $('offer').value=x.text;
+    renderWalletMessagePreview();
     $('campaignPreview').textContent='Mesaj pregătit pentru Loial. Îl poți edita înainte de trimitere.';
   }catch(e){status(e.message,true);}
 };
@@ -730,6 +752,7 @@ $('draftCampaign').onclick=async()=>{
     currentCampaignId=r.id;
     $('subject').value=r.subject;
     $('offer').value=r.text;
+    renderWalletMessagePreview();
     $('campaignPreview').textContent=r.generated_by_ai
       ?'Propunere creată cu Loial AI. Verifică oferta și apasă Trimite acum în Loial.'
       :'Șablon pregătit. Poți modifica textul și îl poți trimite direct în Loial.';
@@ -848,6 +871,29 @@ document.querySelectorAll('[data-export]').forEach(button=>button.onclick=async(
     setTimeout(()=>URL.revokeObjectURL(href),5000);
   }catch(e){const feedback=$('exportFeedback');feedback.hidden=false;feedback.textContent=e.message;}
 });
+const walletPreviewCopy={
+  ro:['Așa vede clientul mesajul','Mesaje primite în Loial','Previzualizare • Nu trimite niciun mesaj.'],
+  en:['How the customer sees the message','Messages received in Loial','Preview • This does not send the message.'],
+  de:['So sieht der Kunde die Nachricht','Nachrichten in Loial','Vorschau • Keine Nachricht wird gesendet.'],
+  fr:['Voici ce que voit le client','Messages reçus dans Loial','Aperçu • Aucun message n’est envoyé.'],
+  it:['Come il cliente vede il messaggio','Messaggi ricevuti in Loial','Anteprima • Nessun messaggio viene inviato.'],
+  es:['Así ve el cliente el mensaje','Mensajes recibidos en Loial','Vista previa • No se envía ningún mensaje.'],
+  nl:['Zo ziet de klant het bericht','Ontvangen berichten in Loial','Voorbeeld • Er wordt geen bericht verzonden.'],
+  pl:['Tak klient widzi wiadomość','Wiadomości odebrane w Loial','Podgląd • Wiadomość nie jest wysyłana.'],
+  hu:['Így látja az ügyfél az üzenetet','A Loialban kapott üzenetek','Előnézet • Nem küld üzenetet.']
+};
+function renderWalletMessagePreview(){
+  const title=$('subject').value.trim(),body=$('offer').value.trim();
+  const preview=$('walletMessagePreview');
+  preview.hidden=!title&&!body;
+  $('walletPreviewTitle').textContent=title;
+  $('walletPreviewBody').textContent=body;
+  const copy=walletPreviewCopy[language()]||walletPreviewCopy.ro;
+  for(const [id,t] of [['walletPreviewCaption',copy[0]],['walletPreviewHeading',copy[1]],['walletPreviewNote',copy[2]]])$(id).textContent=t;
+}
+for(const id of ['subject','offer'])$(id).addEventListener('input',renderWalletMessagePreview);
+document.addEventListener('loial:language',renderWalletMessagePreview);
+renderWalletMessagePreview();
 init();
 </script>
 </body>
