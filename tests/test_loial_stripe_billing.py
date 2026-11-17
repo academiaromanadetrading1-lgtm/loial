@@ -119,3 +119,37 @@ def test_wrong_subscription_fails_closed():
     wrong["subscription"]="sub_another"
     assert book(db,state,wrong)=={"review":"subscription_mismatch"}
     assert db.query(AmbassadorCommission).count()==0
+
+
+def test_recurring_portfolio_rates_at_26_and_51_verified_merchants():
+    db,state=db_fixture()
+    from loial_stripe_billing import utc_iso, now_utc
+    stamp=utc_iso(now_utc())
+    for firm_id in range(100,151):
+        db.add(PaidMerchantInvoice(
+            external_invoice_id=f"in_test_tier_{firm_id}",
+            business_id=firm_id,agent_id=2,payment_intent_id=None,
+            subscription_id="sub_tier",provider_customer_id="cus_tier",
+            currency="eur",gross_paid_cents=6700,net_revenue_cents=6700,
+            eligible=1,review_reason="",refunded=0,paid_at=stamp,
+            period="2026-11",created_at=stamp))
+        db.flush()
+        invoice=db.query(PaidMerchantInvoice).filter(
+            PaidMerchantInvoice.external_invoice_id==f"in_test_tier_{firm_id}").one()
+        db.add(AmbassadorCommission(
+            invoice_id=invoice.id,agent_id=2,kind="recurring",
+            amount_cents=500,period="2026-11",
+            status="pending",created_at=stamp))
+        if firm_id==125:
+            db.flush()
+            result=recompute_recurring(db,Agent,"2026-11",2)
+            assert result["active_firms"]==26
+            assert result["recurring_rate_cents"]==1000
+            assert all(x.amount_cents==1000 for x in db.query(
+                AmbassadorCommission).all())
+    db.flush()
+    result=recompute_recurring(db,Agent,"2026-11",2)
+    assert result["active_firms"]==51
+    assert result["recurring_rate_cents"]==1500
+    assert all(x.amount_cents==1500 for x in db.query(
+        AmbassadorCommission).all())
