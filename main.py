@@ -1844,6 +1844,21 @@ def get_business_public(business_id: int, db: Session = Depends(get_db)):
 def join_qr_page(business_id: int):
     return FileResponse("join.html")
 
+def business_can_enroll_new_customers(db, business_id):
+    """Public QR enrollments must respect the PAID subscription, not plan labels.
+
+    Existing members can keep their own wallet. The free tier accepts up to
+    50 registered customers; Stripe/LOIAL reconciliation controls paid access.
+    """
+    from loial_stripe_billing import LoialSubscription, entitlements
+    state=db.query(LoialSubscription).filter(
+        LoialSubscription.business_id==business_id).first()
+    if entitlements(state)["active"]:
+        return True
+    count=db.query(Customer).filter(Customer.business_id==business_id).count()
+    return count<50
+
+
 class QREnrollRequest(BaseModel):
     business_id: int
     name: str
@@ -1855,8 +1870,7 @@ def qr_enroll(req: QREnrollRequest, db: Session = Depends(get_db)):
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Business not found")
-    count = db.query(Customer).filter(Customer.business_id == req.business_id).count()
-    if biz.plan == "free" and count >= (biz.max_customers or 50):
+    if not business_can_enroll_new_customers(db,req.business_id):
         raise HTTPException(status_code=403, detail="LIMIT_REACHED")
     new_uuid = str(uuid.uuid4())[:8]
     customer = Customer(
@@ -2503,6 +2517,11 @@ def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db
         except ValueError as exc:
             raise HTTPException(status_code=422,detail=str(exc))
         return {"status": "exists", "inbox_access": verified_token}
+
+    # A new card for this merchant counts toward the free-tier limit even
+    # when the customer already holds a LOIAL wallet elsewhere.
+    if not business_can_enroll_new_customers(db,req.business_id):
+        raise HTTPException(status_code=403,detail="LIMIT_REACHED")
 
     if existing:
         # Nu asocia o firma noua la un portofel existent doar din QR-ul public.
