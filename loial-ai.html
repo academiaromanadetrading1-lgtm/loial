@@ -239,6 +239,8 @@ Ex.: Revizie auto;1;220;65"></textarea>
 <select id="singleRecipient"><option value="">Toți cei din segmentul ales</option></select>
 <label for="productFilter">Produs sau serviciu (opțional)</label>
 <input id="productFilter" maxlength="200" placeholder="Ex.: croissant / revizie auto / spălare">
+<label for="promotionDeadline" id="promotionDeadlineLabel">Promoție valabilă până la (opțional)</label>
+<input id="promotionDeadline" type="date">
 <label for="offer">Textul care ajunge în Loial</label>
 <textarea id="offer" rows="4" maxlength="2000" placeholder="Ex.: Revino pentru o surpriză la următoarea vizită."></textarea>
 <div class="actions">
@@ -705,9 +707,10 @@ $('saveMetric').onclick=async()=>{
 $('useTemplate').onclick=async()=>{
   if(!$('template').value)return;
   try{
-    const x=await api('/message-templates/'+$('template').value+'/preview?'+new URLSearchParams({product:$('productFilter').value}));
+    const promo=promotionFields();
+    const x=await api('/message-templates/'+$('template').value+'/preview?'+new URLSearchParams(promo));
     $('subject').value=x.subject;
-    $('offer').value=x.text;
+    $('offer').value=campaignBaseText(x.text,promo);
     renderWalletMessagePreview();
     $('campaignPreview').textContent='Mesaj pregătit pentru Loial. Îl poți edita înainte de trimitere.';
   }catch(e){status(e.message,true);}
@@ -746,12 +749,13 @@ $('previewAudience').onclick=async()=>{
 $('draftCampaign').onclick=async()=>{
   $('draftCampaign').disabled=true;
   try{
+    const promo=promotionFields();
     const r=await api('/campaigns',{method:'POST',body:JSON.stringify({
       objective:$('objective').value||'Informarea clienților',
-      audience:$('audience').value,product:$('productFilter').value,offer:$('offer').value})});
+      audience:$('audience').value,...promo,offer:$('offer').value})});
     currentCampaignId=r.id;
     $('subject').value=r.subject;
-    $('offer').value=r.text;
+    $('offer').value=campaignBaseText(r.text,promo);
     renderWalletMessagePreview();
     $('campaignPreview').textContent=r.generated_by_ai
       ?'Propunere creată cu Loial AI. Verifică oferta și apasă Trimite acum în Loial.'
@@ -762,11 +766,11 @@ $('draftCampaign').onclick=async()=>{
 $('sendCampaign').onclick=async()=>{
   const subject=$('subject').value.trim();
   const message=campaignMessageText();
-  if(subject.length<2||$('offer').value.trim().length<2||message.length<2){status('Completează titlul și textul mesajului.',true);return;}
+  if(subject.length<2||message.length<2){status('Completează titlul și textul mesajului.',true);return;}
   $('sendCampaign').disabled=true;
   try{
     const payload={subject,text:message,audience:$('audience').value,
-      product:$('productFilter').value};
+      ...promotionFields()};
     if($('singleRecipient').value)payload.customer_ids=[Number($('singleRecipient').value)];
     const signature=JSON.stringify(payload);
     if(signature!==pendingMessageFingerprint){
@@ -882,14 +886,42 @@ const walletPreviewCopy={
   pl:['Tak klient widzi wiadomość','Wiadomości odebrane w Loial','Podgląd • Wiadomość nie jest wysyłana.'],
   hu:['Így látja az ügyfél az üzenetet','A Loialban kapott üzenetek','Előnézet • Nem küld üzenetet.']
 };
+const promotionCopy={
+  ro:['În promoție: ','Profită de ofertă acum!','Valabilă până la ','Promoție valabilă până la (opțional)'],
+  en:['On promotion: ','Take advantage of the offer now!','Valid until ','Promotion end date (optional)'],
+  de:['Im Angebot: ','Nutze das Angebot jetzt!','Gültig bis ','Angebot gültig bis (optional)'],
+  fr:['En promotion : ','Profitez de l’offre dès maintenant !','Valable jusqu’au ','Fin de la promotion (facultatif)'],
+  it:['In promozione: ','Approfitta subito dell’offerta!','Valida fino al ','Fine promozione (facoltativa)'],
+  es:['En promoción: ','¡Aprovecha la oferta ahora!','Válida hasta el ','Fin de la promoción (opcional)'],
+  nl:['In de aanbieding: ','Profiteer nu van de aanbieding!','Geldig tot ','Einddatum aanbieding (optioneel)'],
+  pl:['W promocji: ','Skorzystaj z oferty już teraz!','Ważna do ','Koniec promocji (opcjonalnie)'],
+  hu:['Akcióban: ','Használd ki az ajánlatot most!','Érvényes eddig: ','Akció vége (opcionális)']
+};
+function promotionFields(){
+  const product=$('productFilter').value.trim();
+  return {product,language:language(),deadline:product?$('promotionDeadline').value:''};
+}
+function promotionFooter(promo){
+  if(!promo.product)return '';
+  const [prefix,action,validity]=promotionCopy[promo.language]||promotionCopy.ro;
+  return [prefix+promo.product+'.',...(promo.deadline?[validity+promo.deadline+'.']:[]),action].join('\n');
+}
+function campaignBaseText(text,promo){
+  const msg=text.trim(),footer=promotionFooter(promo);
+  if(!footer)return msg;
+  if(msg===footer)return '';
+  return msg.endsWith('\n\n'+footer)?msg.slice(0,-footer.length-2).trimEnd():msg;
+}
 function campaignMessageText(){
-  const message=$('offer').value.trim(), product=$('productFilter').value.trim();
-  if(!product||message.toLowerCase().includes(product.toLowerCase()))return message;
-  const suffix='\n\n'+product;
-  return message?Array.from(message).slice(0,2000-Array.from(suffix).length).join('').trimEnd()+suffix:product;
+  const promo=promotionFields(),message=$('offer').value.trim(),footer=promotionFooter(promo);
+  if(!footer)return message;
+  if(message===footer||message.endsWith('\n\n'+footer))return message;
+  return message?Array.from(message).slice(0,2000-Array.from(footer).length-2).join('').trimEnd()+'\n\n'+footer:footer;
 }
 function renderWalletMessagePreview(){
   const title=$('subject').value.trim(),body=campaignMessageText();
+  $('promotionDeadlineLabel').textContent=(promotionCopy[language()]||promotionCopy.ro)[3];
+  $('promotionDeadline').disabled=!$('productFilter').value.trim();
   const preview=$('walletMessagePreview');
   preview.hidden=!title&&!body;
   $('walletPreviewTitle').textContent=title;
@@ -897,7 +929,7 @@ function renderWalletMessagePreview(){
   const copy=walletPreviewCopy[language()]||walletPreviewCopy.ro;
   for(const [id,t] of [['walletPreviewCaption',copy[0]],['walletPreviewHeading',copy[1]],['walletPreviewNote',copy[2]]])$(id).textContent=t;
 }
-for(const id of ['subject','offer','productFilter'])$(id).addEventListener('input',renderWalletMessagePreview);
+for(const id of ['subject','offer','productFilter','promotionDeadline'])$(id).addEventListener('input',renderWalletMessagePreview);
 document.addEventListener('loial:language',renderWalletMessagePreview);
 renderWalletMessagePreview();
 init();
