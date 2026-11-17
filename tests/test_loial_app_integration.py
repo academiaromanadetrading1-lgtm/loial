@@ -454,6 +454,20 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             with main.SessionLocal() as db:
                 assert main.business_can_enroll_new_customers(db,recruited_id)
                 assert db.get(main.BusinessAccount,recruited_id).max_customers==999999
+            # Store the confirmed business profile, then read it in a new request.
+            profile_payload={"sector":"patiserie","description":"Patiserie cu 4 angajati si 120 clienti zilnic.","currency":"EUR"}
+            saved=client.put("/api/loial-ai/profile",json=profile_payload,headers=second_auth)
+            assert saved.status_code==200,saved.text
+            assert saved.json()["status"]=="saved"
+            assert saved.json()["industry"]["key"]=="patiserie"
+            assert saved.json()["currency"]=="EUR"
+            assert saved.json()["description"]==profile_payload["description"]
+            persisted=client.get("/api/loial-ai/context",headers=second_auth).json()
+            assert persisted["industry"]["key"]=="patiserie"
+            assert persisted["description"]==profile_payload["description"]
+            assert persisted["currency"]=="EUR"
+            assert client.put("/api/loial-ai/profile",json=profile_payload,headers=bearer).status_code==402
+            assert client.get("/loial-i18n.js").status_code==200
             assert client.put(manual_url,json={"active":False},headers=admin_headers).status_code==200
             assert client.get("/api/loial-stripe/me",headers=second_auth).json()["subscription"]["active"] is False
             with main.SessionLocal() as db:
