@@ -317,6 +317,16 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert ambassador_status.status_code==200
             assert ambassador_status.json()["sponsored_ambassadors"]==1
             assert ambassador_status.json()["pending_eur"]==0
+            # A mistyped merchant referral must not silently drop ambassador pay.
+            wrong_ref=client.post("/api/register",json={
+                "email":"invalid-merchant-ref@example.invalid",
+                "password":"merchant-password-strong",
+                "business_name":"Referral must be valid",
+                "ref_code":"LOIAL-INVALID999"})
+            assert wrong_ref.status_code==422,wrong_ref.text
+            with main.SessionLocal() as db:
+                assert db.query(main.BusinessAccount).filter(
+                    main.BusinessAccount.email=="invalid-merchant-ref@example.invalid").first() is None
             firm_b=client.post("/api/register",json={
                 "email":"firm-recruited-by-b@example.invalid",
                 "password":"secure-firm-test-password",
