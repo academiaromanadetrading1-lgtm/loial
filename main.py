@@ -1732,6 +1732,7 @@ def health(db: Session = Depends(get_db)):
 
 @app.get("/setup-admin")
 def setup_admin(email: str = "ciprianpop@academiadetrading.llc", db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410, detail="Activarea administratorului prin URL public este dezactivata.")
     user = db.query(User).filter(User.email == email).first()
     if not user:
         user = User(email=email, password=pwd_context.hash("Admin123!"), name="Ciprian Pop", plan="network", role="admin")
