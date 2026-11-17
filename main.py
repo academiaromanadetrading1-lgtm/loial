@@ -2784,6 +2784,23 @@ def get_universal_wallet_profile(wallet_uuid: str, request: Request, db: Session
     }
 
 
+class AmbassadorLoginRequest(BaseModel):
+    email: str
+    password: str
+
+@app.post("/api/ambassador/login")
+def login_loial_ambassador(req: AmbassadorLoginRequest, db: Session = Depends(get_db)):
+    email=sanitize_input(req.email,100).lower()
+    agent=db.query(SalesAgent).filter(SalesAgent.email==email,
+              SalesAgent.active.is_(True)).first()
+    if not agent or not agent.password or not pwd_context.verify(req.password,agent.password):
+        raise HTTPException(status_code=401, detail="Email sau parola incorecta")
+    if agent.status!="active" or agent.role!="ambassador":
+        raise HTTPException(status_code=403, detail="Contul nu este activ")
+    token=create_access_token({"sub":agent.email,"role":"ambassador","agent_id":agent.id})
+    return {"access_token":token,"token_type":"bearer",
+            "name":agent.name,"email":agent.email}
+
 class AmbassadorEnrollRequest(BaseModel):
     name: str
     email: str
@@ -2844,6 +2861,7 @@ def enroll_ambassador(req: AmbassadorEnrollRequest, db: Session = Depends(get_db
         "monthly_rate": tier["monthly_rate"],
         "sponsored_by_another_ambassador":bool(sponsor_link),
         "ambassador_invite_url":"https://loial.space/join.html?ambref="+agent.qr_code,
+        "access_token":create_access_token({"sub":agent.email,"role":"ambassador","agent_id":agent.id}),
         "message": "Contul a fost creat. Pastreaza parola in siguranta."
     }
 
