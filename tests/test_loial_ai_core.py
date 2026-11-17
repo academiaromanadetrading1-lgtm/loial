@@ -485,3 +485,52 @@ def test_provider_charges_unusable_response_and_estimates_missing_usage(monkeypa
     assert usage.output_tokens==2225
     assert abs(usage.cost_eur-0.005578)<1e-10
     assert len(commits)==3
+
+
+def test_retention_campaign_rejects_generated_conflicting_expiry(app_client, monkeypatch):
+    import json
+    import loial_business_ai as ai
+    client, auth = app_client
+    calls = []
+    async def mock(system, question, usage, db, **kwargs):
+        calls.append(json.loads(question))
+        return json.dumps({"subject":"Oferta la revizie","text":"Valabila pana la 20.11.2026 ora 12:35"})
+    monkeypatch.setattr(ai,"ask_model",mock)
+    payload={"objective":"reactivare clienti","audience":"inactive_8_30","product":"Revizie",
+             "terms":"20% reducere","deadline":"2099-11-21","deadline_time":"18:00",
+             "offer":"Oferta veche 20.11.2026 ora 12:35"}
+    response=client.post("/api/loial-ai/campaigns",headers=auth("owner1@test.invalid"),json=payload)
+    assert response.status_code==200,response.text
+    data=response.json()
+    assert data["generated_by_ai"] is False and data["sent"]==0
+    assert "Reactivare" in data["strategy"]
+    assert data["text"].count("2099-11-21 18:00")==1
+    assert "20.11.2026" not in data["text"]
+    assert "20% reducere" in data["text"]
+    assert calls[0]["offer_explicit"]=="20% reducere"
+
+
+def test_retention_campaign_valid_model_copy_and_template(app_client, monkeypatch):
+    import json
+    import loial_business_ai as ai
+    client, auth = app_client
+    async def mock(system, question, usage, db, **kwargs):
+        assert "retenție" in system
+        assert json.loads(question)["strategy"]
+        return json.dumps({"subject":"Revino la atelier","text":"Te așteptăm pentru următoarea revizie."})
+    monkeypatch.setattr(ai,"ask_model",mock)
+    h=auth("owner1@test.invalid")
+    p={"objective":"crestere vanzari","audience":"product_buyers","product":"Revizie",
+       "terms":"Preț promoțional 100 lei","deadline":"2099-12-31","deadline_time":"17:30"}
+    response=client.post("/api/loial-ai/campaigns",headers=h,json=p)
+    assert response.status_code==200,response.text
+    d=response.json()
+    assert d["generated_by_ai"] is True and d["sent"]==0
+    assert d["text"].count("2099-12-31 17:30")==1
+    preview=client.get("/api/loial-ai/message-templates/reactivation/preview",headers=h,
+                       params={k:p[k] for k in ("product","terms","deadline","deadline_time")})
+    assert preview.status_code==200,preview.text
+    assert "Preț promoțional 100 lei" in preview.json()["text"]
+    assert preview.json()["sent"] is False
+    p["terms"]="Valabil până la 20.11.2026"
+    assert client.post("/api/loial-ai/campaigns",headers=h,json=p).status_code==422
