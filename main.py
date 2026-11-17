@@ -1795,7 +1795,8 @@ class QuickRegisterRequest(BaseModel):
 
 
 @app.post("/api/register")
-def quick_register(req: QuickRegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def quick_register(request: Request, req: QuickRegisterRequest, db: Session = Depends(get_db)):
     existing = db.query(BusinessAccount).filter(BusinessAccount.email == req.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email deja înregistrat")
@@ -2814,7 +2815,8 @@ class AmbassadorLoginRequest(BaseModel):
     password: str
 
 @app.post("/api/ambassador/login")
-def login_loial_ambassador(req: AmbassadorLoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login_loial_ambassador(request: Request, req: AmbassadorLoginRequest, db: Session = Depends(get_db)):
     email=sanitize_input(req.email,100).lower()
     agent=db.query(SalesAgent).filter(SalesAgent.email==email,
               SalesAgent.active.is_(True)).first()
@@ -2837,7 +2839,8 @@ class AmbassadorEnrollRequest(BaseModel):
 
 
 @app.post("/api/ambassador/join")
-def enroll_ambassador(req: AmbassadorEnrollRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def enroll_ambassador(request: Request, req: AmbassadorEnrollRequest, db: Session = Depends(get_db)):
     email = sanitize_input(req.email, 100).lower()
     if not email:
         raise HTTPException(status_code=400, detail="Email obligatoriu pentru contul de Ambasador")
