@@ -81,3 +81,22 @@ def test_ai_workspace_has_six_distinct_views_and_preserves_all_tools():
     assert 'data-export="sales.xlsx"' in html
     assert 'document_id:selectedDocument' in html
     assert "api('/exports/summary')" in html
+
+
+def test_favicon_is_public_and_valid_ico():
+    from io import BytesIO
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from PIL import Image
+    from loial_pwa import install_pwa
+
+    app = FastAPI()
+    install_pwa(app)
+    with TestClient(app) as client:
+        response = client.get("/favicon.ico")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/x-icon"
+        assert response.headers["x-content-type-options"] == "nosniff"
+        with Image.open(BytesIO(response.content)) as icon:
+            assert icon.format == "ICO"
+            assert {(16, 16), (32, 32), (48, 48)} <= icon.ico.sizes()
