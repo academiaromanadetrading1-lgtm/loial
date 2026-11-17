@@ -13,9 +13,9 @@ sumele sunt comparabile; daca se declara preturi cu TVA, nu le trata ca venit ne
 Nu transforma lipsa datelor in zero si nu dubla cheltuielile. Nu confunda achizitiile
 cu consumul. O simulare nu modifica registrul firmei. Nu promite cresterea profitului.
 Cand exista suficiente valori sau ipoteze explicite pentru o simulare lunara de
-profitabilitate, include EXACT un bloc fenced JSON la final:
+profitabilitate, include EXACT un bloc fenced JSON la final. Exemplul de sintaxa de mai jos contine numere fictive; NU le folosi ca date sau ipoteze implicite pentru firma analizata. Inlocuieste toate valorile cu cele relevante cazului:
 ```loial-simulation
-{"currency":"RON","basis":"explain period, VAT, provenance and assumptions in reply language","revenue":56160,"variable_cost":18700,"fixed_cost":25800,"target_pct":30,"scenarios":[{"name":"short label","assumption":"specific action and numeric assumptions","revenue_delta":0,"variable_cost_delta":-1750,"fixed_cost_delta":0}]}
+{"currency":"RON","basis":"explain period, VAT, provenance and assumptions in reply language","revenue":100000,"variable_cost":40000,"fixed_cost":30000,"target_pct":20,"scenarios":[{"name":"short label","assumption":"specific action and numeric assumptions","revenue_delta":0,"variable_cost_delta":-1000,"fixed_cost_delta":0}]}
 ```
 In loc de revenue poti furniza transactions (numar lunar) si average_ticket; nu ambele.
 Valorile numerice sunt fara separatori de mii. target_pct este optional si nu se
