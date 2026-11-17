@@ -2889,7 +2889,11 @@ def enroll_ambassador(request: Request, req: AmbassadorEnrollRequest, db: Sessio
         db.add(agent)
         db.flush()
         from loial_revenue_commissions import sponsor_new_ambassador
-        sponsor_new_ambassador(db,agent,req.sponsor_code,SalesAgent)
+        linked_sponsor=sponsor_new_ambassador(db,agent,req.sponsor_code,SalesAgent)
+        if (req.sponsor_code or "").strip() and linked_sponsor is None:
+            db.rollback()
+            raise HTTPException(status_code=422,
+                detail="Cod de invitatie invalid. Verifica linkul ambasadorului.")
         db.commit()
         db.refresh(agent)
     from loial_revenue_commissions import SponsorRelationship
