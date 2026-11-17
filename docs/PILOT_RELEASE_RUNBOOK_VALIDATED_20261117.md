@@ -1,0 +1,51 @@
+# LOIAL — procedura de lansare pilot, 17.11.2026
+
+## Versiune autorizată pentru pregătire (nu deploy automat)
+- CI #519: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44062943251
+- Commit validat: eadbfb2d11f14686d803fef9e87184ef87754c74
+- 176 teste izolate + 1 test integrat FastAPI/SQLite: PASS; 39 secunde.
+- Bază de producție: 727a7fd7b404d471ae441a5e286594653fa02cd3.
+- 50 commituri înainte, 0 în urmă; 27 fișiere schimbate.
+- Acest document este doar procedural; deploy-ul rămâne fixat pe commitul testat, nu pe HEAD.
+- Railway web / production; volum persistent /data; deployment de revenire 7e8d5fec-dd50-4577-9227-9411466eeefd.
+- Tarife: Start 0 EUR/50 carduri/1 locație; Business 67 EUR/lună; ProBusiness 270 EUR/lună/până la 5 locații, ofertă individuală peste 5. Ultimul plan în pregătire. Fiscalitatea trebuie confirmată înainte de facturare.
+- Pilot gratuit: LOIAL_PUBLIC_FREE_PILOT=1; LOIAL_MULTILOCATION_READY=0; fără credențiale Stripe; Apple/Google Wallet neobligatorii. Nu seta variabile în producție înainte de verificare.
+
+## Gate 1 — copie de siguranță reală
+Din terminalul serviciului existent, fără afișarea credențialelor sau datelor clienților:
+```sh
+set -eu
+umask 077
+test "${LOIAL_DATABASE_URL:-sqlite:////data/loial.db}" = "sqlite:////data/loial.db"
+test -f /data/loial.db
+df -h /data
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+mkdir -p /data/backups
+python loial_backup.py --source /data/loial.db --output "/data/backups/prepilot-$STAMP.db"
+python - "/data/backups/prepilot-$STAMP.db" <<'PY'
+import sys, sqlite3, tempfile
+from pathlib import Path
+from loial_backup import backup_database
+with tempfile.TemporaryDirectory() as d:
+    restore=Path(d)/"restore.db"
+    backup_database(sys.argv[1],restore)
+    with sqlite3.connect(restore) as db:
+        assert db.execute("PRAGMA integrity_check").fetchone()==("ok",)
+        assert db.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'").fetchone()[0]>0
+    print("ISOLATED_RESTORE_OK")
+PY
+```
+Nu substitui o copie locală din același volum unei copii externe. Păstrează o copie externă criptată, cu acces limitat. Dacă DB path diferă sau nu există suficient spațiu, oprește fără modificări. Nu trimite baza sau cheile în conversație.
+
+## Gate 2 — operațiuni
+- Confirmare rotație credențiale istorice, verificare preflight fără expunere secrete.
+- Confirmare backup și restore, spațiu disponibil, configurație pilot și oprire facturare.
+- Doar după acceptarea publicării: conectează serviciul existent la commitul eadbfb2d11f14686d803fef9e87184ef87754c74. Nu crea serviciu sau volum nou, nu fuziona main și nu porni Stripe.
+- Verifică health-check, pagina principală, autentificare, card nou și scanare cu conturi de test separate, limite gratuite, izolarea între firme.
+- Verifică QR și instalare PWA pe Samsung Android și iPhone când disponibil; nu considera testele CI dovadă de dispozitiv real.
+- Dacă apar erori, oprește pilotul și restaurează versiunea anterioară după evaluarea compatibilității DB; nu suprascrie automat baza activă cu backupul. Evită pierderea tranzacțiilor ulterioare.
+- Documente juridice: identitate operator, adresă/contact, fiscalitate, confidențialitate; fără date inventate.
+- Stripe TEST și validare comercială ulterioară separată.
+
+## Stare
+CI PASS. Backup de producție, restore, rotație, verificare dispozitive și publicare încă neconfirmate. Nicio lansare sau execuție plătită inițiată prin acest document.
