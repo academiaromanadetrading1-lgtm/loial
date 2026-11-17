@@ -2866,7 +2866,7 @@ def enroll_ambassador(req: AmbassadorEnrollRequest, db: Session = Depends(get_db
         "active_businesses": len(sales_list),
         "monthly_rate": tier["monthly_rate"],
         "sponsored_by_another_ambassador":bool(sponsor_link),
-        "ambassador_invite_url":"https://loial.space/join.html?ambref="+agent.qr_code,
+        "ambassador_invite_url":"https://loial.space/ambasador.html?ambref="+agent.qr_code,
         "access_token":create_access_token({"sub":agent.email,"role":"ambassador","agent_id":agent.id}),
         "message": "Contul a fost creat. Pastreaza parola in siguranta."
     }
