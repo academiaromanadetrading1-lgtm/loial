@@ -152,10 +152,14 @@ def process_paid_invoice(db, invoice, state, business, Agent, price_id,
     stamp=utc_iso(now_utc())
     agent=db.query(Agent).filter(Agent.id==business.agent_id,
         Agent.active.is_(True)).first() if business.agent_id else None
+    payment=invoice.get("payment_intent")
+    if isinstance(payment,dict):payment=payment.get("id")
+    if not isinstance(payment,str) or not payment.startswith("pi_") or len(payment)>140:
+        payment=None
     row=PaidMerchantInvoice(
         external_invoice_id=invoice_id,business_id=business.id,
         agent_id=agent.id if agent else None,
-        payment_intent_id=None,subscription_id=state.subscription_id,
+        payment_intent_id=payment,subscription_id=state.subscription_id,
         provider_customer_id=state.customer_id or "",
         currency="eur",gross_paid_cents=expected_cents,
         net_revenue_cents=expected_cents,eligible=1,
@@ -192,6 +196,26 @@ def process_paid_invoice(db, invoice, state, business, Agent, price_id,
     business.plan="probusiness"
     business.max_customers=999999
     return {"credited":True,"first":first,"period":period}
+
+def apply_full_subscription_refund(db, record, Agent, recompute_recurring):
+    """Reverse unpaid commission; never claw back paid money automatically."""
+    from loial_revenue_commissions import reverse_invoice
+    result=reverse_invoice(db,record)
+    if not record or result.get("duplicate"):
+        return result
+    state=db.get(LoialSubscription,record.business_id) if record.business_id else None
+    # An old refund must not cancel a newer independently paid service period.
+    if (state and state.last_paid_invoice==record.external_invoice_id and
+            state.subscription_id==record.subscription_id):
+        state.paid_until=None
+        state.grace_until=None
+        state.status="pending"
+        state.updated_at=utc_iso(now_utc())
+    if record.agent_id:
+        db.flush()
+        recompute_recurring(db,Agent,record.period,record.agent_id)
+    return result
+
 
 def record_payment_failure(state, when=None):
     when=when or now_utc()
@@ -439,22 +463,42 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
             outcome=process_paid_invoice(db,obj,state,business,Agent,
                 price,PaidMerchantInvoice,
                 AmbassadorCommission,SponsorRelationship,tier,recompute_recurring,amount)
-        elif typ in ("credit_note.created","charge.dispute.created"):
-            # Never continue payout on disputed/credited invoices. Partial
-            # credits require manual review; no automatic money clawbacks.
-            from loial_revenue_commissions import reverse_invoice
+        elif typ in ("credit_note.created","charge.dispute.created","charge.refunded"):
             invoice_id=obj.get("invoice")
             if isinstance(invoice_id,dict):invoice_id=invoice_id.get("id")
-            record=(db.query(PaidMerchantInvoice).filter(
-                PaidMerchantInvoice.external_invoice_id==invoice_id).first()
-                if invoice_id else None)
+            payment=obj.get("payment_intent")
+            if isinstance(payment,dict):payment=payment.get("id")
+            query=db.query(PaidMerchantInvoice)
+            if invoice_id:
+                query=query.filter(PaidMerchantInvoice.external_invoice_id==invoice_id)
+                if payment:
+                    from sqlalchemy import or_
+                    query=query.filter(or_(PaidMerchantInvoice.payment_intent_id==payment,
+                                           PaidMerchantInvoice.payment_intent_id.is_(None)))
+            elif payment:
+                query=query.filter(PaidMerchantInvoice.payment_intent_id==payment)
+            else:
+                query=query.filter(False)
+            matches=query.limit(2).all()
+            record=matches[0] if len(matches)==1 else None
             if record:
-                for entry in db.query(AmbassadorCommission).filter(
-                    AmbassadorCommission.invoice_id==record.id).all():
-                    if entry.status in ("pending","approved"):
-                        entry.status="held"
-                record.review_reason="stripe_credit_or_dispute_manual_review"
-                outcome={"held":True,"manual_review":True}
+                full=(typ=="charge.refunded" and obj.get("refunded") is True
+                      and obj.get("currency")=="eur"
+                      and obj.get("amount")==record.gross_paid_cents
+                      and obj.get("amount_refunded")==record.gross_paid_cents)
+                if full:
+                    outcome=apply_full_subscription_refund(db,record,Agent,recompute_recurring)
+                else:
+                    paid_any=False
+                    for entry in db.query(AmbassadorCommission).filter(
+                        AmbassadorCommission.invoice_id==record.id).all():
+                        if entry.status in ("pending","approved"):
+                            entry.status="held"
+                        if entry.status=="paid":paid_any=True
+                    if not record.refunded:
+                        record.review_reason="stripe_credit_or_dispute_manual_review"
+                    outcome={"held":True,"manual_review":True,
+                             "paid_commissions_require_recovery":paid_any}
             else:
                 outcome={"review":"billing_dispute_unmatched"}
         elif typ=="invoice.payment_failed":
