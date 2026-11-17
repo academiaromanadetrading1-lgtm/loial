@@ -61,3 +61,6 @@ Prima publicare (2ebda673-955f-4bb1-b514-7508a496e46d) a rulat efectiv main/0234
 
 ## Preflight producție — 17.11.2026
 Captura operatorului din containerul activ confirmă CHECKS PASSED: True și BLOCKERS: []. Aceasta validează regulile automate ale loial_preflight.py, nu audit complet de securitate. Backup și restore au dovezi separate; revocarea cheii OpenAI anterioare, identitatea juridică, testele autentificate în producție și dispozitivele fizice rămân de confirmat. Nicio modificare de producție necesară pentru acest test.
+
+## Validare post-pilot — 17.11.2026
+Execuția GitHub Actions #520 (44079730202), job 134026871699, commit c533b96e67017f701f82e86158e131305170c05e: 182 teste izolate + 1 test integrare FastAPI, toate PASS; compilare, JavaScript și PWA PASS. Durată afișată 30 secunde. Ramura release/loial-pilot-c533b96 este identică SHA testat. Producția rămâne eadbfb2 până la o aprobare explicită de publicare. Nu activa Stripe. Validarea nu include apeluri API reale, dispozitive fizice sau audit juridic. 
