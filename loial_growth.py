@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from fastapi.responses import HTMLResponse, Response
 from loial_plans import public_catalog
 from loial_seo_locales import COPY, landing, path_for
+from loial_local_seo import install_local_seo, local_paths
 
 ORIGIN = "https://loial.space"
 LANGUAGES = ("ro","en","de","fr","it","es","nl","pl","hu")
@@ -35,7 +36,7 @@ def install_growth(app, industries):
     def sitemap():
         # Only actual, published canonical pages; never advertise speculative translations.
         return Response(sitemap_xml(["/ambasadori","/demo"]+[path_for(lang) for lang in COPY]+
-            ["/solutii/"+x for x in industries]),media_type="application/xml")
+            ["/solutii/"+x for x in industries]+local_paths()),media_type="application/xml")
 
     @app.get("/ambasadori")
     def ambassadors():
@@ -54,3 +55,5 @@ def install_growth(app, industries):
                 return HTMLResponse(landing(locale))
             return localized_page
         app.add_api_route(path_for(lang),make_page(lang),methods=["GET"],name="loial_landing_"+lang)
+
+    install_local_seo(app,page)
