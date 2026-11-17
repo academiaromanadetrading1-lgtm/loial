@@ -61,3 +61,23 @@ def test_admin_dashboard_price_payment_and_export_are_consistent():
     assert "adminActivity" in html
     assert "loadSuperAdmin()" in html
     assert "toggleProPlan(" not in html
+
+
+def test_ai_workspace_has_six_distinct_views_and_preserves_all_tools():
+    import re
+    html=source("loial-ai.html")
+    tabs=re.findall(r'data-workspace="([^"]+)"',html)
+    views=re.findall(r'data-view="([^"]+)"',html)
+    assert tabs==views==["chat","documents","sales","reports","customers","messages"]
+    assert "workspace-view[hidden]{display:none!important}" in html
+    assert "@media(max-width:1050px)" in html
+    assert "@media(max-width:760px)" in html
+    assert '<aside class="right">' not in html
+    for element in ("saveProfile","chat","send","attachment","upload","documentPreview",
+                    "expenseSave","issueReceipt","reportBtn","runBreakEven","showClients",
+                    "sendCampaign","exportFeedback","chatFeedback","aiMode"):
+        assert html.count('id="'+element+'"')==1
+    assert 'data-export="customers.xlsx"' in html
+    assert 'data-export="sales.xlsx"' in html
+    assert 'document_id:selectedDocument' in html
+    assert "api('/exports/summary')" in html
