@@ -297,7 +297,7 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             attacker=client.put(
                 f"/sales/agent/{ambassador_b['id']}/payout",
                 params={"method":"wise","details":"attacker@invalid.test"},
-                headers=other_bearer)
+                headers=user_headers)
             assert attacker.status_code==410,attacker.text
             bad_update=client.put(
                 "/api/loial-revenue/ambassador/wise-details",
