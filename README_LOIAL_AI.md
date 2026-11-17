@@ -1,3 +1,5 @@
+> **Decizia de lansare actuală (17.11.2026):** ProBusiness **67 EUR/lună, fără TVA adăugat în prezent**; încasare și reînnoiri prin **Stripe LOIAL**, comisioane plătite separat prin **Wise Business**. Card PWA direct pe ecranul telefonului, fără dependență Apple/Google Wallet. Secțiunile istorice despre „Google Wallet first” sunt doar pentru context și nu blochează lansarea. Pentru operațiuni vezi [docs/STRIPE_LOIAL_LAUNCH_67_EUR.md](docs/STRIPE_LOIAL_LAUNCH_67_EUR.md).
+
 # Loial AI Business — arhitectură și stadiu
 
 ## Obiectiv comercial
