@@ -351,6 +351,13 @@
       <div class="plan-badge" id="adminMonthBadge">Luna curentă</div>
     </div>
 
+    <div class="card" id="acquisitionPanel">
+      <span class="step-tag">CREȘTERE ORGANICĂ</span><h2>Surse de înscriere</h2>
+      <p id="acquisitionStatus" role="status">Se încarcă...</p>
+      <div id="acquisitionBars"></div>
+      <p style="font-size:12px;color:var(--text-muted)">Date înregistrate de la activarea atribuirii. Conturile nu sunt firme juridice verificate și nu reprezintă abonamente plătite.</p>
+      <button type="button" class="btn-secondary" onclick="loadAcquisition()">Actualizează</button>
+    </div>
     <div class="card" id="googlePilotPanel">
       <span class="step-tag">PILOT PRIMELE 100 DE FIRME</span>
       <h2>Card LOIAL pe ecranul telefonului · Fără Google/Apple Wallet</h2>
@@ -377,7 +384,7 @@
       <div id="adminActivity" aria-live="polite" style="font-size:13px;line-height:1.7"></div>
     </div>
     <div class="card">
-      <h2>1. Firme înscrise & planuri LOIAL (67 EUR/lună, fără TVA adăugat)</h2><p style="font-size:13px;color:var(--text-muted)">Accesul Business acordat manual este gratuit până la retragere și nu generează comisioane. Abonamentele Stripe sunt independente.</p>
+      <h2>1. Firme înscrise & planuri LOIAL</h2><p style="font-size:13px;color:var(--text-muted)">Accesul Business acordat manual este gratuit până la retragere și nu generează comisioane. Abonamentele Stripe sunt independente.</p>
       <table>
         <thead>
           <tr><th>Firmă</th><th>Email</th><th>Adusă de</th><th>Clienți</th><th>Plan</th><th>Acțiune</th></tr>
@@ -887,7 +894,7 @@
   }
 
     async function loadSuperAdmin() {
-    await loadGooglePilot();
+    await Promise.all([loadGooglePilot(),loadAcquisition()]);
     const res = await authorizedFetch('/api/admin/overview');
     if (!res.ok) return;
     const data = await res.json();
@@ -917,7 +924,7 @@
         <td>${Number(b.customers_count)||0}</td>
         <td><strong>${escapeHtml((b.plan||'').toUpperCase())}</strong>${b.manual_grant?'<br><small>Acces manual gratuit</small>':''}</td>
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" data-admin-action="manualPlan" data-id="${Number(b.id)}" data-name="${escapeHtml(b.name)}" data-granted="${b.manual_grant?'1':'0'}">${b.manual_grant?'Retrage ProBusiness manual':'Acordă ProBusiness manual'}</button>
+          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" data-admin-action="manualPlan" data-id="${Number(b.id)}" data-name="${escapeHtml(b.name)}" data-granted="${b.manual_grant?'1':'0'}">${b.manual_grant?'Retrage Business manual':'Acordă Business manual'}</button>
           <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" data-admin-action="inviteAmb" data-email="${escapeHtml(b.email)}">Desemnează ambasador</button>
           <button type="button" class="btn-danger" data-admin-action="deleteBiz" data-id="${Number(b.id)}" data-name="${escapeHtml(b.name)}">🗑️ Șterge</button>
         </td>
@@ -1132,6 +1139,27 @@ async function loadLocations(){
       for(const v of data.caveats){const p=document.createElement('p');p.textContent=v;report.append(p);}
     });
   }catch(err){panel.hidden=true;}
+}
+</script>
+<script>
+async function loadAcquisition(){
+  const status=document.getElementById('acquisitionStatus'),box=document.getElementById('acquisitionBars');
+  if(!status||!box)return;
+  box.replaceChildren();
+  try{
+    const response=await authorizedFetch('/api/admin/pilot-metrics');
+    if(!response.ok)throw Error('Date indisponibile');
+    const d=await response.json();
+    status.textContent=d.tracked_business_accounts+' conturi atribuite · '+d.registered_cards+' carduri · '+d.stamp_operations+' operațiuni de ștampilare';
+    const labels={card:'Card digital',receipt:'Bon digital',poster:'Afiș QR',demo:'Demonstrație',ambassador:'Ambasador',industry:'Pagini SEO',review:'Feedback',direct:'Direct'};
+    for(const [key,n] of Object.entries(d.by_source).sort((a,b)=>b[1]-a[1])){
+      const label=document.createElement('p');label.textContent=(labels[key]||key)+' · '+n;
+      const track=document.createElement('div');track.style.cssText='height:12px;border-radius:8px;background:#e4e9e5;overflow:hidden';
+      const bar=document.createElement('div');bar.style.cssText='height:100%;background:#2d6a4f;border-radius:8px';bar.style.width=(d.tracked_business_accounts?Math.min(100,n/d.tracked_business_accounts*100):0)+'%';
+      track.append(bar);box.append(label,track);
+    }
+    if(!d.tracked_business_accounts)box.textContent='Nu există încă înscrieri atribuite.';
+  }catch(e){status.textContent='Indicatorii nu au putut fi încărcați.';}
 }
 </script>
 </body>
