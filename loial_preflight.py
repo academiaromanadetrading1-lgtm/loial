@@ -67,7 +67,14 @@ def preflight(env=None,stage="production"):
     public_free_pilot=env.get("LOIAL_PUBLIC_FREE_PILOT","0")=="1"
     # Free-only public launch can proceed before Stripe credentials exist.
     # Fail closed when credentials are partly set, or live charges requested.
-    stripe_values=(stripe_key,webhook_key,price_id)
+    pro_price_id=env.get("LOIAL_STRIPE_PROBUSINESS_PRICE_ID","")
+    multilocation_ready=env.get("LOIAL_MULTILOCATION_READY","0")=="1"
+    stripe_values=(stripe_key,webhook_key,price_id,pro_price_id)
+    add("pilot_multilocation_disabled",not public_free_pilot or not multilocation_ready,
+        "Free pilot must not activate ProBusiness before paid validation")
+    add("probusiness_price_distinct",not multilocation_ready or (
+        bool(re.fullmatch(r"price_[A-Za-z0-9]{8,}",pro_price_id)) and pro_price_id!=price_id),
+        "ProBusiness requires a separate recurring EUR 270 price ID")
     no_stripe_config=not any(stripe_values)
     if public_free_pilot:
         add("free_pilot_stripe_disabled",no_stripe_config,
@@ -96,6 +103,10 @@ def preflight(env=None,stage="production"):
     add("backup_restore_manual",False,
         "Back up the existing SQLite database and verify an isolated restore",
         severity="manual")
+    add("legal_operator_manual",False,
+        "Verify operator identity, terms, privacy notice and actual contact channel before commercial launch",severity="manual")
+    add("device_validation_manual",False,
+        "Validate PWA installation, scanning and independent business authorization on real devices",severity="manual")
     blockers=[c.key for c in checks if not c.passed and c.severity=="blocker"]
     manual=[c.key for c in checks if c.severity=="manual"]
     return {"stage":stage,"safe_to_deploy_automatically":False,
