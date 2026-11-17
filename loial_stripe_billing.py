@@ -103,7 +103,11 @@ def process_paid_invoice(db, invoice, state, business, Agent, price_id,
     period,covered_until=invoice_period(invoice)
     if not period or not covered_until:
         return {"review":"missing_service_period"}
-    if not invoice.get("subscription") and not state.subscription_id:
+    invoice_sub=invoice.get("subscription")
+    if isinstance(invoice_sub,dict):invoice_sub=invoice_sub.get("id")
+    if invoice_sub and state.subscription_id and invoice_sub!=state.subscription_id:
+        return {"review":"subscription_mismatch"}
+    if not invoice_sub and not state.subscription_id:
         return {"review":"missing_subscription"}
     prior=db.query(PaidMerchantInvoice).filter(
         PaidMerchantInvoice.business_id==business.id,
@@ -212,9 +216,17 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
         if not key.startswith(("sk_test_","sk_live_")) or not price.startswith("price_"):
             raise HTTPException(status_code=503,detail="Stripe LOIAL neconfigurat")
         stripe.api_key=key
+        try:
+            stripe_price=stripe.Price.retrieve(price)
+            if stripe_price.get("unit_amount")!=PRICE_CENTS or \
+               stripe_price.get("currency")!="eur" or \
+               (stripe_price.get("recurring") or {}).get("interval")!="month":
+                raise HTTPException(status_code=503,detail="Pret Stripe incorect pentru LOIAL")
+        except stripe.error.StripeError:
+            raise HTTPException(status_code=502,detail="Configurarea pretului Stripe nu poate fi verificata")
         state=db.query(LoialSubscription).filter(
             LoialSubscription.business_id==biz.id).first()
-        if state and entitlements(state)["active"]:
+        if state and state.status in ("active","past_due") and entitlements(state)["active"]:
             raise HTTPException(status_code=409,detail="Abonament deja activ")
         kwargs={
             "mode":"subscription",
@@ -299,6 +311,8 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
                 state=LoialSubscription(business_id=business.id,status="pending",
                     updated_at=utc_iso(now_utc()))
                 db.add(state)
+            if state.subscription_id and state.subscription_id!=subscription and entitlements(state)["active"]:
+                raise HTTPException(status_code=409,detail="Alt abonament activ asociat firmei")
             state.customer_id=customer
             state.subscription_id=subscription
             state.updated_at=utc_iso(now_utc())
