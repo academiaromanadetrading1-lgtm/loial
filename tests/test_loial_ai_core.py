@@ -99,6 +99,10 @@ def app_client(monkeypatch):
     engine = create_engine("sqlite://", connect_args={"check_same_thread":False},
                            poolclass=StaticPool)
     DB.metadata.create_all(engine)
+    from loial_stripe_billing import BillingBase
+    from loial_manual_admin import GrantBase, ManualBusinessGrant
+    BillingBase.metadata.create_all(engine)
+    GrantBase.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False)
     with factory() as db:
         db.add_all([Biz(id=1, email="owner1@test.invalid", name="Taxi",
@@ -106,7 +110,14 @@ def app_client(monkeypatch):
                     Biz(id=2, email="owner2@test.invalid", name="Garaj",
                         business_type="atelier auto", plan="probusiness"),
                     Biz(id=3, email="free@test.invalid", name="Free",
+                        business_type="patiserie", plan="free"),
+                    Biz(id=4, email="expired@test.invalid", name="Expired",
+                        business_type="patiserie", plan="probusiness"),
+                    Biz(id=5, email="grant@test.invalid", name="Grant",
                         business_type="patiserie", plan="free")])
+        db.add_all([ManualBusinessGrant(business_id=i, active=1, actor_id=1,
+                    reason="isolated test grant", updated_at="2026-11-17T00:00:00Z")
+                    for i in (1,2,5)])
         db.add(Customer(id=1,business_id=1,name="Client Taxi",email="taxi@test.invalid",
                         uuid="w1",wallet_uuid="w1",last_visit="2026-11-10",stamps=1))
         db.add(Customer(id=2,business_id=2,name="Client Garaj",email="garage@test.invalid",
@@ -123,6 +134,8 @@ def app_client(monkeypatch):
 def test_business_scoping_and_premium_entitlement(app_client):
     client, auth = app_client
     assert client.get("/api/loial-ai/context", headers=auth("free@test.invalid")).status_code == 403
+    assert client.get("/api/loial-ai/context", headers=auth("expired@test.invalid")).status_code == 403
+    assert client.get("/api/loial-ai/context", headers=auth("grant@test.invalid")).status_code == 200
     assert client.get("/api/loial-ai/context", headers=auth("owner1@test.invalid", "admin")).status_code == 403
     assert client.get("/api/loial-ai/context").status_code == 401
     assert client.get("/api/loial-ai/context",headers=auth("owner1@test.invalid")).json()["industry"]["key"] == "rideshare"
