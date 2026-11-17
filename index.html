@@ -131,7 +131,7 @@
   .toggle-wrapper { text-align: center; margin-top: 28px; }
 
   /* PRICING */
-  .pricing-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 28px; max-width: 920px; margin: 0 auto; }
+  .pricing-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 18px; max-width: 1180px; margin: 0 auto; }
   @media (max-width: 768px) { .pricing-grid { grid-template-columns: 1fr; } }
 
   .price-card { background: #ffffff; border: 1px solid var(--border); border-radius: 24px; padding: 34px; display: flex; flex-direction: column; justify-content: space-between; position: relative; }
@@ -306,7 +306,7 @@
 <section class="section-wrap" id="preturi">
   <div class="section-header">
     <h2>Prețuri simple și transparente</h2>
-    <p>Începi gratuit fără card bancar. Treci la ProBusiness doar când afacerea ta crește și depășește primii 50 de clienți fideli.</p>
+    <p>Începi gratuit fără card bancar. Alege Business pentru o locație sau ProBusiness pentru până la cinci locații.</p>
   </div>
 
   <div class="pricing-grid">
@@ -330,20 +330,28 @@
     <div class="price-card featured">
       <div class="popular-tag">RECOMANDAT PENTRU AFACERI ACTIVE</div>
       <div>
-        <div class="plan-name">ProBusiness</div>
-        <div class="plan-desc">Toată puterea de fidelizare, control pe echipă și creștere fără limite.</div>
+        <div class="plan-name">Business</div>
+        <div class="plan-desc">Fidelizare, CRM și LOIAL AI pentru o singură locație.</div>
         <div class="plan-price">67 EUR <span>/ lună</span></div>
         <div class="vat-note">Fără TVA adăugat în prezent</div>
         <ul class="feature-list">
-          <li><span class="check-icon">✓</span> <strong>Clienți activi nelimitați</strong></li>
+          <li><span class="check-icon">✓</span> O locație</li><li><span class="check-icon">✓</span> <strong>Clienți activi nelimitați</strong></li>
           <li><span class="check-icon">✓</span> <strong>Angajați nelimitați</strong> cu PIN individual de 4 cifre</li>
           <li><span class="check-icon">✓</span> Coduri QR personalizate în culoarea brandului</li>
           <li><span class="check-icon">✓</span> Funcții offline, în limita compatibilității dispozitivului</li>
           <li><span class="check-icon">✓</span> Statistici detaliate și top scanări per angajat</li>
-          <li><span class="check-icon">✓</span> Suport prioritar la configurare</li>
+          <li><span class="check-icon">✓</span> LOIAL AI și analiză financiară</li><li><span class="check-icon">✓</span> Suport prioritar la configurare</li>
         </ul>
       </div>
-      <button type="button" class="btn-primary" style="width:100%;padding:15px;font-size:15px;" onclick="goRegister()">Testează gratuit, apoi ProBusiness →</button>
+      <button type="button" class="btn-primary" style="width:100%;padding:15px;font-size:15px;" onclick="goRegister()">Testează gratuit, apoi Business →</button>
+    </div>
+    <div class="price-card">
+      <div><div class="plan-name">ProBusiness*</div><div class="plan-desc">Pentru afaceri cu mai multe locații.</div>
+      <div class="plan-price">270 EUR <span>/ lună</span></div>
+      <div class="vat-note">Până la 5 locații • ofertă personalizată peste 5</div>
+      <ul class="feature-list"><li>✓ Clienți și angajați nelimitați</li><li>✓ Management centralizat al locațiilor</li><li>✓ Statistici și analiză financiară consolidată</li><li>✓ Compararea performanței locațiilor</li><li>✓ LOIAL AI avansat</li></ul>
+      <p>Plan în pregătire; activarea va fi disponibilă după validarea funcțiilor.</p></div>
+      <button type="button" class="btn-outline" style="width:100%;padding:14px" onclick="goRegister()">Începe cu Start →</button>
     </div>
   </div>
 
@@ -374,8 +382,8 @@
       <p>Toți clienții pot alege să lase o recenzie publică pe Google sau să trimită feedback privat firmei, indiferent de calificativ. Nu oferim recompense pentru recenzii.</p>
     </details>
     <details class="faq-item">
-      <summary>Cum se facturează planul ProBusiness (67 EUR/lună)?</summary>
-      <p>Începi complet gratuit până la primii 50 de clienți. Când depășești acest prag, poți activa abonamentul ProBusiness la 67 EUR/lună, fără TVA adăugat în prezent. Activarea abonamentelor plătite va fi disponibilă după finalizarea configurării plăților.</p>
+      <summary>Cum se facturează planul Business (67 EUR/lună)?</summary>
+      <p>Începi complet gratuit până la primii 50 de clienți. Când depășești acest prag, poți activa abonamentul Business la 67 EUR/lună, fără TVA adăugat în prezent. Activarea abonamentelor plătite va fi disponibilă după finalizarea configurării plăților.</p>
     </details>
   </div>
 </section>
