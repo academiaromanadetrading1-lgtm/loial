@@ -82,19 +82,37 @@ CAMPAIGN_TEMPORAL = re.compile(r"(?<!\d)(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[./-]\d{
 def campaign_has_temporal(text):
     return bool(CAMPAIGN_TEMPORAL.search(text or ""))
 
-def campaign_message(text, product, language="ro", deadline=""):
+def promotion_footer(product, language="ro", deadline="", terms=""):
+    if not product.strip():
+        return ""
+    prefix, action, validity = PROMOTION_COPY.get(language, PROMOTION_COPY["ro"])
+    lines = [prefix + product.strip() + "."]
+    if terms.strip():
+        lines.append(terms.strip())
+    if deadline:
+        lines.append(validity + deadline + ".")
+    lines.append(action)
+    return "\n".join(lines)
+
+
+def campaign_base(text, product, language="ro", deadline="", terms=""):
+    message = text.strip()
+    footer = promotion_footer(product, language, deadline, terms)
+    if footer and message == footer:
+        return ""
+    if footer and message.endswith("\n\n" + footer):
+        return message[:-len(footer)-2].rstrip()
+    return message
+
+
+def campaign_message(text, product, language="ro", deadline="", terms=""):
     """Build a deterministic promotion and call to action for preview and delivery."""
     message = text.strip()
     product = product.strip()
     if not product:
         return message
-    prefix, action, validity = PROMOTION_COPY.get(language, PROMOTION_COPY["ro"])
-    lines = [prefix + product + "."]
-    if deadline:
-        lines.append(validity + deadline + ".")
-    lines.append(action)
     # The footer is exact and idempotent: the server will reject any other payload.
-    footer = "\n".join(lines)
+    footer = promotion_footer(product, language, deadline, terms)
     if message == footer or message.endswith("\n\n" + footer):
         return message
     return message[:2000-len(footer)-2].rstrip() + "\n\n" + footer if message else footer
@@ -109,6 +127,21 @@ def validate_promotion_deadline(value):
             raise ValueError()
     except (TypeError, ValueError):
         raise ValueError("Data de expirare trebuie sa fie o data valida, cel putin astazi.")
+    return value
+
+
+def validate_offer_terms(terms):
+    terms = terms.strip()
+    if campaign_has_temporal(terms):
+        raise ValueError("Introdu data și ora expirării în câmpurile dedicate, nu în beneficiul promoției.")
+    return terms
+
+
+def validate_expiry_time(value, deadline):
+    if not value:
+        return ""
+    if not deadline or not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", value):
+        raise ValueError("Ora expirării necesită o dată și o oră validă.")
     return value
 
 
