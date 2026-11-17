@@ -755,18 +755,30 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm,pass
         from openpyxl.styles import Font, PatternFill
         from io import BytesIO
         from fastapi import Response
+        def excel_literal(value):
+            # Prevent spreadsheet formula injection from ambassador names and
+            # manual Wise payment reference fields in admin-only exports.
+            if isinstance(value,str) and value.lstrip().startswith(
+                    ("=","+","-","@","\\t","\\r")):
+                return "'"+value
+            return value
         book=Workbook()
         overview=book.active
         overview.title="De platit"
         overview.append(["ID ambasador","Ambasador","Comisioane in asteptare EUR",
                          "Aprobate EUR","Platite EUR","Reversate EUR",
-                         "Activari EUR","Recurente EUR","Recrutare directa EUR"])
+                         "Activari EUR","Recurente EUR","Recrutare directa EUR",
+                         "Furnizor plata comisioane","Destinatie Wise (date personale)"])
         monthly=summary(db,Agent,period)["ambassadors"]
+        agents_by_id={a.id:a for a in db.query(Agent).all()}
         for row in monthly:
-            overview.append([row["agent_id"],row["name"],row["pending_eur"],
+            agent=agents_by_id.get(row["agent_id"])
+            overview.append([row["agent_id"],excel_literal(row["name"]),row["pending_eur"],
                              row["available_eur"],row["paid_eur"],
                              row["reversed_eur"],row["activation_eur"],
-                             row["recurring_eur"],row["sponsor_eur"]])
+                             row["recurring_eur"],row["sponsor_eur"],
+                             "Wise Business",excel_literal(agent.payout_details or "")
+                             if agent else ""])
         detail=book.create_sheet("Registru comisioane")
         detail.append(["ID","ID ambasador","ID factura","Tip","Suma EUR",
                        "Luna","Status","Data","Referinta plata Wise"])
@@ -776,7 +788,7 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm,pass
         for row in entries:
             detail.append([row.id,row.agent_id,row.invoice_id,row.kind,
                            row.amount_cents/100,row.period,row.status,
-                           row.created_at,row.payout_reference or ""])
+                           row.created_at,excel_literal(row.payout_reference or "")])
         receipts=book.create_sheet("Incasari verificate")
         receipts.append(["ID factura","ID firma","Ambasador direct","Luna",
                          "Incasare EUR","Procesator","Status"])
