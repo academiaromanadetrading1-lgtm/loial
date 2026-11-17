@@ -94,7 +94,7 @@ class AmbassadorSettlement(RevenueBase):
 class WiseReceiptInput(BaseModel):
     business_id:int=Field(gt=0)
     wise_reference:str=Field(min_length=8,max_length=110)
-    payment_month:str=Field(pattern=r"^\\d{4}-(0[1-9]|1[0-2])$")
+    payment_month:str=Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
     paid_amount_eur_cents:int=Field(ge=SUBSCRIPTION_PRICE_EUR_CENTS)
     confirmed_in_wise:bool=False
     evidence_note:str=Field(min_length=12,max_length=400)
@@ -381,8 +381,8 @@ def apply_verified_wise_receipt(db, business, Agent, reference, period,
                         period=period,status="pending",created_at=now))
                     awards.append({"agent_id":recruiter.id,
                                    "kind":"sponsor","eur":10})
-        else:
-            recompute_recurring(db,Agent,period,agent.id)
+        # Recalculate pending renewals as the active portfolio changes.
+        recompute_recurring(db,Agent,period,agent.id)
     return {"receipt_id":row.id,"first_payment":first,
             "business_id":business.id,"period":period,"awards":awards,
             "verified_by_admin":True,"wise_reference":reference}
@@ -557,7 +557,7 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm):
     @router.get("/admin/wise/receipts")
     def wise_receipts(period:Optional[str]=None,actor=Depends(admin),
                       db:Session=Depends(session)):
-        if period and not re.fullmatch(r"\\d{4}-(0[1-9]|1[0-2])",period):
+        if period and not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])",period):
             raise HTTPException(status_code=422,detail="Luna invalida")
         q=db.query(PaidMerchantInvoice).filter(
             PaidMerchantInvoice.provider_customer_id=="wise_business")
