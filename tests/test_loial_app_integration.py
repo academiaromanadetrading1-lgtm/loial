@@ -316,6 +316,17 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert refreshed.status_code==200
             assert refreshed.json()["wise_details_saved"] is True
             assert "ambassador-a@wise.test" not in refreshed.text
+            # Legacy analytics routes must not leak merchant data or permit
+            # unauthenticated fabricated purchases and cancellations.
+            assert client.get("/analytics/business/"+str(business_id)).status_code==410
+            assert client.post("/analytics/purchase",params={
+                "customer_id":target,"business_id":business_id,
+                "product":"fake","amount":999}).status_code==410
+            assert client.post("/analytics/cancel",params={
+                "business_id":business_id,"reason":"forged"},headers=user_headers).status_code==410
+            assert client.get("/sales/live",headers=user_headers).status_code==410
+            assert client.get("/analytics/agent/"+str(ambassador_a["id"]),
+                headers=user_headers).status_code==410
             # Paid state must never be inferred solely from registration.
             # The public wallet route cannot bypass the free-tier 50-card limit.
             with main.SessionLocal() as db:
