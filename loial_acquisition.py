@@ -17,7 +17,7 @@ def normalize_source(source):
 
 def record_registration(db,business_id,source,has_ambassador=False):
     db.add(Acquisition(business_id=business_id,
-        source="ambassador" if has_ambassador else normalize_source(source),
+        source="ambassador" if has_ambassador else ("direct" if normalize_source(source)=="ambassador" else normalize_source(source)),
         created_at=datetime.now(timezone.utc).isoformat()))
 
 def pilot_snapshot(db,Business,Customer,StampAward):
@@ -29,6 +29,9 @@ def pilot_snapshot(db,Business,Customer,StampAward):
     ids=db.query(Acquisition.business_id).join(Business,Business.id==Acquisition.business_id)
     cards=db.query(Customer).filter(Customer.business_id.in_(ids)).count()
     stamps=db.query(StampAward).filter(StampAward.business_id.in_(ids)).count()
+    active=db.query(func.count(func.distinct(StampAward.business_id))).filter(StampAward.business_id.in_(ids)).scalar() or 0
+    with_cards=db.query(func.count(func.distinct(Customer.business_id))).filter(Customer.business_id.in_(ids)).scalar() or 0
     return {"tracked_business_accounts":sum(by_source.values()),"by_source":by_source,
-            "registered_cards":cards,"stamp_operations":stamps,"pilot_goal":100,
+            "registered_cards":cards,"stamp_operations":stamps,"active_accounts":active,
+            "accounts_with_cards":with_cards,"pilot_goal":100,
             "scope":"Accounts recorded since attribution launch; includes unverified accounts; not a count of unique firms."}
