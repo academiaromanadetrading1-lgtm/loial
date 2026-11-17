@@ -345,6 +345,12 @@
     </div>
 
     <div class="card">
+      <h2>Activitate LOIAL: conturi, recrutări și plăți confirmate</h2>
+      <p style="font-size:12px;color:var(--text-muted)">Actualizată la deschiderea panoului sau prin buton; încasările apar numai după reconcilierea Wise.</p>
+      <button type="button" class="btn-secondary" onclick="loadSuperAdmin()">Actualizează activitatea</button>
+      <div id="adminActivity" aria-live="polite" style="font-size:13px;line-height:1.7"></div>
+    </div>
+    <div class="card">
       <h2>1. Firme înscrise & Confirmare Wise (65 EUR/lună, fără TVA adăugat)</h2>
       <table>
         <thead>
@@ -811,6 +817,22 @@
     if (!res.ok) return;
     const data = await res.json();
     document.getElementById('adminMonthBadge').textContent = 'Luna: ' + data.month;
+    const activityBox=document.getElementById('adminActivity');
+    activityBox.replaceChildren();
+    for(const row of (data.activity||[])){
+      const item=document.createElement('div');
+      item.style.padding='9px 0';
+      item.style.borderBottom='1px solid #e3e8e4';
+      const date=(row.date||'').slice(0,16).replace('T',' ');
+      const detail=row.type==='wise_payment_confirmed'
+        ? (row.business||'')+' • '+Number(row.amount_eur||0).toFixed(2)+' EUR • '+(row.month||'')
+        : row.type==='business_registered'
+        ? (row.business||'') : '';
+      item.textContent=date+' • '+row.message+(detail?' • '+detail:'');
+      activityBox.appendChild(item);
+    }
+    if(!(data.activity||[]).length)activityBox.textContent='Încă nu există activitate.';
+
 
     document.getElementById('adminBizTable').innerHTML = (data.businesses || []).map(b => `
       <tr>
