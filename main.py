@@ -3132,6 +3132,39 @@ def generate_qr_from_query(url: str, color: str = "#2d6a4f", initial: str = "L")
     )
 
 
+# Wise payment link is optional during preparation. No automatic credit
+# is granted by opening the link or returning from Wise.
+@app.get("/api/loial/checkout")
+def loial_wise_checkout(credentials: HTTPAuthorizationCredentials = Depends(security),
+                        db: Session = Depends(get_db)):
+    from urllib.parse import urlsplit
+    if not credentials:
+        raise HTTPException(status_code=401,detail="Cont de firma necesar")
+    try:
+        claims=jwt.decode(credentials.credentials,SECRET_KEY,algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401,detail="Sesiune invalida")
+    if claims.get("role")!="business":
+        raise HTTPException(status_code=403,detail="Doar firmele pot achita abonamentul")
+    business=db.query(BusinessAccount).filter(
+        BusinessAccount.id==claims.get("business_id"),
+        BusinessAccount.email==claims.get("sub")).first()
+    if not business:
+        raise HTTPException(status_code=403,detail="Firma invalida")
+    raw=os.getenv("LOIAL_WISE_PAYMENT_URL","").strip()
+    parsed=urlsplit(raw)
+    host=(parsed.hostname or "").lower()
+    enabled=(parsed.scheme=="https" and
+             (host=="wise.com" or host.endswith(".wise.com")) and
+             not parsed.username and not parsed.password)
+    month=datetime.now().strftime("%Y%m")
+    return {"available":enabled,"payment_url":raw if enabled else None,
+            "amount_eur":65,"currency":"EUR","vat_added":False,
+            "business_id":business.id,
+            "payment_reference":f"LOIAL-{business.id}-{month}",
+            "confirmation":"manual_wise_reconciliation_only",
+            "notice":"Butonul de plata nu activeaza abonamentul automat."}
+
 # Loial AI Business - module independent from existing QR and loyalty routes.
 from loial_business_ai import install_loial_ai
 install_loial_ai(app, engine, SessionLocal, BusinessAccount, Customer, Consent, SECRET_KEY, ALGORITHM)
