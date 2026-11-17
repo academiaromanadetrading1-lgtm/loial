@@ -414,6 +414,18 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             also_denied=client.post("/api/enroll",json={
                 "business_id":firm_b.json()["business_id"],"name":"Client 51"})
             assert also_denied.status_code==403,also_denied.text
+            # Universal scan must also refuse to add an existing customer's
+            # wallet to the capped-out second merchant.
+            second_auth={"Authorization":"Bearer "+firm_b.json()["token"]}
+            second_account=client.get("/api/my-business",headers=second_auth)
+            assert second_account.status_code==200,second_account.text
+            capped_scan=client.post("/api/scan-universal",json={
+                "business_id":firm_b.json()["business_id"],
+                "customer_uuid":"W-INTEGRATION-TEST-001",
+                "pin":second_account.json()["staff_pin"],
+                "idempotency_key":"capped-out-merchant-scan"})
+            assert capped_scan.status_code==403,capped_scan.text
+            assert capped_scan.json()["detail"]=="LIMIT_REACHED"
             # No external provider or recipient data is needed for this scenario.
     finally:
         main.engine.dispose()
