@@ -25,20 +25,29 @@ def backup_database(source: str | Path, destination: str | Path) -> dict:
     tmp=dst.with_name("."+dst.name+"."+uuid.uuid4().hex+".tmp")
     # SQLite WAL/journal mode snapshot remains transaction-consistent.
     conn=None
+    target=None
     try:
+        # Restrict access before any customer data is written.
+        handle=os.open(tmp,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+        os.close(handle)
         conn=sqlite3.connect(f"file:{src.as_posix()}?mode=ro",uri=True,timeout=20)
-        with sqlite3.connect(str(tmp)) as target:
-            conn.backup(target,pages=100,sleep=0.05)
-            check=target.execute("PRAGMA integrity_check").fetchone()
-            if not check or check[0]!="ok":
-                raise RuntimeError("Backup integrity_check failed")
-        os.chmod(tmp,0o600)
-        if dst.exists():
-            raise ValueError("Destination appeared during backup")
-        os.replace(tmp,dst)
+        target=sqlite3.connect(str(tmp))
+        conn.backup(target,pages=100,sleep=0.05)
+        check=target.execute("PRAGMA integrity_check").fetchone()
+        if not check or check[0]!="ok":
+            raise RuntimeError("Backup integrity_check failed")
+        target.commit()
+        target.close()
+        target=None
+        conn.close()
+        conn=None
+        # Atomic hard-link creation refuses an existing destination. Unlike
+        # os.replace this can never overwrite another operator's backup.
+        os.link(tmp,dst)
         return {"backup_path":str(dst),"bytes":dst.stat().st_size,
                 "integrity":"ok","permissions":"0600"}
     finally:
+        if target is not None:target.close()
         if conn is not None:conn.close()
         if tmp.exists():tmp.unlink()
 
