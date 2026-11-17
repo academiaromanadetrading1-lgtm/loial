@@ -106,6 +106,14 @@ def invoice_is_eligible(invoice,price_id,expected_cents=PRICE_CENTS):
     return (price.get("id")==price_id or
             (pricing.get("price_details") or {}).get("price")==price_id)
 
+def subscription_event_matches(state, customer, subscription):
+    """Ignore delayed events belonging to another subscription or customer."""
+    if isinstance(customer,dict):customer=customer.get("id")
+    if isinstance(subscription,dict):subscription=subscription.get("id")
+    return bool(state and customer and subscription and
+                state.customer_id==customer and state.subscription_id==subscription)
+
+
 def process_paid_invoice(db, invoice, state, business, Agent, price_id,
                          PaidMerchantInvoice, AmbassadorCommission,
                          SponsorRelationship, tier, recompute_recurring, expected_cents=PRICE_CENTS):
@@ -400,6 +408,15 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
                             state=LoialSubscription(business_id=business.id,
                                 updated_at=utc_iso(now_utc()))
                             db.add(state)
+                        # Never let late invoices replace an existing binding.
+                        # A new binding is permitted only when Stripe independently
+                        # confirms the same customer and subscription identity.
+                        remote_customer=sub.get("customer")
+                        if isinstance(remote_customer,dict):remote_customer=remote_customer.get("id")
+                        if (remote_customer!=customer or sub.get("id")!=sub_id or
+                            (state.customer_id and state.customer_id!=customer) or
+                            (state.subscription_id and state.subscription_id!=sub_id)):
+                            raise HTTPException(409,"Factura nu corespunde abonamentului asociat")
                         state.customer_id=customer
                         state.subscription_id=sub_id
             if not state:
@@ -442,7 +459,9 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
                 outcome={"review":"billing_dispute_unmatched"}
         elif typ=="invoice.payment_failed":
             state=lookup_by_customer(obj.get("customer"))
-            outcome=record_payment_failure(state)
+            outcome=(record_payment_failure(state)
+                     if subscription_event_matches(state,obj.get("customer"),obj.get("subscription"))
+                     else {"ignored":"unmatched_payment_failure"})
         elif typ in ("customer.subscription.updated","customer.subscription.deleted"):
             sub_id=obj.get("id")
             state=db.query(LoialSubscription).filter(
