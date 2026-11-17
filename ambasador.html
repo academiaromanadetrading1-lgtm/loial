@@ -256,6 +256,8 @@
         <p id="dashAmounts" style="font-weight:700"></p>
         <p id="dashRecruited"></p>
         <div id="dashLedger" style="font-size:13px;line-height:1.7"></div>
+        <h3 style="margin-top:20px">Firmele mele și firmele ambasadorilor recrutați direct</h3>
+        <div id="dashFirmActivity" style="font-size:13px;line-height:1.7"></div>
         <button type="button" class="btn-secondary" onclick="reloadAmbassador()">Actualizează plățile</button>
         <button type="button" class="btn-secondary" onclick="logoutAmb()">Ieșire / Schimbă contul</button>
       </div>
@@ -365,6 +367,20 @@
       ledger.approved_eur.toFixed(2)+' EUR | Achitat: '+ledger.paid_eur.toFixed(2)+' EUR';
     document.getElementById('dashRecruited').textContent=
       'Ambasadori recrutați direct: '+ledger.sponsored_ambassadors;
+    const firms=document.getElementById('dashFirmActivity');
+    firms.replaceChildren();
+    for(const firm of (ledger.firm_activity||[])){
+      const div=document.createElement('div');
+      div.style.padding='7px 0';div.style.borderBottom='1px solid #ddd';
+      div.textContent=firm.business_name+' • '+
+        (firm.source==='direct'?'adusă de mine':'adusă de ambasadorul meu')+
+        ' • înscrisă: '+(firm.registered_at||'').slice(0,16)+
+        ' • '+(firm.payment_verified
+          ? 'Plată confirmată: '+(firm.first_payment_confirmed_at||'').slice(0,16)
+          : 'Plata încă neconfirmată');
+      firms.appendChild(div);
+    }
+    if(!(ledger.firm_activity||[]).length)firms.textContent='Încă nu există firme asociate.';
     const container=document.getElementById('dashLedger');
     container.replaceChildren();
     if(!ledger.entries.length){container.textContent='Încă nu există comisioane verificate.';return;}
