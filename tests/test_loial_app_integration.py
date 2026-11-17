@@ -280,6 +280,15 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                 assert result.status_code==200,result.text
                 return result.json()
             ambassador_a=create_ambassador("ambassador-a@example.invalid")
+            invalid_sponsor=client.post("/api/ambassador/join",json={
+                "email":"no-sponsor@example.invalid","name":"Invalid Sponsor",
+                "password":"secure-test-ambassador-2026",
+                "sponsor_code":"LOIAL-UNKNOWN999",
+                "payout_method":"wise","payout_details":"wise@example.invalid"})
+            assert invalid_sponsor.status_code==422,invalid_sponsor.text
+            with main.SessionLocal() as db:
+                assert db.query(main.SalesAgent).filter(
+                    main.SalesAgent.email=="no-sponsor@example.invalid").first() is None
             ambassador_b=create_ambassador("ambassador-b@example.invalid",
                 ambassador_a["ref_code"])
             assert ambassador_b["sponsored_by_another_ambassador"] is True
