@@ -38,3 +38,20 @@ def test_sitemap():
     assert len(CITIES)==len(set(CITIES))==40
     assert len(LANGUAGES)==9
     assert all(node[0].text.startswith("https://loial.space/") for node in root)
+
+
+def test_mixed_portfolio_at_senior_threshold():
+    from loial_plans import simulate_portfolio
+    d=simulate_portfolio(10,30,5,10,5,0)
+    assert d["active_direct_firms"]==55
+    assert d["activation_cents"]==60000
+    assert d["recurring_cents"]==105000
+    assert d["sponsor_cents"]==5000
+    assert d["total_commission_cents"]==170000
+    assert d["illustrative_subscription_revenue_cents"]==706500
+    assert d["scenario_only"]
+
+@pytest.mark.parametrize("counts",[(True,0,0,0,0,0),(-1,0,0,0,0,0),(60000,60000,0,0,0,0)])
+def test_invalid_portfolio(counts):
+    from loial_plans import simulate_portfolio
+    with pytest.raises(ValueError):simulate_portfolio(*counts)
