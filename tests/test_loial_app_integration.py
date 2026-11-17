@@ -316,6 +316,14 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert refreshed.status_code==200
             assert refreshed.json()["wise_details_saved"] is True
             assert "ambassador-a@wise.test" not in refreshed.text
+            pricing=client.get("/pricing").json()
+            assert any(x["plan"]=="pro" and x["base_price"]==67
+                       and x["total"]==67 and x["vat_amount"]==0
+                       for x in pricing)
+            assert client.post("/email",params={"to":"victim@example.invalid",
+                "subject":"spam","body":"spam"},headers=user_headers).status_code==410
+            assert client.put("/pricing/pro",params={"base_price":1},
+                headers=user_headers).status_code==410
             # Legacy analytics routes must not leak merchant data or permit
             # unauthenticated fabricated purchases and cancellations.
             assert client.get("/analytics/business/"+str(business_id)).status_code==410
