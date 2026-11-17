@@ -64,3 +64,6 @@ Captura operatorului din containerul activ confirmă CHECKS PASSED: True și BLO
 
 ## Validare post-pilot — 17.11.2026
 Execuția GitHub Actions #520 (44079730202), job 134026871699, commit c533b96e67017f701f82e86158e131305170c05e: 182 teste izolate + 1 test integrare FastAPI, toate PASS; compilare, JavaScript și PWA PASS. Durată afișată 30 secunde. Ramura release/loial-pilot-c533b96 este identică SHA testat. Producția rămâne eadbfb2 până la o aprobare explicită de publicare. Nu activa Stripe. Validarea nu include apeluri API reale, dispozitive fizice sau audit juridic. 
+
+## Publicare post-pilot — 17.11.2026
+După aprobarea explicită a operatorului, Railway deployment e9ee05b7-26b2-4025-bb87-10b3227486f9 SUCCESS, branch release/loial-pilot-c533b96, commit efectiv c533b96e67017f701f82e86158e131305170c05e. Startup complet, volum persistent montat, /health și /it/ HTTP 200; solicitarea externă /wp-admin/install.php a primit 404. Nu s-au modificat variabilele ori activat Stripe. Retestarea extinsă HTTP pe această versiune, dispozitivele fizice, apelul AI real și validarea comercială rămân de efectuat.
