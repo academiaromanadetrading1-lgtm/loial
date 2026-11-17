@@ -73,6 +73,8 @@ header{padding:14px max(24px,calc((100% - 1392px)/2));flex-wrap:wrap}
 <h1>Loial AI</h1>
 <div class="chat-top"><p id="headline">Consultant managerial, prin conversații exclusiv text</p><span id="aiMode" class="mode-label" role="status"></span></div>
 <div class="chat" id="chat" aria-live="polite"></div>
+<div id="selectedDocument" class="status" hidden><span id="selectedDocumentName"></span> <button class="ghost" id="clearDocument" type="button" style="padding:4px 8px">×</button></div>
+<div id="chatFeedback" class="status" role="status" aria-live="polite" hidden></div>
 <div class="compose">
 <textarea id="message" aria-label="Mesaj către Loial AI" placeholder="Scrie întrebarea ta..."></textarea>
 <button id="openAttachments" type="button" class="ghost" title="Documente și facturi" aria-label="Documente și facturi">＋</button><button id="send">Trimite</button>
@@ -227,7 +229,7 @@ const $=x=>document.getElementById(x);
 let currentTopic='general', canUse=false, currentIndustry='general', currentCampaignId=null;
 let pendingMessageKey='', pendingMessageFingerprint='';
 function showWorkspace(key,updateHash=true){
-  if(!document.querySelector('[data-view="'+key+'"]'))key='chat';
+  if(!['chat','documents','sales','reports','customers','messages'].includes(key))key='chat';
   for(const panel of document.querySelectorAll('[data-view]')){panel.hidden=panel.dataset.view!==key;panel.classList.toggle('active',!panel.hidden);}
   for(const tab of document.querySelectorAll('[data-workspace]')){const active=tab.dataset.workspace===key;tab.classList.toggle('active',active);tab.setAttribute('aria-pressed',String(active));}
   if(updateHash)history.replaceState(null,'',location.pathname+location.search+(key==='chat'?'':'#'+key));
@@ -240,6 +242,7 @@ showWorkspace(location.hash.slice(1)||'chat',false);
 window.addEventListener('hashchange',()=>showWorkspace(location.hash.slice(1)||'chat',false));
 
 let savedProfile=null, feedbackKey='', connectionKey='', savingProfile=false;
+let selectedDocument=null, aiStatus='unknown', sending=false;
 const tr=s=>window.LoialLang?LoialLang.t(s):s;
 const language=()=>window.LoialLang?LoialLang.get():'ro';
 function renderProfileHeadline(){if(savedProfile)$('headline').textContent=savedProfile.business+' • '+tr(savedProfile.industry.label)+' • '+savedProfile.currency;}
@@ -247,7 +250,7 @@ function feedback(key,err=false,detail=''){feedbackKey=key;const box=$('profileF
 function applySavedProfile(p){savedProfile=p;currentIndustry=p.industry.key;renderProfileHeadline();renderMetricChoices();if(window.LoialLang)LoialLang.apply();}
 function dirty(){return savedProfile&&($('sector').value!==savedProfile.industry.key||$('details').value!==savedProfile.description||$('currency').value!==savedProfile.currency);}
 for(const id of ['sector','details','currency'])$(id).addEventListener('input',()=>{if(savedProfile&&!savingProfile)feedback(dirty()?'Modificări nesalvate':'Profil salvat');});
-document.addEventListener('loial:language',()=>{renderProfileHeadline();if(connectionKey)status(tr(connectionKey));if(feedbackKey)feedback(feedbackKey);if(!savingProfile)$('saveProfile').textContent=tr('Salvează profilul');});
+document.addEventListener('loial:language',()=>{renderProfileHeadline();if(connectionKey)status(tr(connectionKey));if(feedbackKey)feedback(feedbackKey);setAIStatus(aiStatus);if(!savingProfile)$('saveProfile').textContent=tr('Salvează profilul');});
 const sectorMetrics={
   rideshare:[['revenue','Încasări din curse'],['online_hours','Ore online'],['kilometres','Kilometri parcurși'],['platform_fees','Comisioane Uber/Bolt'],['fuel_energy','Combustibil sau încărcări']],
   atelier_auto:[['revenue','Încasări atelier'],['billed_hours','Ore facturate'],['worked_hours','Ore lucrate']],
@@ -266,11 +269,15 @@ function renderMetricChoices(){
   });
 }
 function status(message,error=false){$('connection').textContent=message;$('connection').classList.toggle('error',error);}
+function setAIStatus(value){aiStatus=value;const mode=$('aiMode');mode.textContent=tr(value==='configured'?'AI configurat':value==='budget_exhausted'?'Buget AI epuizat':value==='provider_unavailable'?'AI temporar indisponibil':'AI neconectat');mode.classList.toggle('online',value==='configured');}
+function chatFeedback(message,error=false){const b=$('chatFeedback');b.textContent=message;b.hidden=!message;b.classList.toggle('error',error);}
+function chooseDocument(id,name){selectedDocument=id;$('selectedDocumentName').textContent=tr('Document selectat')+': '+name;$('selectedDocument').hidden=false;showWorkspace('chat');$('message').focus();}
+$('clearDocument').onclick=()=>{selectedDocument=null;$('selectedDocument').hidden=true;};
 async function api(path,opts={}){
   const res=await fetch(API+path,{...opts,headers:{'Authorization':'Bearer '+token,...(opts.body instanceof FormData?{}:{'Content-Type':'application/json'}),...(opts.headers||{})}});
   let data;
   try{data=await res.json();}catch(e){throw new Error('Răspuns neașteptat de la server ('+res.status+')');}
-  if(!res.ok)throw new Error(data.detail||data.message||'Eroare '+res.status);
+  if(!res.ok){const detail=data.detail;const err=new Error(typeof detail==='string'?detail:detail?.message||data.message||'Eroare '+res.status);err.code=detail?.code||'';throw err;}
   return data;
 }
 function bubble(role,text){
@@ -287,7 +294,7 @@ async function init(){
   try{
     const c=await api('/context');
     canUse=true;currentIndustry=c.industry.key;connectionKey=c.ai_connected?'Loial AI este conectat':'Analizele și importurile sunt disponibile; conversația AI necesită activarea furnizorului';status(tr(connectionKey));
-    savedProfile=c;renderProfileHeadline();
+    savedProfile=c;renderProfileHeadline();setAIStatus(c.ai_status||(c.ai_connected?'configured':'not_configured'));
     $('sector').replaceChildren();
     c.sectors.forEach(s=>{const opt=document.createElement('option');opt.value=s.key;opt.textContent=s.label;$('sector').appendChild(opt);});
     $('sector').value=currentIndustry;
@@ -321,12 +328,17 @@ async function init(){
   }catch(e){status(e.message,true);}
 }
 async function send(){
-  if(!canUse)return;
+  if(!canUse||sending)return;
   const text=$('message').value.trim();if(!text)return;
-  $('send').disabled=true;$('message').value='';bubble('user',text);
-  try{const r=await api('/chat',{method:'POST',body:JSON.stringify({text,topic:currentTopic,language:language()})});bubble('assistant',r.answer);}
-  catch(e){bubble('meta','Eroare: '+e.message);}
-  finally{$('send').disabled=false;}
+  if(aiStatus==='not_configured'||aiStatus==='budget_exhausted'){
+    chatFeedback(tr(aiStatus==='not_configured'?'AI neconectat. Întrebarea ta a fost păstrată. Instrumentele de analiză rămân disponibile.':'Buget AI epuizat'),true);return;
+  }
+  sending=true;$('send').disabled=true;$('message').readOnly=true;
+  chatFeedback(tr('Loial analizează întrebarea…'));
+  try{const r=await api('/chat',{method:'POST',body:JSON.stringify({text,topic:currentTopic,language:language(),document_id:selectedDocument})});
+    bubble('user',text);bubble('assistant',r.answer);$('message').value='';chatFeedback('');setAIStatus('configured');}
+  catch(e){if(e.code)setAIStatus(e.code);chatFeedback(e.message,true);}
+  finally{sending=false;$('send').disabled=false;$('message').readOnly=false;}
 }
 $('send').addEventListener('click',send);
 $('message').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
@@ -366,6 +378,10 @@ async function loadFiles(){
   for(const x of files){
     const div=document.createElement('div');div.className='file-row';
     const name=document.createElement('span');name.textContent=x.name+' • '+(x.confirmed?'confirmat':'neconfirmat');div.appendChild(name);
+    const previewButton=document.createElement('button');previewButton.className='ghost';previewButton.textContent=tr('Vezi documentul');
+    previewButton.onclick=async()=>{try{const d=await api('/documents/'+x.id+'/preview');const box=$('documentPreview');box.hidden=false;box.textContent=d.name+'\n\n'+(d.text||JSON.stringify(d.rows,null,2))+(d.notes?.length?'\n\n'+d.notes.join('\n'):'')+(d.truncated?'\n\n'+tr('Previzualizare parțială'):'');}catch(e){documentFeedback(e.message,true);}};
+    const analyze=document.createElement('button');analyze.className='ghost';analyze.textContent=tr('Discută cu AI');analyze.onclick=()=>chooseDocument(x.id,x.name);div.append(previewButton,analyze);
+
     if(x.type==='sales'&&!x.confirmed){
       const b=document.createElement('button');b.textContent='Confirmă';b.className='ghost';
       b.onclick=async()=>{if(!confirm('Ai verificat că datele din fișier corespund vânzărilor reale și că prețurile sunt consecvente?'))return;
@@ -376,17 +392,18 @@ async function loadFiles(){
     $('files').appendChild(div);
   }
 }
+function documentFeedback(message,error=false){const box=$('documentFeedback');box.hidden=false;box.textContent=message;box.classList.toggle('error',error);}
 $('upload').onclick=async()=>{
   if(!canUse||!$('attachment').files.length)return;
-  $('upload').disabled=true;status('Documentul este prelucrat...');
+  $('upload').disabled=true;documentFeedback('Documentul este prelucrat...');
   try{
     const form=new FormData();form.append('file',$('attachment').files[0]);
     const data=await api('/documents',{method:'POST',body:form});
     const preview=data.preview||{};
     bubble('meta','Document primit: '+(data.kind||'')+'. '+(data.message||'Verifică fișierul.')+
       (preview.rows?.length?'\nExemplu date: '+JSON.stringify(preview.rows.slice(0,2)): ''));
-    $('attachment').value='';await loadFiles();status('Document prelucrat. Confirmă valorile înainte de utilizare.');
-  }catch(e){status(e.message,true);}finally{$('upload').disabled=false;}
+    $('attachment').value='';await loadFiles();documentFeedback(data.duplicate?'Documentul există deja.':'Document prelucrat. Deschide previzualizarea și verifică valorile.');
+  }catch(e){documentFeedback(e.message,true);}finally{$('upload').disabled=false;}
 };
 async function expenseApi(path,options={}){
   const res=await fetch('/api/loial-expenses'+path,{...options,headers:{
@@ -687,12 +704,15 @@ $('showReceipts').onclick=async()=>{
 };
 document.querySelectorAll('[data-export]').forEach(button=>button.onclick=async()=>{
   try{
-    const res=await fetch(API+'/exports/'+button.dataset.export,{headers:{Authorization:'Bearer '+token}});
+    const kind=button.dataset.export;const counts=await api('/exports/summary');const count=kind.startsWith('ads-')?counts.ads_consented:kind.startsWith('customers')?counts.customers:counts.sales;
+    const feedback=$('exportFeedback');feedback.hidden=false;feedback.textContent=count?String(count)+' '+tr('înregistrări disponibile'):tr(kind.startsWith('ads-')?'Nu există clienți cu consimțământ publicitar și email.':'Nu există înregistrări de exportat.');
+    if(!count)return;
+    const res=await fetch(API+'/exports/'+kind,{headers:{Authorization:'Bearer '+token}});
     if(!res.ok){const x=await res.json();throw new Error(x.detail||'Export nereușit');}
     const blob=await res.blob();const href=URL.createObjectURL(blob);
     const link=document.createElement('a');link.href=href;link.download='loial_'+button.dataset.export;link.click();
     setTimeout(()=>URL.revokeObjectURL(href),5000);
-  }catch(e){status(e.message,true);}
+  }catch(e){const feedback=$('exportFeedback');feedback.hidden=false;feedback.textContent=e.message;}
 });
 init();
 </script>
