@@ -14,6 +14,10 @@ def sample_env():
             "private_key":"-----BEGIN PRIVATE KEY-----\nFAKE\n-----END PRIVATE KEY-----"
         }),
         "LOIAL_GOOGLE_WALLET_SYNC_ENABLED":"0",
+        "LOIAL_STRIPE_SECRET_KEY":"sk_live_CI_ONLY_PLACEHOLDER_NEVER_USE_AS_A_KEY",
+        "LOIAL_STRIPE_WEBHOOK_SECRET":"whsec_CI_ONLY_PLACEHOLDER_NEVER_USE",
+        "LOIAL_STRIPE_PRICE_ID":"price_LOIALCI2026",
+        "LOIAL_PUBLIC_ORIGIN":"https://loial.space",
         "LOIAL_DEV_SEED_DATA":"0"
     }
 
@@ -31,6 +35,16 @@ def test_missing_google_does_not_block_pwa_launch():
     assert "google_issuer" not in preflight(env,"staging")["blockers"]
     assert "google_issuer" not in preflight(env,"production")["blockers"]
     assert "google_class_id" not in preflight(env,"production")["blockers"]
+
+def test_missing_stripe_blocks_public_launch_but_not_staging():
+    env=sample_env()
+    for key in ("LOIAL_STRIPE_SECRET_KEY","LOIAL_STRIPE_WEBHOOK_SECRET",
+                "LOIAL_STRIPE_PRICE_ID"):
+        env.pop(key)
+    checks=preflight(env,"production")
+    assert {"loial_stripe_live_key","loial_stripe_webhook",
+            "loial_stripe_price"}.issubset(checks["blockers"])
+    assert "loial_stripe_live_key" not in preflight(env,"staging")["blockers"]
 
 def test_apple_and_weak_secrets_cannot_pass_launch_checks():
     env=sample_env()
