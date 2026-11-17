@@ -694,6 +694,65 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm):
             raise HTTPException(status_code=422,detail="Luna trebuie sa fie YYYY-MM")
         return summary(db,Agent,period)
 
+    @router.get("/admin/export/{period}.xlsx")
+    def export_commissions_xlsx(period:str,actor=Depends(admin),
+                                db:Session=Depends(session)):
+        """Excel export is read-only; approval and Wise payout stay separate."""
+        if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])",period):
+            raise HTTPException(status_code=422,detail="Luna invalida")
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill
+        from io import BytesIO
+        from fastapi import Response
+        book=Workbook()
+        overview=book.active
+        overview.title="De platit"
+        overview.append(["ID ambasador","Ambasador","Comisioane in asteptare EUR",
+                         "Aprobate EUR","Platite EUR","Reversate EUR",
+                         "Activari EUR","Recurente EUR","Recrutare directa EUR"])
+        monthly=summary(db,Agent,period)["ambassadors"]
+        for row in monthly:
+            overview.append([row["agent_id"],row["name"],row["pending_eur"],
+                             row["available_eur"],row["paid_eur"],
+                             row["reversed_eur"],row["activation_eur"],
+                             row["recurring_eur"],row["sponsor_eur"]])
+        detail=book.create_sheet("Registru comisioane")
+        detail.append(["ID","ID ambasador","ID factura","Tip","Suma EUR",
+                       "Luna","Status","Data","Referinta plata Wise"])
+        entries=db.query(AmbassadorCommission).filter(
+            AmbassadorCommission.period==period).order_by(
+            AmbassadorCommission.id).all()
+        for row in entries:
+            detail.append([row.id,row.agent_id,row.invoice_id,row.kind,
+                           row.amount_cents/100,row.period,row.status,
+                           row.created_at,row.payout_reference or ""])
+        receipts=book.create_sheet("Incasari verificate")
+        receipts.append(["ID factura","ID firma","Ambasador direct","Luna",
+                         "Incasare EUR","Status"])
+        invoices=db.query(PaidMerchantInvoice).filter(
+            PaidMerchantInvoice.period==period,
+            PaidMerchantInvoice.provider_customer_id=="wise_business").all()
+        for row in invoices:
+            receipts.append([row.id,row.business_id,row.agent_id,row.period,
+                             row.gross_paid_cents/100,
+                             "Rambursat" if row.refunded else "Verificat"])
+        for sheet in book.worksheets:
+            sheet.freeze_panes="A2"
+            sheet.auto_filter.ref=sheet.dimensions
+            for cell in sheet[1]:
+                cell.font=Font(bold=True,color="FFFFFF")
+                cell.fill=PatternFill("solid",fgColor="1B3A31")
+            for column in sheet.columns:
+                letter=column[0].column_letter
+                width=min(45,max(14,max(len(str(c.value or "")) for c in column)+2))
+                sheet.column_dimensions[letter].width=width
+        buf=BytesIO();book.save(buf)
+        return Response(buf.getvalue(),media_type=(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            headers={"Content-Disposition":
+                     f'attachment; filename="loial-comisioane-{period}.xlsx"',
+                     "Cache-Control":"no-store"})
+
     @router.post("/admin/approve/{period}")
     def approve_period(period:str,actor=Depends(admin),
                        db:Session=Depends(session)):
