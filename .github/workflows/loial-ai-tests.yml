@@ -27,7 +27,7 @@ jobs:
       - name: Install test and application dependencies
         run: python -m pip install --disable-pip-version-check -r requirements.txt
       - name: Compile Loial modules
-        run: python -m py_compile loial_inbox.py loial_business_ai.py loial_analytics.py loial_industries.py loial_marketing.py loial_knowledge.py loial_identity.py loial_premium_wallet.py loial_weekly_jobs.py loial_receipts.py loial_wallet_sync.py loial_google_issuer.py loial_google_pilot.py loial_preflight.py loial_expenses.py loial_wallet_recovery.py loial_apple_updates.py loial_pwa.py loial_friend_referrals.py loial_revenue_commissions.py loial_stripe_billing.py loial_backup.py main.py
+        run: python -m py_compile loial_financial_simulation.py loial_inbox.py loial_business_ai.py loial_analytics.py loial_industries.py loial_marketing.py loial_knowledge.py loial_identity.py loial_premium_wallet.py loial_weekly_jobs.py loial_receipts.py loial_wallet_sync.py loial_google_issuer.py loial_google_pilot.py loial_preflight.py loial_expenses.py loial_wallet_recovery.py loial_apple_updates.py loial_pwa.py loial_friend_referrals.py loial_revenue_commissions.py loial_stripe_billing.py loial_backup.py main.py
       - name: Verify inline JavaScript syntax without browser or external calls
         run: |
           node - <<'NODE'
@@ -41,6 +41,26 @@ jobs:
             if(!n)throw Error('Script absent: '+file);
             console.log(file+': '+n+' script valid');
           }
+          NODE
+          node - <<'NODE'
+          const fs=require('fs'),vm=require('vm'),assert=require('assert');
+          const html=fs.readFileSync('loial-ai.html','utf8');
+          const src=html.slice(html.indexOf('function richInline('),html.indexOf('function setTopic('));
+          class Node{
+            constructor(tag,text=''){this.tag=tag;this.textContent=text;this.children=[];this.style={};}
+            append(...items){this.children.push(...items)}
+          }
+          const ctx={document:{createElement:x=>new Node(x),createTextNode:x=>new Node('#text',x)},language:()=> 'ro'};
+          vm.createContext(ctx);vm.runInContext(src,ctx);
+          const root=new Node('div'),fence=String.fromCharCode(96).repeat(3);
+          const chart=JSON.stringify({title:'Profit',unit:'RON',points:[{label:'Base',value:-10},{label:'Target',value:20}]});
+          ctx.renderRich(root,'### Titlu\n**Profit**\n| A | B |\n| --- | ---: |\n| Unu | 5 |\n'+fence+'loial-chart\n'+chart+'\n'+fence+'\n<img src=x onerror=alert(1)>');
+          const walk=n=>[n,...n.children.flatMap(walk)],all=walk(root);
+          for(const tag of ['h4','strong','table','th','td','figure'])assert(all.some(n=>n.tag===tag),tag);
+          assert(!all.some(n=>n.tag==='img'||n.tag==='script'));
+          assert(all.some(n=>n.tag==='#text'&&n.textContent.includes('<img')));
+          assert(all.some(n=>n.className==='chart-fill negative'));
+          const bad=new Node('div');assert.equal(ctx.richChart(bad,JSON.stringify({title:'bad',unit:'RON',points:[{label:'x',value:'<bad>'},{label:'y',value:10}]})),false);
           NODE
       - name: Validate PWA helper, service worker and manifest
         run: |
