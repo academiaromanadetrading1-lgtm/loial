@@ -238,7 +238,7 @@ Ex.: Revizie auto;1;220;65"></textarea>
 <label for="singleRecipient">Client individual (opțional)</label>
 <select id="singleRecipient"><option value="">Toți cei din segmentul ales</option></select>
 <label for="productFilter">Produs sau serviciu (opțional)</label>
-<input id="productFilter" placeholder="Ex.: croissant / revizie auto / spălare">
+<input id="productFilter" maxlength="200" placeholder="Ex.: croissant / revizie auto / spălare">
 <label for="offer">Textul care ajunge în Loial</label>
 <textarea id="offer" rows="4" maxlength="2000" placeholder="Ex.: Revino pentru o surpriză la următoarea vizită."></textarea>
 <div class="actions">
@@ -705,7 +705,7 @@ $('saveMetric').onclick=async()=>{
 $('useTemplate').onclick=async()=>{
   if(!$('template').value)return;
   try{
-    const x=await api('/message-templates/'+$('template').value+'/preview');
+    const x=await api('/message-templates/'+$('template').value+'/preview?'+new URLSearchParams({product:$('productFilter').value}));
     $('subject').value=x.subject;
     $('offer').value=x.text;
     renderWalletMessagePreview();
@@ -761,8 +761,8 @@ $('draftCampaign').onclick=async()=>{
 };
 $('sendCampaign').onclick=async()=>{
   const subject=$('subject').value.trim();
-  const message=$('offer').value.trim();
-  if(subject.length<2||message.length<2){status('Completează titlul și textul mesajului.',true);return;}
+  const message=campaignMessageText();
+  if(subject.length<2||$('offer').value.trim().length<2||message.length<2){status('Completează titlul și textul mesajului.',true);return;}
   $('sendCampaign').disabled=true;
   try{
     const payload={subject,text:message,audience:$('audience').value,
@@ -882,8 +882,14 @@ const walletPreviewCopy={
   pl:['Tak klient widzi wiadomość','Wiadomości odebrane w Loial','Podgląd • Wiadomość nie jest wysyłana.'],
   hu:['Így látja az ügyfél az üzenetet','A Loialban kapott üzenetek','Előnézet • Nem küld üzenetet.']
 };
+function campaignMessageText(){
+  const message=$('offer').value.trim(), product=$('productFilter').value.trim();
+  if(!product||message.toLowerCase().includes(product.toLowerCase()))return message;
+  const suffix='\n\n'+product;
+  return message?Array.from(message).slice(0,2000-Array.from(suffix).length).join('').trimEnd()+suffix:product;
+}
 function renderWalletMessagePreview(){
-  const title=$('subject').value.trim(),body=$('offer').value.trim();
+  const title=$('subject').value.trim(),body=campaignMessageText();
   const preview=$('walletMessagePreview');
   preview.hidden=!title&&!body;
   $('walletPreviewTitle').textContent=title;
@@ -891,7 +897,7 @@ function renderWalletMessagePreview(){
   const copy=walletPreviewCopy[language()]||walletPreviewCopy.ro;
   for(const [id,t] of [['walletPreviewCaption',copy[0]],['walletPreviewHeading',copy[1]],['walletPreviewNote',copy[2]]])$(id).textContent=t;
 }
-for(const id of ['subject','offer'])$(id).addEventListener('input',renderWalletMessagePreview);
+for(const id of ['subject','offer','productFilter'])$(id).addEventListener('input',renderWalletMessagePreview);
 document.addEventListener('loial:language',renderWalletMessagePreview);
 renderWalletMessagePreview();
 init();
