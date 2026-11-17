@@ -1834,6 +1834,7 @@ class QuickRegisterRequest(BaseModel):
     reward: str = "A 6-a e din partea casei!"
     color: str = "#1e293b"
     ref_code: Optional[str] = ""
+    acquisition_source: Optional[str] = ""
 
 
 @app.post("/api/register")
@@ -1871,6 +1872,9 @@ def quick_register(request: Request, req: QuickRegisterRequest, db: Session = De
     )
 
     db.add(business)
+    db.flush()
+    from loial_acquisition import record_registration
+    record_registration(db,business.id,req.acquisition_source,has_ambassador=bool(agent))
     db.commit()
     db.refresh(business)
     token = create_access_token({"sub": req.email, "role": "business", "business_id": business.id})
@@ -3456,3 +3460,13 @@ install_growth(app, INDUSTRIES)
 
 from loial_multilocation import install_multilocation
 install_multilocation(app,engine,SessionLocal,BusinessAccount,Customer,SECRET_KEY,ALGORITHM)
+
+
+from loial_acquisition import AcquisitionBase, pilot_snapshot
+AcquisitionBase.metadata.create_all(bind=engine)
+
+@app.get("/api/admin/pilot-metrics")
+def admin_pilot_metrics(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_platform_admin(credentials,db)
+    from loial_scans import StampAward
+    return pilot_snapshot(db,BusinessAccount,Customer,StampAward)
