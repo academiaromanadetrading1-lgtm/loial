@@ -524,11 +524,36 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm):
             SponsorRelationship.sponsor_id==agent.id).all()
         recruited_ids={x.ambassador_id for x in team_links}
         recruits_people=db.query(Agent).filter(Agent.id.in_(recruited_ids)).all() if recruited_ids else []
+        owned_firms=db.query(Business).filter(Business.agent_id==agent.id).all()
+        team_firms=db.query(Business).filter(Business.agent_id.in_(
+            recruited_ids)).all() if recruited_ids else []
+        first_paid_by_business={}
+        for receipt in invoices:
+            if receipt.business_id not in first_paid_by_business:
+                first_paid_by_business[receipt.business_id]=receipt
+            elif receipt.created_at<first_paid_by_business[receipt.business_id].created_at:
+                first_paid_by_business[receipt.business_id]=receipt
+        firm_activity=[]
+        for firm in owned_firms+team_firms:
+            paid=first_paid_by_business.get(firm.id)
+            direct=(firm.agent_id==agent.id)
+            firm_activity.append({
+                "business_name":firm.name,
+                "business_id":firm.id,
+                "source":"direct" if direct else "direct_recruit",
+                "registered_at":firm.created_at or "",
+                "first_payment_confirmed_at":paid.created_at if paid else None,
+                "paid_month":paid.period if paid else None,
+                "commission_on_first_payment_eur":20 if direct else 10,
+                "payment_verified":bool(paid)})
+        firm_activity.sort(key=lambda x:x["registered_at"],reverse=True)
+
         return {"agent_id":agent.id,"sponsored_ambassadors":recruits,
                 "pending_eur":sum(x.amount_cents for x in rows if x.status=="pending")/100,
                 "approved_eur":sum(x.amount_cents for x in rows if x.status=="approved")/100,
                 "paid_eur":sum(x.amount_cents for x in rows if x.status=="paid")/100,
                 "direct_paid_businesses":len({x.business_id for x in personal}),
+                "firm_activity":firm_activity[:100],
                 "month":datetime.now(timezone.utc).strftime("%Y-%m"),
                 "recruits":[{"name":x.name,"joined_at":next(
                     (r.referred_at for r in team_links if r.ambassador_id==x.id),"")}
