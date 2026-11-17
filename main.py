@@ -3136,7 +3136,9 @@ def generate_qr_from_query(url: str, color: str = "#2d6a4f", initial: str = "L")
 # is granted by opening the link or returning from Wise.
 @app.get("/api/loial/checkout")
 def loial_wise_checkout(credentials: HTTPAuthorizationCredentials = Depends(security),
+
                         db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Abonamentele LOIAL sunt administrate prin Stripe.")
     from urllib.parse import urlsplit
     if not credentials:
         raise HTTPException(status_code=401,detail="Cont de firma necesar")
@@ -3224,6 +3226,14 @@ install_friend_referrals(app,engine,SessionLocal)
 # Urmeaza reconcilierea dedicata Wise inainte de activarea platilor in productie.
 from loial_revenue_commissions import install_revenue
 install_revenue(app,engine,SessionLocal,SalesAgent,BusinessAccount,User,SECRET_KEY,ALGORITHM)
+# Stripe = subscriptions and automatic access; Wise = ambassador payouts only.
+from loial_stripe_billing import install_stripe_billing
+from loial_revenue_commissions import (PaidMerchantInvoice,AmbassadorCommission,
+    SponsorRelationship,tier,recompute_recurring)
+install_stripe_billing(app,engine,SessionLocal,BusinessAccount,SalesAgent,
+    PaidMerchantInvoice,AmbassadorCommission,SponsorRelationship,tier,
+    recompute_recurring,SECRET_KEY,ALGORITHM)
+
 
 
 
