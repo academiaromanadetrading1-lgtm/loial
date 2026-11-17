@@ -226,8 +226,10 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
             raise HTTPException(status_code=502,detail="Configurarea pretului Stripe nu poate fi verificata")
         state=db.query(LoialSubscription).filter(
             LoialSubscription.business_id==biz.id).first()
-        if state and state.status in ("active","past_due") and entitlements(state)["active"]:
-            raise HTTPException(status_code=409,detail="Abonament deja activ")
+        if state and state.subscription_id and state.status in (
+            "pending","active","past_due"):
+            raise HTTPException(status_code=409,
+                detail="Există deja un abonament Stripe. Folosește portalul de facturare pentru actualizare.")
         kwargs={
             "mode":"subscription",
             "line_items":[{"price":price,"quantity":1}],
@@ -346,6 +348,24 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
             outcome=process_paid_invoice(db,obj,state,business,Agent,
                 os.getenv("LOIAL_STRIPE_PRICE_ID",""),PaidMerchantInvoice,
                 AmbassadorCommission,SponsorRelationship,tier,recompute_recurring)
+        elif typ in ("credit_note.created","charge.dispute.created"):
+            # Never continue payout on disputed/credited invoices. Partial
+            # credits require manual review; no automatic money clawbacks.
+            from loial_revenue_commissions import reverse_invoice
+            invoice_id=obj.get("invoice")
+            if isinstance(invoice_id,dict):invoice_id=invoice_id.get("id")
+            record=(db.query(PaidMerchantInvoice).filter(
+                PaidMerchantInvoice.external_invoice_id==invoice_id).first()
+                if invoice_id else None)
+            if record:
+                for entry in db.query(AmbassadorCommission).filter(
+                    AmbassadorCommission.invoice_id==record.id).all():
+                    if entry.status in ("pending","approved"):
+                        entry.status="held"
+                record.review_reason="stripe_credit_or_dispute_manual_review"
+                outcome={"held":True,"manual_review":True}
+            else:
+                outcome={"review":"billing_dispute_unmatched"}
         elif typ=="invoice.payment_failed":
             state=lookup_by_customer(obj.get("customer"))
             outcome=record_payment_failure(state)
