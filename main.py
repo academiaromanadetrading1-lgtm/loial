@@ -3228,6 +3228,9 @@ def admin_delete_business(biz_id: int, credentials: HTTPAuthorizationCredentials
     from loial_revenue_commissions import PaidMerchantInvoice
     if db.query(PaidMerchantInvoice).filter(PaidMerchantInvoice.business_id==biz_id).first():
         raise HTTPException(status_code=409,detail="Firma are incasari sau comisioane istorice; arhiveaza, nu sterge.")
+    # A reused SQLite integer ID must never inherit a deleted firm's grant.
+    from loial_manual_admin import ManualBusinessGrant
+    db.query(ManualBusinessGrant).filter(ManualBusinessGrant.business_id==biz_id).delete()
     db.query(StaffMember).filter(StaffMember.business_id == biz_id).delete()
     db.query(Customer).filter(Customer.business_id == biz_id).delete()
     db.query(Sale).filter(Sale.business_id == biz_id).delete()
