@@ -70,6 +70,22 @@
   th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--border); }
   th { color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
 
+  .metal-profile-card{position:relative;overflow:hidden;max-width:355px;min-height:205px;
+    border-radius:20px;padding:24px;color:#e8d5a8;border:1px solid rgba(213,188,133,.5);
+    background:repeating-linear-gradient(0deg,transparent,rgba(255,255,255,.025) 2px,transparent 3px),
+      linear-gradient(116deg,#050607 0%,#26292f 27%,#121318 47%,#37383d 66%,#07080c 100%);
+    box-shadow:0 16px 30px rgba(0,0,0,.18),inset 0 1px 0 rgba(245,219,169,.28);}
+  .metal-profile-card::after{content:"";position:absolute;right:-40px;top:-75px;
+    width:220px;height:240px;border:1px solid rgba(223,197,135,.12);border-radius:50%;
+    box-shadow:0 0 0 25px rgba(227,196,132,.025),0 0 0 55px rgba(227,196,132,.02);}
+  .metal-profile-card .brand{font-size:23px;font-weight:900;letter-spacing:.19em;color:#f0ddaa}
+  .metal-profile-card .edition{font-size:9px;letter-spacing:.17em;color:#bca875;font-weight:800}
+  .metal-profile-card .status{font-size:10px;letter-spacing:.1em;color:#dac493;margin-top:35px;font-weight:800}
+  .metal-profile-card .holder{font-size:19px;font-weight:750;margin-top:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .profile-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:355px}
+  .profile-actions button{margin-top:0}
+  .role-caption{font-size:12px;color:#607367;line-height:1.5;margin-top:8px}
+  .roles-password{display:none}
   @media print {
     body * { visibility: hidden; }
     #printablePoster, #printablePoster * { visibility: visible; }
@@ -98,6 +114,65 @@
     <div class="plan-badge" id="planBadge">Plan Start: 0 / 50 clienți</div>
   </div>
 
+  <div class="card" id="wiseBillingCard">
+    <span class="step-tag">ABONAMENT LOIAL PROBUSINESS</span>
+    <h2>67 EUR / lună, fără TVA adăugat</h2>
+    <p style="font-size:13px;color:var(--text-muted)">Abonamentul se plătește lunar prin Stripe. Accesul se activează după încasarea verificată și poate fi suspendat după 3 zile de neplată.</p>
+    <p id="wiseReference" style="font-weight:700;margin-top:10px"></p>
+    <button id="stripePayButton" class="btn-primary" type="button" onclick="startStripeCheckout()" style="width:max-content">Activează ProBusiness – 67 EUR/lună</button>
+    <button id="stripePortalButton" class="btn-secondary" type="button" onclick="manageStripeBilling()" style="display:none;width:max-content">Gestionează abonamentul Stripe</button>
+    <p id="wisePayHint" style="font-size:12px;color:var(--text-muted)">Stripe LOIAL se configurează în contul dedicat. Plata activează automat abonamentul.</p>
+  </div>
+  <div id="loialAiEntry" style="background:#fff;border:1px solid #dfeae2;border-radius:15px;padding:16px 20px;margin:0 0 18px;display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;">
+    <div><strong style="font-size:17px;color:#2d6a4f;">🤖 Loial AI • Consultantul afacerii</strong><div style="color:#61766a;font-size:13px;margin-top:3px;">Analizează documente, vânzări, marje, clienți și campanii pentru domeniul tău.</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <a href="/loial-ai.html#messages" style="background:#2d6a4f;color:#fff;border-radius:11px;padding:11px 18px;text-decoration:none;font-weight:750;">Trimite mesaje Loial</a>
+      <a href="/loial-ai.html" style="border:1px solid #2d6a4f;color:#2d6a4f;border-radius:11px;padding:11px 18px;text-decoration:none;font-weight:750;">Deschide consultantul AI</a>
+    </div>
+  </div>
+  <div class="card" id="loialRolesSection">
+    <span class="step-tag">IDENTITĂȚILE TALE LOIAL</span>
+    <h2>Administrator, ambasador și client</h2>
+    <p class="role-caption">Aceeași persoană poate avea toate cele trei roluri, fără conturi separate pentru administrarea firmei. Cardul de client rămâne independent de cardul de ambasador.</p>
+    <div class="grid-2" style="margin-top:16px;">
+      <div>
+        <div class="metal-profile-card" aria-label="Card premium Black Metal de ambasador">
+          <div class="brand">LOIAL</div>
+          <div class="edition">BLACK METAL · AMBASSADOR</div>
+          <div class="status" id="metalAmbassadorRank">STATUT: NEACTIVAT</div>
+          <div class="holder" id="metalAmbassadorHolder">Ambasador Loial</div>
+          <div class="edition">CARD DE PARTENER · NU ESTE CARD BANCAR</div>
+        </div>
+        <p id="rolesStatus" class="role-caption">Se verifică identitățile disponibile...</p>
+        <div class="profile-actions">
+          <button id="rolesAppleWallet" class="btn-secondary" onclick="saveAmbassadorWallet('apple')" disabled style="display:none">Apple Wallet</button>
+          <button id="rolesGoogleWallet" class="btn-secondary" onclick="saveAmbassadorWallet('google')" disabled style="display:none">Google Wallet</button>
+        </div>
+      </div>
+      <div>
+        <label for="ambassadorDisplayName">Numele tău pe cardul Black Metal</label>
+        <input id="ambassadorDisplayName" maxlength="100" placeholder="Numele persoanei, nu neapărat al firmei">
+        <button class="btn-primary" id="rolesActivate" onclick="activateBusinessAmbassador()">Activează rolul de ambasador</button>
+        <div id="rolesExistingBox" style="display:none;">
+          <label for="existingAmbassadorPassword">Parola contului de ambasador existent</label>
+          <input id="existingAmbassadorPassword" type="password" autocomplete="current-password">
+          <button class="btn-secondary" onclick="linkExistingAmbassador()">Asociază contul existent, fără să-l înlocuiești</button>
+        </div>
+        <div id="ambassadorLinkRow" style="display:none;margin-top:12px;">
+          <label for="ambassadorDirectLink">Linkul tău de recomandare</label>
+          <input id="ambassadorDirectLink" readonly>
+          <button class="btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('ambassadorDirectLink').value)">Copiază linkul de ambasador</button>
+          <button class="btn-secondary" onclick="saveAmbassadorName()">Actualizează numele de pe card</button>
+        </div>
+        <div style="border-top:1px solid #dce6e0;margin-top:18px;padding-top:12px;">
+          <strong>Poți fi și client Loial</strong>
+          <p class="role-caption" id="rolesCustomerStatus">Activează cardul tău de client în portofelul Loial.</p>
+          <a class="btn-secondary" id="rolesJoinClient" href="/join/1">Deschide cardul meu de client</a>
+          <button class="btn-secondary" id="rolesLinkClient" onclick="linkBusinessCustomer()">Asociază portofelul meu verificat</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="grid-2">
     <div class="card">
       <span class="step-tag">Pasul 1 • Atrage clienții</span>
@@ -172,15 +247,69 @@
       <button type="button" class="btn-primary" style="margin-top:0;" onclick="addStaff()">+ Adaugă angajat</button>
     </div>
     <div class="status-msg" id="staffError"></div>
+    <div style="border:1px solid #e0e9e0;border-radius:12px;padding:14px;margin:14px 0;background:#f7faf8;">
+      <strong>PIN principal pentru administrator</strong>
+      <p id="primaryPinStatus" style="font-size:13px;color:#476251;margin:8px 0;">
+        PIN-ul rămâne privat. Nu folosi 1234.
+      </p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button type="button" class="btn-secondary" onclick="revealPrimaryPin()">Arată / ascunde PIN</button>
+        <button type="button" class="btn-secondary" onclick="rotatePrimaryPin()">Generează PIN nou</button>
+      </div>
+      <p style="font-size:11px;color:#5a7063;margin:8px 0 0;">
+        După schimbare, PIN-ul anterior nu mai funcționează. Comunică noul cod doar persoanelor autorizate.
+      </p>
+    </div>
 
     <table>
       <thead>
         <tr><th>Nume Angajat</th><th>Cod PIN</th><th>Ștampile acordate</th><th>Acțiune</th></tr>
       </thead>
       <tbody id="staffTable">
-        <tr><td colspan="4" style="color: var(--text-muted);">Nu ai adăugat încă angajați. Poți scana și cu PIN-ul principal (1234).</td></tr>
+        <tr><td colspan="4" style="color: var(--text-muted);">Nu ai angajați înregistrați. Folosește PIN-ul principal afișat în zona securizată de mai sus.</td></tr>
       </tbody>
     </table>
+  </div>
+
+  <div class="card">
+    <span class="step-tag">AUDIT DE FIDELIZARE</span>
+    <h2>Ștampile, recompense și retururi</h2>
+    <p style="font-size:13px;color:var(--text-muted)">
+      Vezi cine a primit ștampile, când au fost acordate și dacă o recompensă sau un bon a fost corectat.
+    </p>
+    <button type="button" class="btn-secondary" onclick="loadStampAudit()">
+      Actualizează jurnalul
+    </button>
+    <div id="stampAudit" role="status" style="margin-top:12px;font-size:13px">
+      Se încarcă istoricul...
+    </div>
+  </div>
+
+  <div class="card" id="legacyRecovery">
+    <span class="step-tag">RECUPERARE SECURIZATĂ</span>
+    <h2>Transferă un card vechi pe telefonul clientului</h2>
+    <p style="font-size:13px;color:var(--text-muted);line-height:1.6">
+      Disponibil numai pentru cardurile create înaintea activării portofelului privat.
+      Verifică titularul în persoană înainte de a genera linkul. QR-ul vechi singur nu
+      constituie dovadă a identității. Transferul privește exclusiv cardul firmei tale.
+    </p>
+    <label for="recoveryCustomerSearch">Caută clientul</label>
+    <input id="recoveryCustomerSearch" placeholder="Numele clientului sau o parte din nume" maxlength="60">
+    <button type="button" class="btn-secondary" onclick="findLegacyCards()">Caută carduri care pot fi recuperate</button>
+    <label for="recoveryCustomer" style="display:block;margin-top:10px">Cardul verificat</label>
+    <select id="recoveryCustomer"><option value="">Alege un client după verificare</option></select>
+    <label for="recoveryVerificationNote" style="display:block;margin-top:10px">Cum ai verificat identitatea?</label>
+    <input id="recoveryVerificationNote" maxlength="200"
+      placeholder="Ex.: titularul prezent la casă, verificat de administrator">
+    <button type="button" class="btn-secondary" onclick="createRecoveryCode()">
+      Generează link valabil 15 minute
+    </button>
+    <div id="recoveryStatus" role="status" style="font-size:12px;margin:10px 0;color:#48604f"></div>
+    <input id="recoveryLink" readonly style="display:none" aria-label="Link temporar de recuperare">
+    <button id="copyRecoveryLink" type="button" class="btn-secondary"
+      style="display:none" onclick="navigator.clipboard.writeText(document.getElementById('recoveryLink').value)">
+      Copiază linkul și arată-l titularului
+    </button>
   </div>
 
   <div class="card">
@@ -205,8 +334,33 @@
       <div class="plan-badge" id="adminMonthBadge">Luna curentă</div>
     </div>
 
+    <div class="card" id="googlePilotPanel">
+      <span class="step-tag">PILOT PRIMELE 100 DE FIRME</span>
+      <h2>Card LOIAL pe ecranul telefonului · Fără Google/Apple Wallet</h2>
+      <p style="font-size:13px;color:var(--text-muted)">
+        Firmele active sunt cele cu cel puțin o ștampilă acordată în Loial. Înscrierile singure nu sunt considerate activitate.
+      </p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin:14px 0;">
+        <div><strong id="pilotActive">–</strong><div style="font-size:12px">Firme active / 100</div></div>
+        <div><strong id="pilotCards">–</strong><div style="font-size:12px">Firme cu clienți</div></div>
+        <div><strong id="pilotRegistered">–</strong><div style="font-size:12px">Firme înscrise</div></div>
+      </div>
+      <div style="height:9px;border-radius:999px;background:#e4e9e5;overflow:hidden">
+        <div id="pilotProgress" style="height:100%;width:0;background:#2d6a4f;border-radius:999px"></div>
+      </div>
+      <p id="pilotIssuerStatus" style="font-size:12px;color:#536b5b;margin:12px 0">Cardul PWA LOIAL nu necesită Google Wallet.</p>
+      <button class="btn-secondary" type="button" onclick="loadGooglePilot()">Actualizează stadiul pilotului</button>
+      <p style="font-size:11px;color:#607467">Google Wallet și Apple Wallet nu sunt necesare pentru lansarea PWA.</p>
+    </div>
+
     <div class="card">
-      <h2>1. Firme înscrise & Activare ProBusiness (65 EUR + TVA)</h2>
+      <h2>Activitate LOIAL: conturi, recrutări și plăți confirmate</h2>
+      <p style="font-size:12px;color:var(--text-muted)">Actualizată la deschiderea panoului sau prin buton; încasările Stripe apar după confirmarea automată prin webhook.</p>
+      <button type="button" class="btn-secondary" onclick="loadSuperAdmin()">Actualizează activitatea</button>
+      <div id="adminActivity" aria-live="polite" style="font-size:13px;line-height:1.7"></div>
+    </div>
+    <div class="card">
+      <h2>1. Firme înscrise & planuri LOIAL (67 EUR/lună, fără TVA adăugat)</h2><p style="font-size:13px;color:var(--text-muted)">Accesul ProBusiness acordat manual este gratuit până la retragere și nu generează comisioane. Abonamentele Stripe sunt independente.</p>
       <table>
         <thead>
           <tr><th>Firmă</th><th>Email</th><th>Adusă de</th><th>Clienți</th><th>Plan</th><th>Acțiune</th></tr>
@@ -217,8 +371,17 @@
 
     <div class="card">
       <h2>2. Ambasadori & Plăți Lunare Wise Business</h2>
+      <div style="margin:12px 0">
+        <label for="adminAmbEmail">Desemnează un membru LOIAL ca ambasador (email existent)</label>
+        <input id="adminAmbEmail" type="email" placeholder="Email membru">
+        <button class="btn-secondary" type="button" onclick="inviteExistingAmbassador()">Creează invitația de activare</button>
+        <p id="adminInviteStatus" role="status" style="font-size:13px"></p>
+        <input id="adminInviteLink" type="text" readonly hidden>
+        <button id="adminCopyInvite" class="btn-secondary" type="button" hidden onclick="navigator.clipboard.writeText(document.getElementById('adminInviteLink').value)">Copiază linkul privat</button>
+      </div>
+      <button type="button" class="btn-secondary" onclick="downloadCommissionXlsx()">Descarcă raportul Excel al lunii (comisioane / Wise)</button>
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px;">
-        Luna 1: <strong>20 EUR</strong>/firmă nouă • Luna 2+: <strong>5 EUR</strong> (1–25 firme), <strong>10 EUR</strong> Manager (26–50), <strong>15 EUR</strong> Senior (51+).
+        Luna 1: <strong>20 EUR</strong> direct + <strong>10 EUR</strong> recrutorului direct, o singură dată • Luna 2+: <strong>5 EUR</strong> (1–25 firme), <strong>10 EUR</strong> Manager (26–50), <strong>15 EUR</strong> Senior (51+).
       </p>
       <table>
         <thead>
@@ -258,6 +421,152 @@
 
  <script>
   const token = localStorage.getItem('token');
+  async function loadStripeSubscription(){
+    const hint=document.getElementById('wisePayHint');
+    const button=document.getElementById('stripePayButton');
+    const portal=document.getElementById('stripePortalButton');
+    try{
+      const response=await authorizedFetch('/api/loial-stripe/me');
+      if(!response.ok)throw Error('Autentifică-te în contul firmei.');
+      const data=await response.json();
+      const active=!!data.subscription.active;
+      button.style.display=active?'none':'inline-block';
+      button.disabled=!data.checkout_configured;
+      portal.style.display=(!data.checkout_configured||data.status==='not_started')?'none':'inline-block';
+      hint.textContent=data.subscription.status==='manual_grant'
+        ?'Acces ProBusiness gratuit acordat de administrator, până la retragere.'
+        :data.free_pilot_only&&!active
+        ?'LOIAL este disponibil în pilot gratuit. Abonamentele de 67 EUR/lună vor fi activate după configurarea Stripe.'
+        :active
+        ?'Abonament activ'+(data.paid_until?' până la '+data.paid_until.slice(0,10):'')+
+          (data.subscription.status==='grace_period'?' • perioada de remediere a plății':'')
+        :data.checkout_configured
+        ?'Abonamentul este inactiv. Confirmarea plății se face automat prin Stripe.'
+        :'Stripe LOIAL nu este configurat încă; plata nu poate fi inițiată.';
+      document.getElementById('wiseReference').textContent='Status: '+data.subscription.status;
+    }catch(error){hint.textContent=error.message;}
+  }
+  async function stripeLink(path){
+    const response=await authorizedFetch('/api/loial-stripe/'+path,{method:'POST'});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw Error(data.detail||'Stripe indisponibil');
+    if(!/^https:\/\//.test(data.url||''))throw Error('Link Stripe invalid');
+    window.location.assign(data.url);
+  }
+  async function startStripeCheckout(){try{await stripeLink('checkout');}catch(e){alert(e.message);}}
+  async function manageStripeBilling(){try{await stripeLink('portal');}catch(e){alert(e.message);}}
+  loadStripeSubscription();
+  function authorizedFetch(url, options = {}) {
+    return fetch(url, { ...options, headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token } });
+  }
+  let premiumWalletReady = null;
+  let verifiedAmbassador = null;
+
+  async function roleApi(path,opts={}){
+    const response=await authorizedFetch('/api/loial-identity'+path,{
+      ...opts,headers:{...(opts.body?{'Content-Type':'application/json'}:{}),...(opts.headers||{})}
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw Error(data.detail||'Nu s-a putut procesa cererea.');
+    return data;
+  }
+  async function loadBusinessRoles(){
+    try{
+      const [identity,ready]=await Promise.all([
+        roleApi('/me'),fetch('/api/premium-wallet/availability').then(r=>r.json())]);
+      premiumWalletReady=ready;
+      verifiedAmbassador=identity.ambassador||null;
+      document.getElementById('rolesCustomerStatus').textContent=identity.customer_wallet_linked
+        ?'Portofelul tău de client este verificat și asociat cu această identitate.'
+        :'Poți folosi cardul de client Loial; asocierea cere accesul privat la portofel.';
+      const clientLink=document.getElementById('rolesJoinClient');
+      if(identity.business)clientLink.href='/join/'+identity.business.id;
+      document.getElementById('rolesExistingBox').style.display=
+        identity.ambassador_needs_verification?'block':'none';
+      if(identity.ambassador){
+        document.getElementById('metalAmbassadorHolder').textContent=identity.ambassador.name;
+        document.getElementById('metalAmbassadorRank').textContent=identity.ambassador.rank;
+        document.getElementById('ambassadorDisplayName').value=identity.ambassador.name;
+        document.getElementById('ambassadorDirectLink').value=identity.ambassador.referral_url;
+        document.getElementById('ambassadorLinkRow').style.display='block';
+        document.getElementById('rolesActivate').style.display='none';
+        document.getElementById('rolesStatus').textContent='Rol activ: administrator și ambasador Loial.';
+      }else{
+        document.getElementById('ambassadorLinkRow').style.display='none';
+        document.getElementById('rolesActivate').style.display=
+          identity.ambassador_needs_verification?'none':'block';
+        document.getElementById('rolesStatus').textContent=
+          identity.ambassador_needs_verification?'Verifică întâi contul de ambasador existent.':
+          'Rolul de ambasador poate fi activat din acest panou, fără pierderea accesului Business.';
+      }
+      document.getElementById('rolesAppleWallet').disabled=
+        !(verifiedAmbassador&&premiumWalletReady.apple_ready);
+      document.getElementById('rolesGoogleWallet').disabled=
+        !(verifiedAmbassador&&premiumWalletReady.google_ambassador_ready);
+      if(!premiumWalletReady.apple_ready&&!premiumWalletReady.google_ambassador_ready)
+        document.getElementById('rolesStatus').textContent+=' Cardul LOIAL se poate salva direct pe ecranul telefonului.';
+    }catch(e){document.getElementById('rolesStatus').textContent=e.message;}
+  }
+
+  async function activateBusinessAmbassador(){
+    const button=document.getElementById('rolesActivate');button.disabled=true;
+    try{
+      await roleApi('/ambassador/activate',{method:'POST',body:JSON.stringify({
+        display_name:document.getElementById('ambassadorDisplayName').value.trim()})});
+      await loadBusinessRoles();
+    }catch(e){
+      document.getElementById('rolesStatus').textContent=e.message;
+      if(e.message.includes('Exista deja cont'))document.getElementById('rolesExistingBox').style.display='block';
+    }finally{button.disabled=false;}
+  }
+  async function linkExistingAmbassador(){
+    const password=document.getElementById('existingAmbassadorPassword').value;
+    if(!password)return;
+    try{
+      await roleApi('/ambassador/link',{method:'POST',body:JSON.stringify({password})});
+      document.getElementById('existingAmbassadorPassword').value='';
+      await loadBusinessRoles();
+    }catch(e){document.getElementById('rolesStatus').textContent=e.message;}
+  }
+  async function saveAmbassadorName(){
+    const display_name=document.getElementById('ambassadorDisplayName').value.trim();
+    if(display_name.length<2)return;
+    try{
+      await roleApi('/ambassador/name',{method:'PUT',body:JSON.stringify({display_name})});
+      await loadBusinessRoles();
+    }catch(e){document.getElementById('rolesStatus').textContent=e.message;}
+  }
+  async function linkBusinessCustomer(){
+    const wallet_private_token=localStorage.getItem('loial_wallet_inbox_token')||'';
+    if(!wallet_private_token){
+      document.getElementById('rolesCustomerStatus').textContent=
+        'Deschide portofelul pe dispozitivul pe care ai activat cardul. Asocierea nu se poate face numai pe baza QR-ului.';
+      return;
+    }
+    try{
+      await roleApi('/customer/link',{method:'POST',body:JSON.stringify({wallet_private_token})});
+      await loadBusinessRoles();
+    }catch(e){document.getElementById('rolesCustomerStatus').textContent=e.message;}
+  }
+  async function saveAmbassadorWallet(kind){
+    if(!verifiedAmbassador)return;
+    try{
+      const response=await authorizedFetch('/api/premium-wallet/ambassador/'+kind+
+        (kind==='apple'?'-ticket':''),{method:kind==='apple'?'POST':'GET'});
+      if(!response.ok){const e=await response.json().catch(()=>({}));
+        throw Error(e.detail||'Wallet nu este configurat.');}
+      if(kind==='google'){
+        const data=await response.json();
+        if(!data.url||!data.url.startsWith('https://pay.google.com/gp/v/save/'))throw Error('Link invalid');
+        location.href=data.url;return;
+      }
+      const ticket=await response.json();
+      if(!ticket.url||!ticket.url.startsWith('/api/premium-wallet/apple/claim?'))
+        throw Error('Link Apple Wallet invalid');
+      window.location.assign(ticket.url);
+    }catch(e){document.getElementById('rolesStatus').textContent=e.message;}
+  }
+
   const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
   let bizId = localStorage.getItem('biz_id');
 
@@ -271,19 +580,29 @@
     document.getElementById('businessOwnerSection').style.display = 'none';
     document.getElementById('superAdminSection').style.display = 'block';
     loadSuperAdmin();
+    // New registrations, recruited ambassadors and Stripe-verified payments
+    // appear without a manual reload while the administrator is online.
+    setInterval(()=>{
+      if(!document.hidden)loadSuperAdmin();
+    },60000);
   } else {
     if (!bizId) {
       logout();
     } else {
-      const cacheKey = 'loial_admin_cache_' + bizId;
-      const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
-      if (cached) renderDashboardData(cached);
+      // Evitam persistenta locala a datelor comerciale private si a PIN-urilor.
+      localStorage.removeItem('loial_admin_cache_' + bizId);
       loadDashboard();
+      loadBusinessRoles();
     }
   }
 
+  function escapeHtml(value) {
+    return String(value==null?'':value).replace(/[&<>"']/g,c=>({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    })[c]);
+  }
   function renderDashboardData(data) {
-    const brandColor = data.card_color || '#2d6a4f';
+    const brandColor = /^#[0-9a-fA-F]{6}$/.test(data.card_color||'') ? data.card_color : '#2d6a4f';
     document.documentElement.style.setProperty('--primary', brandColor);
 
     document.getElementById('bizTitle').textContent = data.name;
@@ -306,33 +625,157 @@
     if (data.staff && data.staff.length > 0) {
       staffTbody.innerHTML = data.staff.map(s => `
         <tr>
-          <td><strong>${s.name}</strong></td>
-          <td><code>${s.pin}</code></td>
-          <td>${s.scans_count} scanări</td>
-          <td><button type="button" class="btn-danger" onclick="removeStaff(${s.id})">Elimină</button></td>
+          <td><strong>${escapeHtml(s.name)}</strong></td>
+          <td><code>${escapeHtml(s.pin)}</code></td>
+          <td>${Number(s.scans_count)||0} scanări</td>
+          <td><button type="button" class="btn-danger" onclick="removeStaff(${Number(s.id)})">Elimină</button></td>
         </tr>
       `).join('');
     } else {
-      staffTbody.innerHTML = '<tr><td colspan="4" style="color: var(--text-muted);">Nu ai adăugat încă angajați. Poți scana și cu PIN-ul principal (1234).</td></tr>';
+      staffTbody.innerHTML = '<tr><td colspan="4" style="color: var(--text-muted);">Nu ai angajați înregistrați. Folosește PIN-ul principal afișat în zona securizată de mai sus.</td></tr>';
     }
 
     if (data.customers && data.customers.length > 0) {
       document.getElementById('customersTable').innerHTML = data.customers.map(c => `
         <tr>
-          <td><strong>${c.name}</strong></td>
-          <td>${c.stamps} / ${data.stamps_required} ★</td>
-          <td style="color: var(--text-muted);">${(c.last_visit || '').split('T')[0]}</td>
+          <td><strong>${escapeHtml(c.name)}</strong></td>
+          <td>${Number(c.stamps)||0} / ${Number(data.stamps_required)||6} ★</td>
+          <td style="color: var(--text-muted);">${escapeHtml((c.last_visit || '').split('T')[0])}</td>
         </tr>
       `).join('');
     }
   }
 
+  let primaryPinValue=null, primaryPinRevealed=false;
+  async function loadPrimaryPin() {
+    try {
+      const response=await authorizedFetch('/api/my-business');
+      if(!response.ok)return;
+      const data=await response.json();
+      primaryPinValue=data.staff_pin||null;
+      const label=document.getElementById('primaryPinStatus');
+      if(!primaryPinValue||primaryPinValue==='1234'){
+        label.textContent='PIN vechi nesigur sau absent. Generează unul nou înainte de scanare.';
+        label.style.color='#9c3d25';
+      }else{
+        label.textContent=primaryPinRevealed?'PIN principal: '+primaryPinValue:'PIN principal: ••••';
+        label.style.color='#476251';
+      }
+    }catch(error){document.getElementById('primaryPinStatus').textContent='PIN-ul nu a putut fi verificat.';}
+  }
+  function revealPrimaryPin() {
+    primaryPinRevealed=!primaryPinRevealed;
+    const label=document.getElementById('primaryPinStatus');
+    label.textContent=primaryPinRevealed&&primaryPinValue&&primaryPinValue!=='1234'
+      ?'PIN principal: '+primaryPinValue
+      :'PIN principal: ••••';
+  }
+  async function rotatePrimaryPin() {
+    if(!confirm('Schimbi PIN-ul principal? Codul vechi nu va mai putea acorda ștampile.'))return;
+    try{
+      const response=await authorizedFetch('/api/my-business/rotate-pin',{method:'POST'});
+      const data=await response.json();
+      if(!response.ok)throw Error(data.detail||'Nu s-a putut schimba PIN-ul.');
+      primaryPinValue=data.staff_pin;
+      primaryPinRevealed=true;
+      document.getElementById('primaryPinStatus').textContent=
+        'PIN principal nou: '+primaryPinValue+' (comunică-l doar personalului autorizat)';
+    }catch(error){document.getElementById('primaryPinStatus').textContent=error.message;}
+  }
+
+  async function loadStampAudit() {
+    const box=document.getElementById('stampAudit');
+    if(!box)return;
+    box.replaceChildren();
+    try {
+      const res=await authorizedFetch('/api/loial-scans/history?limit=40');
+      const data=await res.json();
+      if(!res.ok)throw Error(data.detail||'Jurnalul nu poate fi încărcat.');
+      if(!data.items.length){
+        box.textContent='Încă nu există operațiuni de fidelizare înregistrate.';
+        return;
+      }
+      const sourceNames={
+        manual:'Ștampilă manuală',receipt:'Bon QR revendicat',
+        redeem:'Recompensă utilizată',refund:'Retur și corecție'
+      };
+      const list=document.createElement('div');
+      for(const event of data.items) {
+        const item=document.createElement('div');
+        item.style.cssText='display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 0;border-bottom:1px solid #e2ebe4;';
+        const label=document.createElement('div');
+        const strong=document.createElement('strong');
+        strong.textContent=event.customer||'Client';
+        const note=document.createElement('div');
+        note.textContent=(sourceNames[event.source]||event.source)+
+          ' · '+new Date(event.at).toLocaleString('ro-RO');
+        note.style.color='#607468';note.style.fontSize='12px';
+        label.append(strong,note);
+        const count=document.createElement('strong');
+        count.textContent=event.stamps_after+' ștampile';
+        item.append(label,count);list.appendChild(item);
+      }
+      box.appendChild(list);
+    } catch(error) {
+      box.textContent=error.message;
+    }
+  }
+
+  async function findLegacyCards(){
+    const box=document.getElementById('recoveryCustomer');
+    box.replaceChildren();
+    const empty=document.createElement('option');empty.value='';
+    empty.textContent='Alege titularul verificat';box.appendChild(empty);
+    document.getElementById('recoveryStatus').textContent='';
+    const q=document.getElementById('recoveryCustomerSearch').value.trim();
+    try{
+      const params=new URLSearchParams({q,limit:'100'});
+      const res=await authorizedFetch('/api/loial-wallet-recovery/eligible?'+params);
+      const data=await res.json();
+      if(!res.ok)throw Error(data.detail||'Nu pot căuta cardurile.');
+      for(const customer of data.items){
+        const option=document.createElement('option');
+        option.value=String(customer.id);
+        option.textContent=customer.name+' (ID '+customer.id+
+          ', '+customer.stamps+' ștampile)';
+        box.appendChild(option);
+      }
+      document.getElementById('recoveryStatus').textContent=
+        data.items.length?data.items.length+' carduri vechi găsite.':
+        'Nu s-au găsit carduri care necesită recuperare.';
+    }catch(err){document.getElementById('recoveryStatus').textContent=err.message;}
+  }
+  async function createRecoveryCode(){
+    const customer_id=Number(document.getElementById('recoveryCustomer').value);
+    const verification_note=document.getElementById('recoveryVerificationNote').value.trim();
+    const status=document.getElementById('recoveryStatus');
+    if(!customer_id||verification_note.length<8){
+      status.textContent='Selectează clientul și descrie verificarea făcută în persoană.';
+      return;
+    }
+    if(!confirm('Confirmi că ai verificat personal titularul cardului înainte de transfer?'))return;
+    try{
+      const res=await authorizedFetch('/api/loial-wallet-recovery/request',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({customer_id,verification_note})
+      });
+      const data=await res.json();
+      if(!res.ok)throw Error(data.detail||'Linkul nu a putut fi creat.');
+      document.getElementById('recoveryLink').value=data.recovery_url;
+      document.getElementById('recoveryLink').style.display='block';
+      document.getElementById('copyRecoveryLink').style.display='block';
+      status.textContent='Link unic valabil 15 minute. Arată-l doar titularului verificat.';
+    }catch(err){status.textContent=err.message;}
+  }
+
   async function loadDashboard() {
-    const res = await fetch(`/api/biz-full/${bizId}`);
+    const res = await authorizedFetch(`/api/biz-full/${bizId}`);
     if (!res.ok) return;
     const data = await res.json();
-    localStorage.setItem('loial_admin_cache_' + bizId, JSON.stringify(data));
+    // Nu pastram date despre clienti sau PIN-uri in localStorage.
     renderDashboardData(data);
+    await loadPrimaryPin();
+    await loadStampAudit();
   }
 
   function copyJoinLink() {
@@ -355,7 +798,7 @@
       errEl.textContent = 'Introdu numele angajatului și un PIN din 4 cifre.';
       return;
     }
-    const res = await fetch(`/api/biz-full/${bizId}/staff`, {
+    const res = await authorizedFetch(`/api/biz-full/${bizId}/staff`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, pin })
@@ -372,14 +815,14 @@
   }
 
   async function removeStaff(staffId) {
-    await fetch(`/api/biz-full/${bizId}/staff/${staffId}`, { method: 'DELETE' });
+    await authorizedFetch(`/api/biz-full/${bizId}/staff/${staffId}`, { method: 'DELETE' });
     loadDashboard();
   }
 
   async function saveOfferSettings() {
     const btn = document.getElementById('saveOfferBtn');
     btn.textContent = 'Se salvează...';
-    const res = await fetch(`/api/biz-full/${bizId}/offer`, {
+    const res = await authorizedFetch(`/api/biz-full/${bizId}/offer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -401,38 +844,78 @@
     }
   }
 
+  async function loadGooglePilot() {
+    const notice=document.getElementById('pilotIssuerStatus');
+    try {
+      const response=await authorizedFetch('/api/admin/google-wallet-pilot');
+      const state=await response.json();
+      if(!response.ok)throw Error(state.detail||'Nu pot verifica pilotul.');
+      document.getElementById('pilotActive').textContent=
+        state.businesses_with_recorded_stamp_awards+' / '+state.goal_active_businesses;
+      document.getElementById('pilotCards').textContent=
+        state.businesses_with_customer_cards;
+      document.getElementById('pilotRegistered').textContent=
+        state.businesses_registered;
+      document.getElementById('pilotProgress').style.width=
+        Math.min(100,100*state.businesses_with_recorded_stamp_awards/
+          state.goal_active_businesses)+'%';
+      const google=state.google_wallet;
+      const ready=google.issuer_credentials_present &&
+        google.loyalty_class_id_configured;
+      notice.textContent=ready
+        ?'Cardul PWA LOIAL este disponibil fără aprobare Google Wallet.'
+         :'Cardul PWA LOIAL funcționează independent de Google Wallet.';
+    }catch(error){notice.textContent=error.message;}
+  }
+
     async function loadSuperAdmin() {
-    const res = await fetch('/api/admin/overview');
+    await loadGooglePilot();
+    const res = await authorizedFetch('/api/admin/overview');
     if (!res.ok) return;
     const data = await res.json();
     document.getElementById('adminMonthBadge').textContent = 'Luna: ' + data.month;
+    const activityBox=document.getElementById('adminActivity');
+    activityBox.replaceChildren();
+    for(const row of (data.activity||[])){
+      const item=document.createElement('div');
+      item.style.padding='9px 0';
+      item.style.borderBottom='1px solid #e3e8e4';
+      const date=(row.date||'').slice(0,16).replace('T',' ');
+      const detail=row.type==='subscription_payment_confirmed'
+        ? (row.business||'')+' • '+Number(row.amount_eur||0).toFixed(2)+' EUR • '+(row.month||'')
+        : row.type==='business_registered'
+        ? (row.business||'') : '';
+      item.textContent=date+' • '+row.message+(detail?' • '+detail:'');
+      activityBox.appendChild(item);
+    }
+    if(!(data.activity||[]).length)activityBox.textContent='Încă nu există activitate.';
+
 
     document.getElementById('adminBizTable').innerHTML = (data.businesses || []).map(b => `
       <tr>
-        <td><strong>${b.name}</strong></td>
-        <td>${b.email}</td>
-        <td>${b.ambassador_name}</td>
-        <td>${b.customers_count}</td>
-        <td><strong>${b.plan.toUpperCase()}</strong></td>
+        <td><strong>${escapeHtml(b.name)}</strong></td>
+        <td>${escapeHtml(b.email)}</td>
+        <td>${escapeHtml(b.ambassador_name)}</td>
+        <td>${Number(b.customers_count)||0}</td>
+        <td><strong>${escapeHtml((b.plan||'').toUpperCase())}</strong>${b.manual_grant?'<br><small>Acces manual gratuit</small>':''}</td>
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" onclick="toggleProPlan(${b.id})">
-            ${b.plan === 'probusiness' ? 'Treci pe Start' : 'Activează ProBusiness (65€)'}
-          </button>
-          <button type="button" class="btn-danger" onclick="deleteBiz(${b.id}, '${b.name}')">🗑️ Șterge</button>
+          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" data-admin-action="manualPlan" data-id="${Number(b.id)}" data-name="${escapeHtml(b.name)}" data-granted="${b.manual_grant?'1':'0'}">${b.manual_grant?'Retrage ProBusiness manual':'Acordă ProBusiness manual'}</button>
+          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" data-admin-action="inviteAmb" data-email="${escapeHtml(b.email)}">Desemnează ambasador</button>
+          <button type="button" class="btn-danger" data-admin-action="deleteBiz" data-id="${Number(b.id)}" data-name="${escapeHtml(b.name)}">🗑️ Șterge</button>
         </td>
       </tr>
     `).join('');
 
     document.getElementById('adminAmbTable').innerHTML = (data.ambassadors || []).map(a => `
       <tr>
-        <td><strong>${a.agent_name}</strong><br><span style="font-size:12px;color:#475d52;">${a.email}</span></td>
-        <td>${a.rank}</td>
-        <td>${a.total_active_businesses} firme</td>
-        <td>${a.new_this_month} noi (20€) + ${a.recurring_businesses} rec. (${a.recurring_rate}€)</td>
-        <td><strong style="color:#2d6a4f;font-size:15px;">${a.total} EUR</strong></td>
+        <td><strong>${escapeHtml(a.agent_name)}</strong><br><span style="font-size:12px;color:#475d52;">${escapeHtml(a.email)}</span></td>
+        <td>${escapeHtml(a.rank)}</td>
+        <td>${Number(a.total_active_businesses)||0} firme</td>
+        <td>${Number(a.new_this_month)||0} noi (20€) + ${Number(a.recurring_businesses)||0} rec. (${Number(a.recurring_rate)||0}€) + ${Number(a.sponsor_commission)||0}€ recrutări</td>
+        <td><strong style="color:#2d6a4f;font-size:15px;">${Number(a.total)||0} EUR</strong></td>
         <td>
-          <code>${a.payout_method}: ${a.payout_details || 'nesetat'}</code>
-          <button type="button" class="btn-danger" style="margin-left:8px;" onclick="deleteAmb(${a.agent_id}, '${a.agent_name}')">🗑️</button>
+          <code>${escapeHtml(a.payout_method)}: ${escapeHtml(a.payout_details || 'nesetat')}</code>
+          <button type="button" class="btn-danger" style="margin-left:8px;" data-admin-action="deleteAmb" data-id="${Number(a.agent_id)}" data-name="${escapeHtml(a.agent_name)}">🗑️</button>
         </td>
       </tr>
     `).join('');
@@ -446,29 +929,83 @@
 
     document.getElementById('adminTopCustTable').innerHTML = (data.top_customers || []).map(c => `
       <tr>
-        <td><strong>${c.name}</strong></td>
-        <td>${c.businesses_count} afaceri</td>
-        <td>${c.total_stamps} ★</td>
-        <td style="font-size:12px;color:#2d6a4f;">${c.bonus || 'Fără bonus încă'}</td>
+        <td><strong>${escapeHtml(c.name)}</strong></td>
+        <td>${Number(c.businesses_count)||0} afaceri</td>
+        <td>${Number(c.total_stamps)||0} ★</td>
+        <td style="font-size:12px;color:#2d6a4f;">${escapeHtml(c.bonus || 'Fără bonus încă')}</td>
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" onclick="sendManualBonus('${c.wallet_uuid}', '${c.name}')">
+          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" data-admin-action="sendBonus" data-wallet="${escapeHtml(c.wallet_uuid)}" data-name="${escapeHtml(c.name)}">
             🎁 Trimite Bonus
           </button>
-          <button type="button" class="btn-danger" onclick="deleteCust('${c.wallet_uuid}', '${c.name}')">🗑️</button>
+          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" data-admin-action="inviteAmb" data-email="${escapeHtml(c.email||'')}" data-wallet="${escapeHtml(c.wallet_uuid)}">Desemnează ambasador</button>
+          <button type="button" class="btn-danger" data-admin-action="deleteCust" data-wallet="${escapeHtml(c.wallet_uuid)}" data-name="${escapeHtml(c.name)}">🗑️</button>
         </td>
       </tr>
     `).join('');
   }
 
-  async function toggleProPlan(id) {
-    await fetch(`/api/admin/business/${id}/toggle-pro`, { method: 'POST' });
-    loadSuperAdmin();
-  }
+  document.getElementById('superAdminSection').addEventListener('click',event=>{
+    const button=event.target.closest('button[data-admin-action]');
+    if(!button)return;
+    const action=button.dataset.adminAction;
+    const id=Number(button.dataset.id);
+    const wallet=button.dataset.wallet||'';
+    const name=button.dataset.name||'';
+    if(action==='manualPlan'&&Number.isInteger(id))setManualPlan(id,name,button.dataset.granted!=='1');
+    else if(action==='inviteAmb')inviteExistingAmbassador(button.dataset.email||'',wallet);
+    else if(action==='deleteBiz'&&Number.isInteger(id))deleteBiz(id,name);
+    else if(action==='deleteAmb'&&Number.isInteger(id))deleteAmb(id,name);
+    else if(action==='sendBonus'&&wallet)sendManualBonus(wallet,name);
+    else if(action==='deleteCust'&&wallet)deleteCust(wallet,name);
+  });
 
-  async function saveNetworkRule() {
+  async function setManualPlan(id,name,active){
+    if(!confirm((active?'Acordă acces ProBusiness gratuit firmei ':'Retrage accesul manual pentru ')+name+'? Nicio plată sau comision nu va fi înregistrat.'))return;
+    try{
+      const res=await authorizedFetch('/api/admin/business/'+id+'/manual-plan',{
+        method:'PUT',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({active,reason:active?'Acces gratuit acordat de administrator':'Acces manual retras de administrator'})});
+      const result=await res.json();
+      if(!res.ok)throw Error(result.detail||'Nu s-a putut modifica planul.');
+      await loadSuperAdmin();
+    }catch(e){alert(e.message);}
+  }
+  async function inviteExistingAmbassador(prefill='',wallet=''){
+    const field=document.getElementById('adminAmbEmail');
+    const status=document.getElementById('adminInviteStatus');
+    const link=document.getElementById('adminInviteLink');
+    const copy=document.getElementById('adminCopyInvite');
+    let email=String(prefill||field.value||'').trim();
+    if(wallet&&!prefill){email=prompt('Introdu emailul titularului verificat al acestui card LOIAL:','')||'';}
+    if(!email){status.textContent='Introdu emailul membrului.';return;}
+    if(!confirm('Desemnezi '+email+' ca ambasador? Trimite linkul privat numai titularului verificat.'))return;
+    field.value=email;link.value='';link.hidden=true;copy.hidden=true;
+    try{
+      const res=await authorizedFetch('/api/admin/ambassador/invite',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email,wallet_uuid:wallet||null})});
+      const result=await res.json();
+      if(!res.ok)throw Error(result.detail||'Invitația nu a putut fi creată.');
+      link.value=result.activation_url;link.hidden=false;copy.hidden=false;
+      status.textContent='Invitație valabilă 24 ore. Trimite linkul privat titularului; membrul își stabilește parola.';
+    }catch(e){status.textContent=e.message;}
+  }
+  async function downloadCommissionXlsx() {
+    const month=document.getElementById('adminMonthBadge').textContent.replace('Luna: ','').trim();
+    if(!/^\d{4}-\d{2}$/.test(month)){alert('Lună invalidă');return;}
+    const res=await authorizedFetch('/api/loial-revenue/admin/export/'+month+'.xlsx');
+    if(!res.ok){alert('Exportul nu este disponibil.');return;}
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement('a');
+    link.href=url;link.download='loial-comisioane-'+month+'.xlsx';
+    document.body.appendChild(link);link.click();link.remove();
+    URL.revokeObjectURL(url);
+  }
+    async function saveNetworkRule() {
     const btn = document.getElementById('saveRuleBtn');
     btn.textContent = 'Se salvează...';
-    await fetch('/api/admin/network-rule', {
+    await authorizedFetch('/api/admin/network-rule', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -486,7 +1023,7 @@
   async function sendManualBonus(walletUuid, name) {
     const msg = prompt(`Scrie mesajul bonusului Loial pentru ${name}:`, 'Felicitări! Ai primit un voucher cadou din partea rețelei Loial.space!');
     if (!msg) return;
-    await fetch('/api/admin/network-bonus/manual', {
+    await authorizedFetch('/api/admin/network-bonus/manual', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ wallet_uuid: walletUuid, bonus_text: msg })
@@ -496,23 +1033,26 @@
 
     async function deleteBiz(id, name) {
     if (!confirm(`Sigur vrei să ștergi definitiv firma de test "${name}" și să eliberezi email-ul?`)) return;
-    await fetch(`/api/admin/business/${id}`, { method: 'DELETE' });
+    await authorizedFetch(`/api/admin/business/${id}`, { method: 'DELETE' });
     loadSuperAdmin();
   }
 
   async function deleteAmb(id, name) {
     if (!confirm(`Sigur vrei să ștergi definitiv ambasadorul de test "${name}"?`)) return;
-    await fetch(`/api/admin/ambassador/${id}`, { method: 'DELETE' });
+    await authorizedFetch(`/api/admin/ambassador/${id}`, { method: 'DELETE' });
     loadSuperAdmin();
   }
 
   async function deleteCust(walletUuid, name) {
     if (!confirm(`Sigur vrei să ștergi clientul de test "${name}"?`)) return;
-    await fetch(`/api/admin/customer/${walletUuid}`, { method: 'DELETE' });
+    await authorizedFetch(`/api/admin/customer/${walletUuid}`, { method: 'DELETE' });
     loadSuperAdmin();
   }
    
   async function logout() {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('loial_admin_cache_')) localStorage.removeItem(key);
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('biz_id');
@@ -520,6 +1060,7 @@
     location.href = '/login.html';
   }
 </script>
+<script src="/loial-i18n.js"></script>
 </body>
 </html>
 

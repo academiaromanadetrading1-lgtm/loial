@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Loial AI • Consultantul afacerii</title>
+<style>
+:root{--green:#2d6a4f;--ink:#11271d;--light:#f4f8f5;--line:#dfeae2;--soft:#e8f4eb;--muted:#607568;--white:#fff}
+*{box-sizing:border-box}body{margin:0;background:var(--light);font-family:Inter,system-ui,Arial,sans-serif;color:var(--ink);font-size:14px}
+header{background:var(--white);border-bottom:1px solid var(--line);padding:15px max(18px,calc((100% - 1280px)/2));display:flex;align-items:center;justify-content:space-between;gap:10px}
+.brand{font-weight:850;font-size:19px;color:var(--green);text-decoration:none}.back{color:var(--green);font-weight:700;text-decoration:none}
+.layout{max-width:1280px;margin:20px auto;padding:0 16px;display:grid;grid-template-columns:310px minmax(0,1fr) 290px;gap:16px;align-items:start}
+.card{background:#fff;border:1px solid var(--line);border-radius:17px;padding:18px;min-width:0;box-shadow:0 5px 24px rgba(19,51,31,.035)}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:15px;margin:0 0 11px}p{margin:6px 0;color:var(--muted);line-height:1.5}
+.muted{color:var(--muted);font-size:12px}label{display:block;font-weight:700;margin:10px 0 6px}input,select,textarea{font:inherit;width:100%;padding:10px 11px;border:1px solid #cedcd1;border-radius:9px;background:white;color:var(--ink)}
+textarea{resize:vertical;min-height:70px}button,.btn{cursor:pointer;border:1px solid var(--green);border-radius:10px;background:var(--green);color:white;font:inherit;font-weight:700;padding:10px 12px;text-align:center;text-decoration:none}
+button:disabled{opacity:.55;cursor:not-allowed}.ghost{background:#fff;color:var(--green)}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #71b88c;outline-offset:2px}
+.topic{display:flex;gap:6px;align-items:center;text-align:left;margin:7px 0;width:100%;background:#fff;color:var(--ink);border-color:var(--line);font-weight:650}
+.topic.active{border-color:var(--green);background:var(--soft);color:var(--green)}
+.chat{height:min(66vh,650px);min-height:330px;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:8px 2px 15px}
+.bubble{max-width:89%;padding:12px 14px;border-radius:15px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.bubble.assistant{align-self:flex-start;background:#eef4ee}.bubble.user{align-self:flex-end;background:#daf0df}.bubble.meta{align-self:center;font-size:12px;background:#fff;color:#54705b;border:1px dashed #c2d9ca}
+.compose{display:flex;align-items:end;gap:9px}.compose textarea{min-height:52px;max-height:115px;flex:1}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.actions button{font-size:12px}
+.panel{margin-bottom:14px}.status{padding:10px 12px;border-radius:10px;background:var(--soft);color:#204e34;font-size:12px;margin:10px 0}
+.error{background:#fff0ef;color:#a73327}.tiny{font-size:11px;color:var(--muted)}.report{font-size:12px;white-space:pre-wrap;line-height:1.65;max-height:380px;overflow:auto}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row>*{flex:1}.row button{flex:0 0 auto}
+.file-list{font-size:12px;color:var(--muted);max-height:145px;overflow:auto}.file-row{display:flex;gap:5px;align-items:center;margin:7px 0}
+.file-row button{font-size:11px;padding:5px 8px}
+hr{border:0;border-top:1px solid var(--line);margin:16px 0}
+@media(max-width:1100px){.layout{grid-template-columns:250px minmax(0,1fr)}.right{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}}
+@media(max-width:720px){.layout{display:flex;flex-direction:column;margin:10px auto;padding:0 10px}.card,.right{width:100%}.right{display:block}.chat{height:48vh}.brand{font-size:16px}.topics-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.topic{margin:0;font-size:12px}.compose button{padding:10px}}
+/* Responsive workspace: only the selected view occupies the page. */
+.layout.workspace{display:block;max-width:1440px;width:100%;padding:0 24px;margin:20px auto 32px}
+header{padding:14px max(24px,calc((100% - 1392px)/2));flex-wrap:wrap}
+.workspace-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;padding:7px;background:#fff;border:1px solid var(--line);border-radius:15px;margin:0 0 14px}
+.workspace-tab{display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;min-height:46px;background:transparent;color:var(--muted);border:1px solid transparent;font-size:13px;padding:8px 10px;overflow-wrap:anywhere}
+.workspace-tab>span:first-child{font-size:17px}.workspace-tab.active{color:var(--green);background:var(--soft);border-color:#bbd8c5}
+.workspace-view[hidden]{display:none!important}.conversation-layout{display:grid;grid-template-columns:minmax(240px,310px) minmax(0,1fr);gap:16px;align-items:start}
+.chat-card{display:flex;flex-direction:column;min-height:600px;height:calc(100dvh - 164px);max-height:920px}
+.chat-card .chat{flex:1;min-height:180px;height:auto}.chat-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.mode-label{font-size:11px;background:#f4eee0;border-radius:20px;padding:5px 10px;color:#785b22;white-space:normal}.mode-label.online{background:var(--soft);color:var(--green)}
+.chat-card .bubble{max-width:92%}.chat-card .compose{padding-top:8px;border-top:1px solid var(--line);align-items:end}.compose textarea{min-width:0}
+.profile-details>summary{font-weight:800;font-size:16px;cursor:pointer;margin-bottom:10px}.profile-content #details{min-height:112px}
+.tool-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}.tool-grid.single{grid-template-columns:minmax(0,1fr);max-width:980px;margin:0 auto}
+.tool-grid .panel{margin:0;padding:24px}.tool-grid .report{max-height:480px}.tool-grid .file-list{max-height:340px}.file-row{overflow-wrap:anywhere}.file-row{flex-wrap:wrap}.file-row span{min-width:0;flex:1 1 160px}.tool-grid input[type=file]{max-width:100%}
+#documentPreview{overflow-wrap:anywhere;background:#f3f7f4;padding:14px;border:1px solid var(--line);border-radius:10px}
+@media(max-width:1050px){.workspace-nav{grid-template-columns:repeat(3,minmax(0,1fr))}.chat-card{height:calc(100dvh - 230px);min-height:500px}.conversation-layout{grid-template-columns:240px minmax(0,1fr)}}
+@media(max-width:760px){.layout.workspace{padding:0 10px;margin:10px auto 20px}.workspace-nav{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:5px}.workspace-tab{flex-direction:column;gap:2px;font-size:11px;line-height:1.25;min-height:56px;padding:5px}.conversation-layout,.tool-grid{display:flex;flex-direction:column}.profile-card,.chat-card,.tool-grid .panel{width:100%;min-width:0}.profile-card{padding:12px 14px}.profile-details>summary{margin:0}.profile-content{padding-top:12px}.chat-card{height:calc(100dvh - 265px);min-height:400px;padding:14px}.tool-grid .panel{padding:16px}header{padding:12px 10px;gap:8px}.brand{font-size:14px}.back{font-size:12px}.chat-card textarea{font-size:16px}.compose button{min-width:42px;padding:10px}.chat-card .bubble{font-size:14px;max-width:95%}}
+@media(max-width:380px){.workspace-tab{font-size:10px}.brand{font-size:13px}}
+
+
+/* Chat output: keyboard-accessible horizontal scroll is confined to wide tables. */
+.chat-card .bubble.rich-answer{white-space:normal;width:fit-content;max-width:100%;min-width:0;flex-shrink:0;overflow-wrap:anywhere;background:#f5f8f5;border:1px solid var(--line);padding:16px 18px}
+.rich-answer p,.rich-answer li{color:var(--ink);line-height:1.65;margin:0 0 8px}
+.rich-answer h2,.rich-answer h3,.rich-answer h4{font-size:15px;line-height:1.35;margin:14px 0 8px}
+.rich-answer h2:first-child,.rich-answer h3:first-child,.rich-answer h4:first-child{margin-top:0}
+.rich-answer ul,.rich-answer ol{padding-left:24px;margin:8px 0 12px}.rich-answer li{padding-left:2px}
+.rich-answer code{background:#dfeae2;padding:1px 4px;border-radius:4px}
+.rich-answer pre{max-width:100%;overflow:auto;white-space:pre-wrap;background:#e8f0e9;padding:10px;border-radius:8px}
+.chat-table-wrap{max-width:100%;overflow-x:auto;margin:12px 0;border:1px solid var(--line);border-radius:10px;background:#fff}
+.chat-table-wrap:focus-visible{outline:2px solid #71b88c}
+.chat-table-wrap table{border-collapse:collapse;min-width:100%;font-size:13px}
+.chat-table-wrap th,.chat-table-wrap td{padding:9px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+.chat-table-wrap th{background:#e4f0e7;font-size:12px;white-space:nowrap}
+.chat-table-wrap tr:last-child td{border-bottom:0}.chat-table-wrap .numeric{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.chat-chart{margin:16px 0 6px;padding:18px;background:#fff;border:1px solid #d5e2da;border-radius:14px;min-width:0;width:100%;box-sizing:border-box}
+.chat-chart figcaption{font-weight:750;font-size:16px;margin-bottom:16px;color:#244b38}.chart-line{margin:14px 0}
+.chart-caption{display:flex;align-items:start;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12px;margin-bottom:5px}.chart-caption strong{font-variant-numeric:tabular-nums}
+.chart-track{position:relative;background:#edf2ee;height:24px;overflow:hidden;border-radius:6px}
+.chart-fill{position:absolute;top:0;bottom:0;background:#78ad8d;border-radius:5px}.chart-fill.baseline{background:#9dc8ae}.chart-fill.target{background:#26543c}.chart-fill.negative{background:#4d8065; background-image:repeating-linear-gradient(135deg,transparent,transparent 5px,#ffffff40 5px,#ffffff40 8px)}
+.chart-axis{position:absolute;top:0;bottom:0;width:1px;background:#a5baac}
+@media(max-width:760px){.chat-card .bubble.rich-answer{padding:12px;max-width:100%;width:100%}.chat-table-wrap th,.chat-table-wrap td{padding:8px;font-size:12px}.chat-chart{padding:10px}}
+</style>
+</head>
+<body>
+<header><a class="brand" href="/platform.html">◉ LOIAL • AI BUSINESS</a><a class="back" href="/platform.html">← Panou firmă</a></header>
+<main class="layout workspace">
+<nav class="workspace-nav" aria-label="Instrumente LOIAL"><button class="workspace-tab active" type="button" data-workspace="chat" aria-pressed="true"><span aria-hidden="true">◉</span><span>Conversație</span></button><button class="workspace-tab" type="button" data-workspace="documents" aria-pressed="false"><span aria-hidden="true">▤</span><span>Documente și facturi</span></button><button class="workspace-tab" type="button" data-workspace="sales" aria-pressed="false"><span aria-hidden="true">▧</span><span>Bonuri și vânzări</span></button><button class="workspace-tab" type="button" data-workspace="reports" aria-pressed="false"><span aria-hidden="true">▥</span><span>Rapoarte și indicatori</span></button><button class="workspace-tab" type="button" data-workspace="customers" aria-pressed="false"><span aria-hidden="true">◎</span><span>Clienți și exporturi</span></button><button class="workspace-tab" type="button" data-workspace="messages" aria-pressed="false"><span aria-hidden="true">✉</span><span>Campanii și mesaje</span></button></nav>
+<div id="workspaceNotice" class="status" role="status" aria-live="polite" hidden></div>
+<section class="workspace-view active" id="view-chat" data-view="chat" ><div class="conversation-layout"><aside class="card profile-card" id="profileCard">
+<details class="profile-details" id="profileDetails" open><summary>Consultantul afacerii tale</summary><div class="profile-content">
+<p>Loial îți explică vânzările, costurile, clienții și oportunitățile, adaptat activității tale.</p>
+<div class="status" id="connection">Se verifică accesul la Loial Business...</div>
+<label for="sector">Tip de activitate</label>
+<select id="sector"></select>
+<label for="currency">Moneda rapoartelor</label>
+<select id="currency"><option value="RON">RON</option><option value="EUR">EUR</option><option value="USD">USD</option><option value="GBP">GBP</option></select>
+<label for="details">Cum funcționează afacerea ta?</label>
+<textarea id="details" maxlength="1200" placeholder="Ex.: Lucrez cu Uber și Bolt, am o mașină electrică și țin evidența kilometrilor."></textarea>
+<button class="ghost" style="width:100%;margin:8px 0 5px" id="saveProfile">Salvează profilul</button>
+<div id="profileFeedback" class="status" role="status" aria-live="polite" style="margin:4px 0 15px" hidden></div>
+<h2>Ce vrei să analizăm?</h2>
+<div id="topics" class="topics-grid"></div>
+</div></details></aside><section class="card chat-card">
+<h1>Loial AI</h1>
+<div class="chat-top"><p id="headline">Consultant managerial, prin conversații exclusiv text</p><span id="aiMode" class="mode-label" role="status"></span></div>
+<div class="chat" id="chat" aria-live="polite"></div>
+<div id="selectedDocument" class="status" hidden><span id="selectedDocumentName"></span> <button class="ghost" id="clearDocument" type="button" style="padding:4px 8px">×</button></div>
+<div id="chatFeedback" class="status" role="status" aria-live="polite" hidden></div>
+<div class="compose">
+<textarea id="message" aria-label="Mesaj către Loial AI" placeholder="Scrie întrebarea ta..."></textarea>
+<button id="openAttachments" type="button" class="ghost" title="Documente și facturi" aria-label="Documente și facturi">＋</button><button id="send">Trimite</button>
+</div>
+<p class="tiny">Loial folosește datele confirmate ale firmei. Când lipsesc informații, le solicită. Recomandările nu înlocuiesc contabilul.</p>
+</section>
+</div></section>
+<section class="workspace-view" id="view-documents" data-view="documents" hidden><div class="tool-grid"><section class="card panel">
+<h2>Documente și capturi</h2>
+<p>Încarcă facturi, fotografii, screenshoturi, PDF, Excel sau CSV. Verifică întotdeauna datele extrase.</p>
+<input type="file" id="attachment" accept=".jpg,.jpeg,.png,.webp,.pdf,.xlsx,.csv,image/*" aria-label="Document de analizat">
+<button id="upload" style="width:100%;margin-top:10px">Încarcă și prelucrează</button>
+<div id="documentFeedback" class="status" role="status" hidden></div><div class="file-list" id="files"></div><pre id="documentPreview" class="report" hidden></pre>
+</section><section class="card panel" id="expensesPanel">
+<h2>Facturi și cheltuieli confirmate</h2>
+<p>Introdu valorile de pe factură sau selectează o fotografie/PDF încărcat. Loial le folosește numai după confirmarea ta.</p>
+<label for="expenseDoc">Document asociat (opțional)</label>
+<select id="expenseDoc"><option value="">Factură introdusă manual</option></select>
+<label for="expenseRef">Numărul facturii</label>
+<input id="expenseRef" maxlength="100" placeholder="Ex.: F-1024">
+<label for="expenseSupplier">Furnizor</label>
+<input id="expenseSupplier" maxlength="160" placeholder="Ex.: Furnizor piese auto">
+<label for="expenseDate">Data facturii</label>
+<input id="expenseDate" type="date">
+<label for="expenseCategory">Tip cheltuială</label>
+<select id="expenseCategory">
+<option value="supplies">Materiale și piese</option>
+<option value="rent">Chirie</option>
+<option value="utilities">Utilități</option>
+<option value="personnel">Personal</option>
+<option value="marketing">Marketing</option>
+<option value="transport">Transport</option>
+<option value="services">Servicii externe</option>
+<option value="taxes">Taxe și contribuții</option>
+<option value="other">Altele</option>
+</select>
+<label for="expenseAmount">Valoarea din factură</label>
+<input id="expenseAmount" type="number" min="0.01" step="0.01" placeholder="Ex.: 119.00">
+<label for="expenseVatBasis">Valoarea introdusă este</label>
+<select id="expenseVatBasis"><option value="gross">Cu TVA inclus</option><option value="net">Fără TVA</option></select>
+<label style="font-size:12px;display:flex;gap:8px;align-items:flex-start;margin-top:10px">
+<input type="checkbox" id="expenseConfirmed" style="width:17px;min-width:17px;height:17px">
+Am verificat factura, valoarea, data și baza TVA. Confirm că informațiile sunt reale.
+</label>
+<button id="expenseSave" style="margin-top:10px;width:100%">Înregistrează cheltuiala verificată</button>
+<div class="report" id="expenseOutput" role="status"></div>
+<button type="button" class="ghost" id="expenseReport" style="width:100%;margin-top:9px">Vezi cheltuielile confirmate</button>
+<p class="tiny">Loial nu transformă automat o fotografie în înregistrare contabilă și nu deduce profitul net din cheltuieli incomplete.</p>
+</section></div></section>
+<section class="workspace-view" id="view-sales" data-view="sales" hidden><div class="tool-grid single"><section class="card panel" id="receipts">
+<h2>Bonuri cu QR Loial • pilot</h2>
+<p>Înregistrează bonul real și produsele. Loial creează un QR unic pe care îl poți afișa sau tipări separat de bonul fiscal.</p>
+<label for="receiptNumber">Numărul bonului / comenzii</label>
+<input id="receiptNumber" maxlength="100" placeholder="Ex.: Bon-2026-1042">
+<label for="receiptItems">Linii de bon</label>
+<textarea id="receiptItems" rows="4" placeholder="Produs;Cantitate;Preț unitar;Cost variabil (opțional)
+Ex.: Revizie auto;1;220;65"></textarea>
+<button type="button" id="issueReceipt" style="width:100%;margin-top:9px">Generează QR pentru bon</button>
+<div class="report" id="receiptStatus" role="status"></div>
+<img id="receiptQR" alt="QR unic de revendicare a bonului" style="width:190px;max-width:100%;display:none;margin:12px auto;">
+<div id="receiptUrlBox" style="display:none">
+  <input id="receiptUrl" readonly aria-label="Link de revendicare">
+  <button class="ghost" type="button" id="copyReceipt" style="width:100%;margin-top:6px">Copiază linkul bonului</button>
+</div>
+<button class="ghost" type="button" id="showReceipts" style="width:100%;margin-top:9px">Bonuri recente și retururi</button>
+<div id="receiptList" class="file-list"></div>
+<p class="tiny">Integrarea directă cu POS-ul sau casa fiscală necesită suportul sistemului de vânzări. Codul QR fiscal standard nu transmite automat produsele către Loial.</p>
+</section></div></section>
+<section class="workspace-view" id="view-reports" data-view="reports" hidden><div class="tool-grid"><section class="card panel">
+<h2>Raport și solicitare săptămânală</h2>
+<div class="actions">
+<button class="ghost" id="weekly">Ce date îți trebuie?</button>
+<button class="ghost" id="reportBtn">Vezi raportul</button>
+</div>
+<div class="report" id="report"></div>
+</section><section class="card panel" id="breakEvenPanel">
+<h2>Pragul de rentabilitate</h2>
+<p>Verifică aproximativ ce vânzări ar trebui să realizeze firma pentru a acoperi costurile fixe. Loial calculează numai din datele confirmate, fără estimări inventate.</p>
+<label for="bePeriod">Luna analizată</label>
+<input id="bePeriod" type="month" required>
+<label for="beFixed">Costuri fixe ale acelei luni</label>
+<input id="beFixed" type="number" min="0" step="0.01" placeholder="Ex.: 12000">
+<label class="tiny" style="display:flex;align-items:flex-start;gap:8px;margin:12px 0;">
+<input id="beVatConfirmed" type="checkbox" style="flex:none;width:17px;height:17px;margin:1px 0;">
+<span>Confirm că toate prețurile de vânzare și costurile variabile introduse sunt pe baze comparabile, fără TVA, pentru aceeași lună.</span>
+</label>
+<button class="ghost" id="runBreakEven" style="width:100%">Analizează pragul</button>
+<div id="beResult" class="report" role="status"></div>
+<p class="tiny">Acesta este un indicator de gestiune, nu un calcul automat al profitului net sau o înregistrare contabilă.</p>
+</section><section class="card panel">
+<h2>Indicatori pentru activitatea ta</h2>
+<label for="metricName">Indicator</label><select id="metricName"></select>
+<label for="metricValue">Valoarea raportată</label><input type="number" step="any" id="metricValue" placeholder="Ex.: 125">
+<label for="metricPeriod">Perioada (ex.: 2026-W47)</label><input id="metricPeriod" maxlength="30" placeholder="2026-W47">
+<button class="ghost" id="saveMetric" style="width:100%;margin-top:9px">Salvează indicatorul</button>
+</section></div></section>
+<section class="workspace-view" id="view-customers" data-view="customers" hidden><div class="tool-grid"><section class="card panel">
+<h2>Clienți și cumpărături</h2>
+<button class="ghost" id="showClients" style="width:100%">Vezi clienții firmei</button>
+<div id="customerList" class="file-list" style="margin-top:10px"></div>
+</section><section class="card panel">
+<h2>Exporturi</h2>
+<div class="actions">
+<button class="ghost" data-export="customers.xlsx">Clienți Excel</button>
+<button class="ghost" data-export="sales.xlsx">Vânzări Excel</button>
+<button class="ghost" data-export="ads-consented.csv">Publicitate CSV</button>
+</div><div class="actions"><button class="ghost" data-export="customers.csv">Clienți CSV</button><button class="ghost" data-export="sales.csv">Vânzări CSV</button></div><div id="exportFeedback" class="status" role="status" hidden></div>
+<p class="tiny">Audiențele publicitare includ numai clienți cu consimțământul necesar înregistrat.</p>
+</section></div></section>
+<section class="workspace-view" id="view-messages" data-view="messages" hidden><div class="tool-grid single"><section class="card panel" id="messagesSection">
+<h2>Mesaje directe în Loial</h2>
+<p>Trimite o ofertă sau o noutate în portofelul Loial. Fără email, SMS, cote lunare sau contracte externe.</p>
+<label for="template">Mesaje predefinite</label><select id="template"><option value="">Selectează un mesaj...</option></select>
+<button class="ghost" id="useTemplate" style="width:100%;margin-top:7px">Folosește acest mesaj</button>
+<label for="subject">Titlul mesajului</label>
+<input id="subject" maxlength="120" placeholder="Ex.: O noutate de la noi">
+<label for="objective">Ce vrei să obții?</label>
+<input id="objective" placeholder="Ex.: Reactivarea clienților inactivi">
+<label for="audience">Public vizat</label>
+<select id="audience">
+<option value="inactive_31_90">Inactivi 31–90 zile</option>
+<option value="inactive_8_30">Inactivi 8–30 zile</option>
+<option value="inactive_91_365">Inactivi 91–365 zile</option>
+<option value="active_0_7">Clienți activi</option>
+<option value="all">Toți clienții care acceptă ofertele Loial</option>
+<option value="product_buyers">Cumpărători ai unui produs/serviciu</option>
+</select>
+<label for="singleRecipient">Client individual (opțional)</label>
+<select id="singleRecipient"><option value="">Toți cei din segmentul ales</option></select>
+<label for="productFilter">Produs sau serviciu (opțional)</label>
+<input id="productFilter" placeholder="Ex.: croissant / revizie auto / spălare">
+<label for="offer">Textul care ajunge în Loial</label>
+<textarea id="offer" rows="4" maxlength="2000" placeholder="Ex.: Revino pentru o surpriză la următoarea vizită."></textarea>
+<div class="actions">
+<button class="ghost" id="draftCampaign">Propunere cu AI</button>
+<button class="ghost" id="previewAudience">Vezi destinatarii</button>
+</div>
+<button id="sendCampaign" style="width:100%;margin-top:9px">Trimite acum în Loial</button>
+<div class="report" id="campaignPreview" style="margin-top:11px"></div>
+<p class="tiny">Mesajul apare în portofelul Loial al destinatarilor eligibili. Nu se folosește emailul. Clientul poate opri ofertele din preferințele portofelului.</p>
+<hr>
+<h2>Mesaje trimise</h2>
+<button class="ghost" id="refreshSent" style="width:100%">Actualizează rezultatele</button>
+<div class="report" id="sentHistory"></div>
+</section></div></section>
+</main>
+<script src="/loial-i18n.js"></script>
+<script>
+const API='/api/loial-ai';
+const token=localStorage.getItem('token') || '';
+const $=x=>document.getElementById(x);
+let currentTopic='general', canUse=false, currentIndustry='general', currentCampaignId=null;
+let pendingMessageKey='', pendingMessageFingerprint='';
+function showWorkspace(key,updateHash=true){
+  if(!['chat','documents','sales','reports','customers','messages'].includes(key))key='chat';
+  for(const panel of document.querySelectorAll('[data-view]')){panel.hidden=panel.dataset.view!==key;panel.classList.toggle('active',!panel.hidden);}
+  for(const tab of document.querySelectorAll('[data-workspace]')){const active=tab.dataset.workspace===key;tab.classList.toggle('active',active);tab.setAttribute('aria-pressed',String(active));}
+  const notice=$('workspaceNotice');if(notice)notice.hidden=true;
+  if(updateHash)history.replaceState(null,'',location.pathname+location.search+(key==='chat'?'':'#'+key));
+  if(key==='chat')$('chat').scrollTop=$('chat').scrollHeight;
+}
+document.querySelectorAll('[data-workspace]').forEach(b=>b.addEventListener('click',()=>showWorkspace(b.dataset.workspace)));
+$('openAttachments').onclick=()=>showWorkspace('documents');
+if(matchMedia('(max-width:760px)').matches)$('profileDetails').open=false;
+showWorkspace(location.hash.slice(1)||'chat',false);
+window.addEventListener('hashchange',()=>showWorkspace(location.hash.slice(1)||'chat',false));
+
+let savedProfile=null, feedbackKey='', connectionKey='', savingProfile=false;
+let selectedDocument=null, aiStatus='unknown', sending=false;
+const tr=s=>window.LoialLang?LoialLang.t(s):s;
+const language=()=>window.LoialLang?LoialLang.get():'ro';
+function renderProfileHeadline(){if(savedProfile)$('headline').textContent=savedProfile.business+' • '+tr(savedProfile.industry.label)+' • '+savedProfile.currency;}
+function feedback(key,err=false,detail=''){feedbackKey=key;const box=$('profileFeedback');box.hidden=false;box.classList.toggle('error',err);box.textContent=tr(key)+(detail?' — '+detail:'');}
+function applySavedProfile(p){savedProfile=p;currentIndustry=p.industry.key;renderProfileHeadline();renderMetricChoices();if(window.LoialLang)LoialLang.apply();}
+function dirty(){return savedProfile&&($('sector').value!==savedProfile.industry.key||$('details').value!==savedProfile.description||$('currency').value!==savedProfile.currency);}
+for(const id of ['sector','details','currency'])$(id).addEventListener('input',()=>{if(savedProfile&&!savingProfile)feedback(dirty()?'Modificări nesalvate':'Profil salvat');});
+document.addEventListener('loial:language',()=>{renderProfileHeadline();if(connectionKey)status(tr(connectionKey));if(feedbackKey)feedback(feedbackKey);setAIStatus(aiStatus);if(!savingProfile)$('saveProfile').textContent=tr('Salvează profilul');});
+const sectorMetrics={
+  rideshare:[['revenue','Încasări din curse'],['online_hours','Ore online'],['kilometres','Kilometri parcurși'],['platform_fees','Comisioane Uber/Bolt'],['fuel_energy','Combustibil sau încărcări']],
+  atelier_auto:[['revenue','Încasări atelier'],['billed_hours','Ore facturate'],['worked_hours','Ore lucrate']],
+  self_wash:[['revenue','Încasări spălătorie'],['wash_cycles','Cicluri de spălare'],['active_bays','Boxe active']],
+  patiserie:[['revenue','Încasări'],['waste_value','Pierderi produse']],
+  restaurant:[['revenue','Încasări'],['waste_value','Pierderi alimente']],
+  salon:[['revenue','Încasări'],['appointments','Programări']],
+  retail:[['revenue','Încasări'],['returns','Retururi']],
+  ecommerce:[['revenue','Încasări'],['returns','Retururi']],
+  general:[['revenue','Încasări'],['operating_cost','Cheltuieli operaționale']]
+};
+function renderMetricChoices(){
+  $('metricName').replaceChildren();
+  (sectorMetrics[currentIndustry]||sectorMetrics.general).forEach(([key,name])=>{
+    const o=document.createElement('option');o.value=key;o.textContent=name;$('metricName').appendChild(o);
+  });
+}
+function status(message,error=false){$('connection').textContent=message;$('connection').classList.toggle('error',error);const n=$('workspaceNotice');if(n){n.hidden=!error&&!document.querySelector('.workspace-view:not([hidden]):not(#view-chat)');n.textContent=message;n.classList.toggle('error',error);}}
+function setAIStatus(value){aiStatus=value;const mode=$('aiMode');mode.textContent=tr(value==='configured'?'AI configurat':value==='budget_exhausted'?'Buget AI epuizat':value==='provider_unavailable'?'AI temporar indisponibil':'AI neconectat');mode.classList.toggle('online',value==='configured');}
+function chatFeedback(message,error=false){const b=$('chatFeedback');b.textContent=message;b.hidden=!message;b.classList.toggle('error',error);}
+function chooseDocument(id,name){selectedDocument=id;$('selectedDocumentName').textContent=tr('Document selectat')+': '+name;$('selectedDocument').hidden=false;showWorkspace('chat');$('message').focus();}
+$('clearDocument').onclick=()=>{selectedDocument=null;$('selectedDocument').hidden=true;};
+async function api(path,opts={}){
+  const res=await fetch(API+path,{...opts,headers:{'Authorization':'Bearer '+token,...(opts.body instanceof FormData?{}:{'Content-Type':'application/json'}),...(opts.headers||{})}});
+  let data;
+  try{data=await res.json();}catch(e){throw new Error('Răspuns neașteptat de la server ('+res.status+')');}
+  if(!res.ok){const detail=data.detail;const err=new Error(typeof detail==='string'?detail:detail?.message||data.message||'Eroare '+res.status);err.code=detail?.code||'';throw err;}
+  return data;
+}
+// Safe Markdown subset; model and historic message content is always text, never HTML.
+function richInline(parent,text){
+  const pattern=/(\*\*([^*\n]+)\*\*|__([^_\n]+)__|\x60([^\x60\n]+)\x60|\*([^*\n]+)\*)/g;
+  let offset=0;
+  for(const m of text.matchAll(pattern)){
+    parent.append(document.createTextNode(text.slice(offset,m.index)));
+    const el=document.createElement(m[2]||m[3]?'strong':m[4]?'code':'em');
+    el.textContent=m[2]||m[3]||m[4]||m[5];parent.append(el);
+    offset=m.index+m[0].length;
+  }
+  parent.append(document.createTextNode(text.slice(offset)));
+}
+function richChart(parent,raw){
+  let data;try{data=JSON.parse(raw);}catch(e){return false;}
+  if(!data||typeof data.title!=='string'||data.title.length>180||
+     !/^[A-Z]{3}$/.test(data.unit)||!Array.isArray(data.points)||data.points.length<2||data.points.length>8||
+     data.points.some(p=>!p||typeof p.label!=='string'||p.label.length>100||
+       typeof p.value!=='number'||!Number.isFinite(p.value)||Math.abs(p.value)>1e14))return false;
+  const figure=document.createElement('figure');figure.className='chat-chart';
+  const caption=document.createElement('figcaption');caption.textContent=data.title;figure.append(caption);
+  const max=Math.max(0,...data.points.map(p=>p.value)),min=Math.min(0,...data.points.map(p=>p.value));
+  const span=max-min||1,zero=-min/span*100;
+  let formatter;try{formatter=new Intl.NumberFormat(language(),{maximumFractionDigits:2});}
+  catch(e){formatter=new Intl.NumberFormat('ro',{maximumFractionDigits:2});}
+  for(const p of data.points){
+    const line=document.createElement('div');line.className='chart-line';
+    const top=document.createElement('div');top.className='chart-caption';
+    const name=document.createElement('span');name.textContent=p.label;
+    const val=document.createElement('strong');val.textContent=formatter.format(p.value)+' '+data.unit;top.append(name,val);
+    const track=document.createElement('div');track.className='chart-track';
+    const axis=document.createElement('span');axis.className='chart-axis';axis.style.left=zero+'%';
+    const bar=document.createElement('span');bar.className='chart-fill'+(p.value<0?' negative':p.kind==='target'?' target':p.kind==='baseline'?' baseline':'');
+    bar.style.left=(p.value<0?(p.value-min)/span*100:zero)+'%';
+    bar.style.width=Math.abs(p.value)/span*100+'%';
+    track.append(bar,axis);line.append(top,track);figure.append(line);
+  }
+  parent.append(figure);return true;
+}
+// Render historical text charts only when every row has an unambiguous numeric value.
+function legacyChart(parent,raw){
+  const rows=String(raw||'').trim().split(/\r?\n/).filter(x=>x.trim());
+  if(rows.length<2||rows.length>8)return false;
+  const points=[];let unit=null;
+  for(const row of rows){
+    const m=row.trim().match(/^(.+?)\s{1,}([+\-\u2212]?\s*\d[\d.,\u00a0 ]*)\s+(lei|RON|EUR|USD|GBP|PLN|HUF|CHF)\s+[█▓▒░▇▆▅▄▃▂▁■]+(?:\s*)$/i);
+    if(!m)return false;
+    let n=m[2].replace(/\s/g,'').replace('\u2212','-');
+    // Only interpret grouped thousands and a decimal separator when the format is unambiguous.
+    if(/^[+-]?\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$/.test(n))n=n.replace(/\./g,'').replace(',','.');
+    else if(/^[+-]?\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?$/.test(n))n=n.replace(/,/g,'');
+    else if(/^[+-]?\d+(?:,\d{1,2})?$/.test(n))n=n.replace(',','.');
+    else if(!/^[+-]?\d+(?:\.\d{1,2})?$/.test(n))return false;
+    const value=Number(n),currency=m[3].toUpperCase()==='LEI'?'RON':m[3].toUpperCase();
+    if(!Number.isFinite(value)||Math.abs(value)>1e14||unit&&unit!==currency)return false;
+    unit=currency;const label=m[1].trim();
+    points.push({label,value,kind:/^(?:ținta|tinta|target|objetivo|ziel|objectif|obiettivo|doel|cel|cél)\b/iu.test(label)?'target':'scenario'});
+  }
+  return richChart(parent,JSON.stringify({title:({ro:'Comparație pe scenarii',en:'Scenario comparison',es:'Comparación de escenarios',de:'Szenariovergleich',fr:'Comparaison des scénarios',it:'Confronto degli scenari',nl:'Scenariovergelijking',pl:'Porównanie scenariuszy',hu:'Forgatókönyvek összehasonlítása'})[language()]||'Scenario comparison',unit,points}));
+}
+function renderRich(parent,text){
+  const lines=String(text||'').split(/\r?\n/);
+  const cells=line=>line.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(x=>x.trim());
+  const isTable=(line,next)=>typeof next==='string'&&line.includes('|')&&cells(line).length>=2&&
+     cells(next).length===cells(line).length&&cells(next).every(c=>/^:?-{3,}:?$/.test(c));
+  for(let i=0;i<lines.length;){
+    const line=lines[i].trim();
+    if(!line){i++;continue;}
+    const fence=line.match(/^\x60{3}([\w-]*)\s*$/);
+    if(fence){
+      const body=[];i++;while(i<lines.length&&!/^\s*\x60{3}\s*$/.test(lines[i]))body.push(lines[i++]);
+      if(i<lines.length)i++;
+      if(fence[1]==='loial-chart'){richChart(parent,body.join('\n'));continue;}
+      if(fence[1]==='loial-simulation')continue;
+      if(legacyChart(parent,body.join('\n')))continue;
+      const pre=document.createElement('pre');pre.textContent=body.join('\n');parent.append(pre);continue;
+    }
+    if(/[█▓▒░▇▆▅▄▃▂▁■]/.test(line)){
+      let j=i;while(j<lines.length&&/[█▓▒░▇▆▅▄▃▂▁■]/.test(lines[j])&&j-i<9)j++;
+      if(legacyChart(parent,lines.slice(i,j).join('\n'))){i=j;continue;}
+    }
+    if(isTable(line,lines[i+1])){
+      const headings=cells(line),aligns=cells(lines[i+1]);i+=2;
+      const wrap=document.createElement('div');wrap.className='chat-table-wrap';wrap.tabIndex=0;
+      const table=document.createElement('table'),thead=document.createElement('thead'),head=document.createElement('tr'),body=document.createElement('tbody');
+      headings.forEach((v,k)=>{const c=document.createElement('th');c.scope='col';richInline(c,v);if(aligns[k].endsWith(':'))c.className='numeric';head.append(c);});
+      thead.append(head);table.append(thead,body);
+      while(i<lines.length&&lines[i].includes('|')&&cells(lines[i]).length===headings.length){
+        const tr=document.createElement('tr');cells(lines[i++]).forEach((v,k)=>{const td=document.createElement('td');richInline(td,v);if(aligns[k].endsWith(':'))td.className='numeric';tr.append(td);});body.append(tr);
+      }
+      wrap.append(table);parent.append(wrap);continue;
+    }
+    const heading=line.match(/^(#{1,6})\s+(.+)$/);
+    if(heading){const h=document.createElement('h'+Math.min(4,heading[1].length+1));richInline(h,heading[2]);parent.append(h);i++;continue;}
+    if(/^[-*_]{3,}$/.test(line)){parent.append(document.createElement('hr'));i++;continue;}
+    const list=line.match(/^([-*+]|\d+[.)])\s+(.+)$/);
+    if(list){
+      const ordered=/^\d/.test(list[1]),el=document.createElement(ordered?'ol':'ul');
+      if(ordered)el.start=parseInt(list[1],10);
+      while(i<lines.length){
+        const m=lines[i].trim().match(/^([-*+]|\d+[.)])\s+(.+)$/);
+        if(!m||/^\d/.test(m[1])!==ordered)break;
+        const item=document.createElement('li');richInline(item,m[2]);el.append(item);i++;
+      }
+      parent.append(el);continue;
+    }
+    const p=document.createElement('p');richInline(p,line);parent.append(p);i++;
+  }
+}
+function bubble(role,text){
+  const b=document.createElement('div');b.className='bubble '+(['assistant','user','meta'].includes(role)?role:'meta');
+  if(role==='assistant'){b.classList.add('rich-answer');renderRich(b,text);}
+  else b.textContent=text;
+  $('chat').appendChild(b);$('chat').scrollTop=$('chat').scrollHeight;
+}
+function setTopic(key,label){currentTopic=key;
+  document.querySelectorAll('.topic').forEach(x=>x.classList.toggle('active',x.dataset.topic===key));
+  if(!sending&&!$('message').value.trim())$('message').value=tr(label); $('message').placeholder=tr('Scrie întrebarea ta...');
+  $('message').focus();
+}
+async function init(){
+  if(!token){status('Autentifică-te ca administrator Business.',true);return;}
+  try{
+    const c=await api('/context');
+    canUse=true;currentIndustry=c.industry.key;connectionKey=c.ai_connected?'Loial AI este conectat':'Analizele și importurile sunt disponibile; conversația AI necesită activarea furnizorului';status(tr(connectionKey));
+    savedProfile=c;renderProfileHeadline();setAIStatus(c.ai_status||(c.ai_connected?'configured':'not_configured'));
+    $('sector').replaceChildren();
+    c.sectors.forEach(s=>{const opt=document.createElement('option');opt.value=s.key;opt.textContent=s.label;$('sector').appendChild(opt);});
+    $('sector').value=currentIndustry;
+    $('currency').value=c.currency||'RON';
+    $('details').value=c.description||'';
+    applySavedProfile(c);feedback('Profil încărcat');
+    const templates=await api('/message-templates');
+    templates.forEach(x=>{
+      const o=document.createElement('option');o.value=x.key;
+      o.textContent=x.label+(x.requires_marketing_permission?' • marketing':'');
+      $('template').appendChild(o);
+    });
+    c.topics.forEach(t=>{const b=document.createElement('button');b.type='button';b.className='topic';b.dataset.topic=t.key;b.textContent=t.label;
+      b.addEventListener('click',()=>setTopic(t.key,t.label));$('topics').appendChild(b);});
+    if(window.LoialLang)LoialLang.apply();
+    const h=await api('/history');if(h.length){h.forEach(x=>bubble(x.role,x.text));}else{bubble('assistant',tr('Bun venit! Spune-mi ce tip de activitate ai sau alege o temă din stânga. Te voi întreba doar ce date sunt necesare pentru analiză.'));}
+    await loadFiles();
+    await loadMessageRecipients();
+    await refreshSent();
+    showWorkspace(location.hash.slice(1)||'chat',false);
+    const weekly=await api('/weekly');
+    $('weekly').title=weekly.automated_delivery
+      ?'Loial pregătește săptămânal solicitarea în această conversație.'
+      :'Generare la cerere. Automatizarea serverului nu este activă.';
+    if(weekly.last_weekly_request_at){
+      $('report').textContent='Ultima solicitare săptămânală: '+
+        new Date(weekly.last_weekly_request_at).toLocaleString('ro-RO')+
+        '. Vezi mesajul din conversație.';
+    }
+
+  }catch(e){status(e.message,true);}
+}
+async function send(){
+  if(!canUse||sending)return;
+  const text=$('message').value.trim();if(!text)return;
+  if(aiStatus==='not_configured'||aiStatus==='budget_exhausted'){
+    chatFeedback(tr(aiStatus==='not_configured'?'AI neconectat. Întrebarea ta a fost păstrată. Instrumentele de analiză rămân disponibile.':'Buget AI epuizat'),true);return;
+  }
+  sending=true;$('send').disabled=true;$('message').readOnly=true;
+  chatFeedback(tr('Loial analizează întrebarea…'));
+  try{const r=await api('/chat',{method:'POST',body:JSON.stringify({text,topic:currentTopic,language:language(),document_id:selectedDocument})});
+    bubble('user',text);bubble('assistant',r.answer);$('message').value='';chatFeedback('');setAIStatus('configured');}
+  catch(e){if(e.code)setAIStatus(e.code);chatFeedback(e.message,true);}
+  finally{sending=false;$('send').disabled=false;$('message').readOnly=false;}
+}
+$('send').addEventListener('click',send);
+$('message').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
+$('saveProfile').addEventListener('click',async()=>{
+  if(!canUse||savingProfile)return;
+  const btn=$('saveProfile');
+  savingProfile=true;btn.disabled=true;
+  const fields=['sector','details','currency'].map($);
+  fields.forEach(el=>el.disabled=true);
+  btn.textContent=tr('Se salvează…');feedback('Se salvează…');
+  try{
+    const requested={sector:$('sector').value,description:$('details').value.trim(),currency:$('currency').value};
+    const result=await api('/profile',{method:'PUT',body:JSON.stringify(requested)});
+    if(result.status!=='saved')throw Error('Unexpected save response');
+    // Confirm persisted data using a separate GET, rather than trusting local input.
+    const verified=await api('/context',{cache:'no-store'});
+    if(verified.industry.key!==requested.sector||verified.description!==requested.description||verified.currency!==requested.currency)
+      throw Error('Profile verification failed');
+    $('sector').value=verified.industry.key;$('details').value=verified.description;$('currency').value=verified.currency;
+    applySavedProfile(verified);feedback('Profil salvat');
+  }catch(e){feedback('Salvarea a eșuat',true,e.message);}
+  finally{savingProfile=false;fields.forEach(el=>el.disabled=false);btn.disabled=false;btn.textContent=tr('Salvează profilul');}
+});
+async function loadFiles(){
+  const files=await api('/documents');$('files').replaceChildren();
+  const select=$('expenseDoc');
+  select.replaceChildren();
+  const unlinked=document.createElement('option');unlinked.value='';
+  unlinked.textContent='Factură introdusă manual';select.appendChild(unlinked);
+  for(const file of files){
+    if(['pdf_text','photo_preview','invoice_preview','expense_preview'].includes(file.type)){
+      const option=document.createElement('option');
+      option.value=file.id;option.textContent=file.name+' • verifică valorile';
+      select.appendChild(option);
+    }
+  }
+  for(const x of files){
+    const div=document.createElement('div');div.className='file-row';
+    const name=document.createElement('span');name.textContent=x.name+' • '+(x.confirmed?'confirmat':'neconfirmat');div.appendChild(name);
+    const previewButton=document.createElement('button');previewButton.className='ghost';previewButton.textContent=tr('Vezi documentul');
+    previewButton.onclick=async()=>{try{const d=await api('/documents/'+x.id+'/preview');const box=$('documentPreview');box.hidden=false;box.textContent=d.name+'\n\n'+(d.text||JSON.stringify(d.rows,null,2))+(d.notes?.length?'\n\n'+d.notes.join('\n'):'')+(d.truncated?'\n\n'+tr('Previzualizare parțială'):'');}catch(e){documentFeedback(e.message,true);}};
+    const analyze=document.createElement('button');analyze.className='ghost';analyze.textContent=tr('Discută cu AI');analyze.onclick=()=>chooseDocument(x.id,x.name);div.append(previewButton,analyze);
+
+    if(x.type==='sales'&&!x.confirmed){
+      const b=document.createElement('button');b.textContent='Confirmă';b.className='ghost';
+      b.onclick=async()=>{if(!confirm('Ai verificat că datele din fișier corespund vânzărilor reale și că prețurile sunt consecvente?'))return;
+        try{await api('/documents/'+x.id+'/confirm',{method:'POST'});await loadFiles();bubble('meta','Vânzările au fost confirmate și incluse în rapoarte.');}
+        catch(e){status(e.message,true);}};
+      div.appendChild(b);
+    }
+    $('files').appendChild(div);
+  }
+}
+function documentFeedback(message,error=false){const box=$('documentFeedback');box.hidden=false;box.textContent=message;box.classList.toggle('error',error);}
+$('upload').onclick=async()=>{
+  if(!canUse||!$('attachment').files.length)return;
+  $('upload').disabled=true;documentFeedback('Documentul este prelucrat...');
+  try{
+    const form=new FormData();form.append('file',$('attachment').files[0]);
+    const data=await api('/documents',{method:'POST',body:form});
+    const preview=data.preview||{};
+    bubble('meta','Document primit: '+(data.kind||'')+'. '+(data.message||'Verifică fișierul.')+
+      (preview.rows?.length?'\nExemplu date: '+JSON.stringify(preview.rows.slice(0,2)): ''));
+    $('attachment').value='';await loadFiles();documentFeedback(data.duplicate?'Documentul există deja.':'Document prelucrat. Deschide previzualizarea și verifică valorile.');
+  }catch(e){documentFeedback(e.message,true);}finally{$('upload').disabled=false;}
+};
+async function expenseApi(path,options={}){
+  const res=await fetch('/api/loial-expenses'+path,{...options,headers:{
+    Authorization:'Bearer '+token,
+    ...(options.body?{'Content-Type':'application/json'}:{})
+  }});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok)throw Error(data.detail||'Eroare de prelucrare a facturii');
+  return data;
+}
+$('expenseSave').onclick=async()=>{
+  const output=$('expenseOutput');
+  if(!$('expenseConfirmed').checked){
+    output.textContent='Confirmă că ai verificat datele de pe factură.';return;
+  }
+  const payload={
+    document_id:$('expenseDoc').value?Number($('expenseDoc').value):null,
+    invoice_ref:$('expenseRef').value.trim(),
+    supplier:$('expenseSupplier').value.trim(),
+    incurred_on:$('expenseDate').value,
+    category:$('expenseCategory').value,
+    amount:Number($('expenseAmount').value),
+    vat_basis:$('expenseVatBasis').value,
+    currency:$('currency').value,
+    owner_confirmed:true
+  };
+  $('expenseSave').disabled=true;
+  try{
+    const result=await expenseApi('/confirm',{method:'POST',body:JSON.stringify(payload)});
+    output.textContent='Factură confirmată: '+result.amount.toFixed(2)+' '+
+      result.currency+' ('+(result.vat_basis==='net'?'fără TVA':'cu TVA')+
+      '). Loial o va include în raport; nu este o înregistrare contabilă.';
+    $('expenseConfirmed').checked=false;
+  }catch(e){output.textContent=e.message;}
+  finally{$('expenseSave').disabled=false;}
+};
+$('expenseReport').onclick=async()=>{
+  try{
+    const data=await expenseApi('/summary');
+    const lines=['Cheltuieli confirmate: '+data.items+' înregistrări.'];
+    for(const row of data.totals){
+      lines.push('• '+row.category_label+': '+row.total.toFixed(2)+' '+row.currency+
+        ' ('+(row.vat_basis==='net'?'fără TVA':'cu TVA')+')');
+    }
+    lines.push('',...data.limitations.map(x=>'• '+x));
+    $('expenseOutput').textContent=lines.join('\n');
+  }catch(e){$('expenseOutput').textContent=e.message;}
+};
+$('weekly').onclick=async()=>{try{const r=await api('/weekly');showWorkspace('chat');bubble('assistant',r.message);}catch(e){status(e.message,true);}};
+$('reportBtn').onclick=async()=>{
+  try{
+    const r=await api('/report'),s=r.sales;
+    const lines=['Activitate: '+r.industry,'Venituri confirmate: '+s.total_revenue+' '+r.currency,
+      'Contribuție cunoscută: '+(s.total_contribution===null?'nu poate fi calculată':s.total_contribution+' '+r.currency),
+      'Produse/servicii: '+s.products.length,'Clienți: '+Object.values(r.customers).reduce((a,b)=>a+b,0),'',
+      'Produse/servicii ordonate după venit:'];
+    s.products.slice(0,10).forEach(p=>lines.push('• '+p.product+': '+p.revenue+' '+r.currency));
+    const specific=Object.entries(s.sector_metrics||{});
+    if(specific.length){lines.push('','Indicatori specifici activității:');
+      specific.forEach(([k,v])=>lines.push('• '+k.replaceAll('_',' ')+': '+v));}
+    if((r.findings||[]).length){
+      lines.push('','Ce observă Loial:');
+      r.findings.forEach(x=>lines.push('• '+x.text));
+    }
+    if(r.verified_expenses){
+      lines.push('','Cheltuieli verificate de administrator: '+
+        r.verified_expenses.confirmed_rows+' documente.');
+      for(const e of r.verified_expenses.totals_by_currency_vat_basis_and_category){
+        lines.push('• '+e.category_label+': '+e.total+' '+e.currency+
+          ' ('+(e.vat_basis==='net'?'fără TVA':'cu TVA')+')');
+      }
+    }
+    lines.push('','Limitări:',...r.limitations.map(x=>'• '+x));
+    $('report').textContent=lines.join('\n');
+    // Report remains visible in the selected Reports view.
+  }catch(e){status(e.message,true);}
+};
+$('runBreakEven').onclick=async()=>{
+  const month=$('bePeriod').value;
+  const fixed_costs=Number($('beFixed').value);
+  const output=$('beResult');output.textContent='';
+  if(!/^\d{4}-\d{2}$/.test(month)||!$('beFixed').value||
+     !Number.isFinite(fixed_costs)||fixed_costs<0){
+    output.textContent='Completează luna și costurile fixe reale pentru perioada respectivă.';
+    return;
+  }
+  $('runBreakEven').disabled=true;
+  try{
+    const x=await api('/break-even',{method:'POST',body:JSON.stringify({
+      period:month,fixed_costs,vat_basis_confirmed:$('beVatConfirmed').checked})});
+    const currency=x.currency||'RON';
+    const lines=['Luna: '+x.period,
+      'Vânzări înregistrate și folosite: '+x.sales_lines_used+' poziții.'];
+    if(x.status==='estimated'){
+      lines.push('Pentru acoperirea costurilor fixe, la mixul și costurile observate, valoarea aproximativă a vânzărilor necesare este: '+
+        x.estimated_break_even_revenue.toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+currency+'.');
+      if(x.estimated_break_even_units!==null){
+        lines.push('Pentru serviciul sau produsul unic din date, volumul orientativ este de '+
+          x.estimated_break_even_units+' unități.');
+      }
+      lines.push(x.sales_gap_to_break_even>0
+        ?'Comparativ cu vânzările înregistrate, până la acest nivel lipsesc aproximativ '+
+            x.sales_gap_to_break_even.toLocaleString('ro-RO')+' '+currency+'.'
+        :'Vânzările înregistrate sunt peste pragul estimat pentru perioada analizată.');
+    }else if(x.status==='negative_contribution'){
+      lines.push('Vânzările înregistrate nu au contribuție pozitivă suficientă pentru acest calcul. Verifică prețurile și costurile.');
+    }else{
+      lines.push('Loial nu poate calcula un prag verificabil cu datele disponibile.');
+    }
+    lines.push('',...x.caveats.map(text=>'• '+text));
+    output.textContent=lines.join('\n');
+  }catch(e){output.textContent=e.message;}
+  finally{$('runBreakEven').disabled=false;}
+};
+$('showClients').onclick=async()=>{
+  try{
+    const response=await api('/customers'),list=$('customerList');list.replaceChildren();
+    if(!response.items.length){list.textContent='Nu există clienți înregistrați.';return;}
+    for(const c of response.items){
+      const b=document.createElement('button');b.className='topic';
+      b.textContent=c.name+' • '+(c.stamps||0)+' ștampile';
+      b.onclick=async()=>{
+        try{
+          const data=await api('/customers/'+c.id+'/purchases');
+          const items=data.purchases.slice(0,15).map(p=>'• '+p.date+' • '+p.product+' × '+p.quantity+' = '+p.total).join('\n');
+          showWorkspace('chat');bubble('assistant','Istoricul lui '+data.name+':\n'+(items||'Nu avem produse asociate acestui client în exporturile confirmate.')+'\n'+data.note);
+        }catch(e){status(e.message,true);}
+      };list.appendChild(b);
+    }
+  }catch(e){status(e.message,true);}
+};
+$('saveMetric').onclick=async()=>{
+  const period=$('metricPeriod').value.trim();
+  const value=Number($('metricValue').value);
+  if(!period||!$('metricValue').value||!Number.isFinite(value)){status('Completează indicatorul și perioada.',true);return;}
+  try{
+    await api('/metrics',{method:'POST',body:JSON.stringify({
+      name:$('metricName').value,value,period,source:'declarat de administrator'
+    })});
+    status('Indicator salvat. Îl poți consulta în raport.');
+    $('metricValue').value='';
+  }catch(e){status(e.message,true);}
+};
+$('useTemplate').onclick=async()=>{
+  if(!$('template').value)return;
+  try{
+    const x=await api('/message-templates/'+$('template').value+'/preview');
+    $('subject').value=x.subject;
+    $('offer').value=x.text;
+    $('campaignPreview').textContent='Mesaj pregătit pentru Loial. Îl poți edita înainte de trimitere.';
+  }catch(e){status(e.message,true);}
+};
+async function nativeInbox(path,options={}){
+  const res=await fetch('/api/loial-inbox'+path,{...options,headers:{
+    Authorization:'Bearer '+token,...(options.body?{'Content-Type':'application/json'}:{})}});
+  const result=await res.json().catch(()=>({}));
+  if(!res.ok)throw Error(result.detail||'Eroare mesagerie Loial '+res.status);
+  return result;
+}
+async function loadMessageRecipients(){
+  const select=$('singleRecipient');select.replaceChildren();
+  const all=document.createElement('option');all.value='';all.textContent='Toți cei din segment';select.appendChild(all);
+  const clients=await api('/customers');
+  clients.items.forEach(c=>{const option=document.createElement('option');
+    option.value=String(c.id);option.textContent=c.name+' (card #'+c.id+')';
+    select.appendChild(option);});
+}
+async function refreshSent(){
+  const records=await nativeInbox('/sent');
+  $('sentHistory').textContent=records.length
+    ?records.map(x=>'• '+x.subject+'\n  '+x.delivered+' livrate în Loial · '+x.read+' citite').join('\n\n')
+    :'Nu ai trimis încă mesaje.';
+}
+$('refreshSent').onclick=()=>refreshSent().catch(e=>status(e.message,true));
+$('previewAudience').onclick=async()=>{
+  try{
+    const params=new URLSearchParams({audience:$('audience').value,product:$('productFilter').value});
+    const data=await nativeInbox('/audience?'+params.toString());
+    $('campaignPreview').textContent='Clienți eligibili: '+data.eligible+
+      ($('singleRecipient').value?' (filtrarea finală va păstra doar clientul ales)':'')+
+      '. Mesajele nu se trimit pe email sau SMS.';
+  }catch(e){status(e.message,true);}
+};
+$('draftCampaign').onclick=async()=>{
+  $('draftCampaign').disabled=true;
+  try{
+    const r=await api('/campaigns',{method:'POST',body:JSON.stringify({
+      objective:$('objective').value||'Informarea clienților',
+      audience:$('audience').value,product:$('productFilter').value,offer:$('offer').value})});
+    currentCampaignId=r.id;
+    $('subject').value=r.subject;
+    $('offer').value=r.text;
+    $('campaignPreview').textContent=r.generated_by_ai
+      ?'Propunere creată cu Loial AI. Verifică oferta și apasă Trimite acum în Loial.'
+      :'Șablon pregătit. Poți modifica textul și îl poți trimite direct în Loial.';
+  }catch(e){status(e.message,true);}
+  finally{$('draftCampaign').disabled=false;}
+};
+$('sendCampaign').onclick=async()=>{
+  const subject=$('subject').value.trim();
+  const message=$('offer').value.trim();
+  if(subject.length<2||message.length<2){status('Completează titlul și textul mesajului.',true);return;}
+  $('sendCampaign').disabled=true;
+  try{
+    const payload={subject,text:message,audience:$('audience').value,
+      product:$('productFilter').value};
+    if($('singleRecipient').value)payload.customer_ids=[Number($('singleRecipient').value)];
+    const signature=JSON.stringify(payload);
+    if(signature!==pendingMessageFingerprint){
+      pendingMessageFingerprint=signature;
+      pendingMessageKey=crypto.randomUUID();
+    }
+    payload.idempotency_key=pendingMessageKey;
+    const data=await nativeInbox('/send',{method:'POST',body:JSON.stringify(payload)});
+    pendingMessageFingerprint='';
+    pendingMessageKey='';
+    $('campaignPreview').textContent='Mesaj livrat în Loial: '+data.sent+' carduri. '+
+      (data.visible_to_wallets||0)+' pot citi acum de pe dispozitive activate. '+
+      (data.awaiting_wallet_activation||0)+' necesită activarea securizată a inboxului.';
+    status(data.sent?'Mesajul a fost înregistrat pentru clienții eligibili.':
+      'Nu există clienți care au ales să primească aceste oferte în Loial.');
+    await refreshSent();
+  }catch(e){status(e.message,true);}
+  finally{$('sendCampaign').disabled=false;}
+};
+async function receiptApi(path,options={}){
+  const res=await fetch('/api/loial-receipts'+path,{
+    ...options,headers:{Authorization:'Bearer '+token,
+      ...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})}});
+  const result=await res.json().catch(()=>({}));
+  if(!res.ok)throw Error(result.detail||'Bonul nu a putut fi prelucrat');
+  return result;
+}
+$('issueReceipt').onclick=async()=>{
+  const ref=$('receiptNumber').value.trim();
+  if(ref.length<2){$('receiptStatus').textContent='Completează numărul bonului.';return;}
+  const lines=[];
+  for(const raw of $('receiptItems').value.split(/\r?\n/).filter(x=>x.trim())){
+    const parts=raw.split(';').map(x=>x.trim());
+    if(parts.length<3||!parts[0]){
+      $('receiptStatus').textContent='Format: Produs;Cantitate;Preț unitar;Cost variabil (opțional)';return;
+    }
+    const number=x=>Number(x.replace(',','.'));
+    const row={product:parts[0],quantity:number(parts[1]),unit_price:number(parts[2])};
+    if(parts[3])row.unit_variable_cost=number(parts[3]);
+    if(!Number.isFinite(row.quantity)||!Number.isFinite(row.unit_price)){
+      $('receiptStatus').textContent='Verifică valorile numerice din linii.';return;
+    }
+    lines.push(row);
+  }
+  if(!lines.length){$('receiptStatus').textContent='Adaugă cel puțin un produs.';return;}
+  $('issueReceipt').disabled=true;
+  try{
+    const res=await receiptApi('/issue',{method:'POST',
+      body:JSON.stringify({receipt_ref:ref,lines,currency:$('currency').value})});
+    $('receiptStatus').textContent='Bon înregistrat: '+res.total+' '+res.currency+
+      '. QR-ul poate fi revendicat o singură dată. Nu înlocuiește bonul fiscal.';
+    $('receiptQR').src=res.qr_png_base64;$('receiptQR').style.display='block';
+    $('receiptUrl').value=res.claim_url;$('receiptUrlBox').style.display='block';
+  }catch(e){$('receiptStatus').textContent=e.message;}
+  finally{$('issueReceipt').disabled=false;}
+};
+$('copyReceipt').onclick=async()=>{
+  try{await navigator.clipboard.writeText($('receiptUrl').value);
+  $('receiptStatus').textContent='Linkul de bon Loial a fost copiat.';}
+  catch(e){$('receiptStatus').textContent='Nu am putut copia linkul; selectează-l din câmp.';}
+};
+$('showReceipts').onclick=async()=>{
+  const list=$('receiptList');list.replaceChildren();
+  try{
+    const records=await receiptApi('/recent');
+    if(!records.length){list.textContent='Nu există bonuri înregistrate.';return;}
+    for(const receipt of records.slice(0,20)){
+      const row=document.createElement('div');row.className='file-row';
+      const title=document.createElement('span');
+      title.textContent=receipt.receipt_ref+' · '+receipt.total+' '+receipt.currency+
+        ' · '+receipt.status;
+      row.appendChild(title);
+      if(receipt.status!=='refunded'){
+        const button=document.createElement('button');button.className='ghost';
+        button.textContent='Retur';
+        button.onclick=async()=>{
+          const reason=prompt('Motivul returului pentru bonul '+receipt.receipt_ref);
+          if(!reason||reason.trim().length<4)return;
+          if(!confirm('Confirmi anularea financiară a acestui bon? O ștampilă deja acordată necesită verificare manuală.'))return;
+          try{
+            const result=await receiptApi('/refund',{method:'POST',
+             body:JSON.stringify({receipt_ref:receipt.receipt_ref,reason:reason.trim()})});
+            $('receiptStatus').textContent=result.notice||'Bon anulat.';
+            $('showReceipts').click();
+          }catch(e){$('receiptStatus').textContent=e.message;}
+        };
+        row.appendChild(button);
+      }
+      list.appendChild(row);
+    }
+  }catch(e){$('receiptStatus').textContent=e.message;}
+};
+document.querySelectorAll('[data-export]').forEach(button=>button.onclick=async()=>{
+  try{
+    const kind=button.dataset.export;const counts=await api('/exports/summary');const count=kind.startsWith('ads-')?counts.ads_consented:kind.startsWith('customers')?counts.customers:counts.sales;
+    const feedback=$('exportFeedback');feedback.hidden=false;feedback.textContent=count?String(count)+' '+tr('înregistrări disponibile'):tr(kind.startsWith('ads-')?'Nu există clienți cu consimțământ publicitar și email.':'Nu există înregistrări de exportat.');
+    if(!count)return;
+    const res=await fetch(API+'/exports/'+kind,{headers:{Authorization:'Bearer '+token}});
+    if(!res.ok){const x=await res.json();throw new Error(x.detail||'Export nereușit');}
+    const blob=await res.blob();const href=URL.createObjectURL(blob);
+    const link=document.createElement('a');link.href=href;link.download='loial_'+button.dataset.export;link.click();
+    setTimeout(()=>URL.revokeObjectURL(href),5000);
+  }catch(e){const feedback=$('exportFeedback');feedback.hidden=false;feedback.textContent=e.message;}
+});
+init();
+</script>
+</body>
+</html>

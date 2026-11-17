@@ -183,6 +183,11 @@
     </div>
 
     <div class="card" id="contAmbasador">
+      <div id="manualActivatePanel" hidden>
+        <h2>Invitație personală de ambasador LOIAL</h2>
+        <p>Administratorul te-a desemnat ca ambasador. Alege o parolă pentru acest cont. Contul tău de firmă sau cardul existent rămâne neschimbat. Detaliile Wise le poți adăuga ulterior.</p>
+        <form id="manualActivateForm"><label for="manualActivatePassword">Parolă nouă</label><input id="manualActivatePassword" type="password" minlength="10" required autocomplete="new-password"><button type="submit" class="btn-primary">Activează contul meu de ambasador</button></form>
+      </div>
       <div id="enrollPanel">
         <span class="tier-tag">Cont Gratuit Partener</span>
         <h2>Creează-ți sau deschide contul de Ambasador</h2>
@@ -200,22 +205,30 @@
           <input type="text" id="ambPhone" placeholder="07xx xxx xxx">
 
           <label>Parolă cont</label>
-          <input type="password" id="ambPassword" required minlength="6" placeholder="Minim 6 caractere">
+          <input type="password" id="ambPassword" required minlength="10" placeholder="Minim 10 caractere">
 
           <label>Cum dorești să primești plățile lunare?</label>
           <select id="ambMethod">
             <option value="wise">Wise Business / Cont Wise (Email sau @wisetag)</option>
-            <option value="iban">Transfer Bancar (IBAN EUR / RON)</option>
-            <option value="revolut">Revolut (@tag sau Telefon)</option>
+
           </select>
 
-          <label>Detalii plată (Email Wise / IBAN / Revolut)</label>
+          <label>Detalii de plată Wise (email sau cont)</label>
           <input type="text" id="ambDetails" required placeholder="Ex: email@wise.com sau RO49AAAA...">
 
           <button type="submit" class="btn-primary" id="ambSubmitBtn">Activează contul de Ambasador →</button>
         </form>
       </div>
 
+      <div id="loginPanel" style="margin-top:18px;padding-top:15px;border-top:1px solid #ddd">
+        <h3>Ai deja un cont de Ambasador?</h3>
+        <form id="loginAmbForm">
+          <label>Email cont</label><input type="email" id="ambLoginEmail" required>
+          <label>Parolă</label><input type="password" id="ambLoginPassword" required>
+          <button class="btn-secondary" type="submit">Autentificare</button>
+        </form>
+      </div>
+      <p id="ambStatus" role="status" style="font-size:13px;color:#b91c1c"></p>
       <div id="dashboardPanel" class="hidden">
         <span class="tier-tag" id="dashRankBadge">Rang: Ambasador</span>
         <h2 id="dashWelcome">Panou Ambasador</h2>
@@ -241,6 +254,25 @@
         <label>Link-ul tău unic de recomandare (trimite-l pe WhatsApp / Email):</label>
         <input type="text" id="dashRefUrl" readonly style="font-weight:700;color:var(--primary);">
         <button type="button" class="btn-primary" id="copyBtn" onclick="copyRefUrl()">📋 Copiază link-ul de Ambasador</button>
+        <p style="margin-top:18px;font-size:13px;font-weight:700;">Invită alt ambasador și primești 10 EUR pentru fiecare firmă nouă plătitoare adusă direct de acesta.</p>
+        <input type="text" id="dashRecruitUrl" readonly>
+        <button type="button" class="btn-secondary" onclick="copyInvite()">Copiază invitația pentru ambasadori</button>
+        <h3 style="margin-top:24px">Comisioanele mele verificate</h3>
+        <p id="dashAmounts" style="font-weight:700"></p>
+        <p id="dashRecruited"></p>
+        <div id="dashLedger" style="font-size:13px;line-height:1.7"></div>
+        <h3 style="margin-top:20px">Contul Wise pentru comisioane</h3>
+        <p id="ambWiseStatus" style="font-size:13px">Detalii Wise neconfirmate</p>
+        <form id="ambWiseForm">
+          <label for="ambWiseDetails">Detalii de plată Wise (email sau cont verificat)</label>
+          <input id="ambWiseDetails" autocomplete="off" maxlength="150" minlength="6" required placeholder="Email Wise sau cont bancar">
+          <label for="ambWisePassword">Parola contului LOIAL, pentru confirmare</label>
+          <input id="ambWisePassword" type="password" autocomplete="current-password" required>
+          <button type="submit" class="btn-secondary">Actualizează contul Wise</button>
+        </form>
+        <h3 style="margin-top:20px">Firmele mele și firmele ambasadorilor recrutați direct</h3>
+        <div id="dashFirmActivity" style="font-size:13px;line-height:1.7"></div>
+        <button type="button" class="btn-secondary" onclick="reloadAmbassador()">Actualizează plățile</button>
         <button type="button" class="btn-secondary" onclick="logoutAmb()">Ieșire / Schimbă contul</button>
       </div>
     </div>
@@ -266,85 +298,184 @@
   }
   updateCalc();
 
-  const savedAmb = JSON.parse(localStorage.getItem('loial_ambassador_session') || 'null');
-  if (savedAmb && savedAmb.email) {
-    renderAmbDashboard(savedAmb);
-    refreshAmbData(savedAmb);
+  // The dashboard only displays authenticated server data, never a stored
+  // self-reported commission or registration response.
+  let ambassadorToken=sessionStorage.getItem('loial_ambassador_token')||'';
+  const statusBox=document.getElementById('ambStatus');
+  function authHeaders(){return {Authorization:'Bearer '+ambassadorToken};}
+  function fail(message){statusBox.textContent=message||'Operațiunea a eșuat.';}
+  async function ambassadorGet(path){
+    const response=await fetch(path,{headers:authHeaders(),cache:'no-store'});
+    if(!response.ok)throw Error('Sesiunea a expirat sau nu este validă.');
+    return response.json();
   }
-
-  document.getElementById('ambForm').onsubmit = async (e) => {
-    e.preventDefault();
-    const btn = document.getElementById('ambSubmitBtn');
-    btn.textContent = 'Se activează contul...';
-    btn.disabled = true;
-
-    const payload = {
-      name: document.getElementById('ambName').value.trim(),
-      email: document.getElementById('ambEmail').value.trim(),
-      phone: document.getElementById('ambPhone').value.trim(),
-      password: document.getElementById('ambPassword').value,
-      payout_method: document.getElementById('ambMethod').value,
-      payout_details: document.getElementById('ambDetails').value.trim()
-    };
-
-    try {
-      const res = await fetch('/api/ambassador/join', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem('loial_ambassador_session', JSON.stringify(data));
-        renderAmbDashboard(data);
-      }
-    } catch (err) {}
-    btn.textContent = 'Activează contul de Ambasador →';
-    btn.disabled = false;
-  };
-
-  async function refreshAmbData(amb) {
-    try {
-      const res = await fetch('/api/ambassador/join', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: amb.name, email: amb.email, payout_method: amb.payout_method || 'wise', payout_details: amb.payout_details || '' })
-      });
-      if (res.ok) {
-        const fresh = await res.json();
-        localStorage.setItem('loial_ambassador_session', JSON.stringify(fresh));
-        renderAmbDashboard(fresh);
-      }
-    } catch (e) {}
+  async function reloadAmbassador(){
+    if(!ambassadorToken)return;
+    try{
+      const [identity,ledger]=await Promise.all([
+        ambassadorGet('/api/loial-identity/me'),
+        ambassadorGet('/api/loial-revenue/ambassador/me')]);
+      const agent=identity.ambassador;
+      if(!agent)throw Error('Contul de ambasador nu este activ.');
+      renderAmbDashboard(agent,ledger);
+    }catch(error){fail(error.message);logoutAmb();}
   }
-
-  function renderAmbDashboard(data) {
+  let activationToken=new URLSearchParams(location.hash.slice(1)).get('activate')||'';
+  if(activationToken){
+    history.replaceState(null,'',location.pathname+location.search);
+    ambassadorToken='';
+    sessionStorage.removeItem('loial_ambassador_token');
     document.getElementById('enrollPanel').classList.add('hidden');
+    document.getElementById('loginPanel').classList.add('hidden');
+    document.getElementById('manualActivatePanel').hidden=false;
+  }else if(ambassadorToken)reloadAmbassador();
+  document.getElementById('manualActivateForm').onsubmit=async event=>{
+    event.preventDefault();
+    const password=document.getElementById('manualActivatePassword');
+    const button=event.currentTarget.querySelector('button');
+    button.disabled=true;statusBox.textContent='';
+    try{
+      const res=await fetch('/api/ambassador/activate-invite',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({activation_token:activationToken,password:password.value})});
+      const result=await res.json();
+      if(!res.ok)throw Error(result.detail||'Activarea a eșuat.');
+      ambassadorToken=result.access_token;activationToken='';
+      sessionStorage.setItem('loial_ambassador_token',ambassadorToken);
+      document.getElementById('manualActivatePanel').hidden=true;
+      await reloadAmbassador();
+    }catch(e){fail(e.message);}
+    finally{password.value='';button.disabled=false;}
+  };
+  // Poll only while the ambassador dashboard is visible; registration never
+  // triggers simulated commissions. Verified payments appear on next refresh.
+  setInterval(()=>{
+    if(ambassadorToken && !document.hidden)reloadAmbassador();
+  },60000);
+  document.addEventListener('visibilitychange',()=>{
+    if(ambassadorToken && !document.hidden)reloadAmbassador();
+  });
+
+  document.getElementById('ambForm').onsubmit=async event=>{
+    event.preventDefault();
+    const button=document.getElementById('ambSubmitBtn');
+    button.disabled=true;statusBox.textContent='';
+    const params=new URLSearchParams(location.search);
+    try{
+      const response=await fetch('/api/ambassador/join',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          name:document.getElementById('ambName').value.trim(),
+          email:document.getElementById('ambEmail').value.trim(),
+          phone:document.getElementById('ambPhone').value.trim(),
+          password:document.getElementById('ambPassword').value,
+          sponsor_code:params.get('ambref')||null,
+          payout_method:'wise',
+          payout_details:document.getElementById('ambDetails').value.trim()})});
+      const result=await response.json();
+      if(!response.ok)throw Error(result.detail||'Nu am putut crea contul.');
+      ambassadorToken=result.access_token;
+      sessionStorage.setItem('loial_ambassador_token',ambassadorToken);
+      await reloadAmbassador();
+    }catch(error){fail(error.message);}
+    finally{button.disabled=false;}
+  };
+  document.getElementById('loginAmbForm').onsubmit=async event=>{
+    event.preventDefault();statusBox.textContent='';
+    try{
+      const response=await fetch('/api/ambassador/login',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:document.getElementById('ambLoginEmail').value.trim(),
+          password:document.getElementById('ambLoginPassword').value})});
+      const result=await response.json();
+      if(!response.ok)throw Error(result.detail||'Autentificare eșuată.');
+      ambassadorToken=result.access_token;
+      sessionStorage.setItem('loial_ambassador_token',ambassadorToken);
+      document.getElementById('ambLoginPassword').value='';
+      await reloadAmbassador();
+    }catch(error){fail(error.message);}
+  };
+  function renderAmbDashboard(data,ledger){
+    document.getElementById('enrollPanel').classList.add('hidden');
+    document.getElementById('loginPanel').classList.add('hidden');
     document.getElementById('dashboardPanel').classList.remove('hidden');
-    document.getElementById('dashRankBadge').textContent = 'Rang: ' + data.rank;
-    document.getElementById('dashWelcome').textContent = 'Salut, ' + data.name + '!';
-    document.getElementById('dashEmailLabel').textContent = `${data.email} • Plată prin: ${(data.payout_method || 'wise').toUpperCase()} (${data.payout_details || 'nesetat'})`;
-    document.getElementById('dashActiveBiz').textContent = data.active_businesses + ' firme';
-    document.getElementById('dashMonthlyRate').textContent = data.monthly_rate + ' EUR / lună';
-    document.getElementById('dashQrImg').src = data.qr_image;
-    document.getElementById('dashRefCode').textContent = data.ref_code;
-    document.getElementById('dashRefUrl').value = data.referral_url;
+    document.getElementById('dashRankBadge').textContent='Rang: '+data.rank;
+    document.getElementById('dashWelcome').textContent='Salut, '+data.name+'!';
+    document.getElementById('dashEmailLabel').textContent='Comisioanele sunt afișate numai după confirmarea încasărilor în Wise Business.';
+    document.getElementById('dashActiveBiz').textContent=ledger.direct_paid_businesses+' firme plătitoare verificate';
+    document.getElementById('dashMonthlyRate').textContent=data.monthly_rate+' EUR / firmă / lună';
+    document.getElementById('dashRefCode').textContent=data.ref_code;
+    document.getElementById('dashRefUrl').value=data.referral_url;
+    document.getElementById('dashRecruitUrl').value=
+      'https://loial.space/ambasador.html?ambref='+encodeURIComponent(data.ref_code);
+    document.getElementById('dashQrImg').src='/api/qr-link?url='+
+      encodeURIComponent(data.referral_url);
+    document.getElementById('dashAmounts').textContent=
+      'În așteptare: '+ledger.pending_eur.toFixed(2)+' EUR | Aprobat: '+
+      ledger.approved_eur.toFixed(2)+' EUR | Achitat: '+ledger.paid_eur.toFixed(2)+' EUR';
+    document.getElementById('ambWiseStatus').textContent=
+      ledger.wise_details_saved?'Contul Wise este salvat.':'Completează datele Wise pentru virarea comisioanelor.';
+    document.getElementById('dashRecruited').textContent=
+      'Ambasadori recrutați direct: '+ledger.sponsored_ambassadors;
+    const firms=document.getElementById('dashFirmActivity');
+    firms.replaceChildren();
+    for(const firm of (ledger.firm_activity||[])){
+      const div=document.createElement('div');
+      div.style.padding='7px 0';div.style.borderBottom='1px solid #ddd';
+      div.textContent=firm.business_name+' • '+
+        (firm.source==='direct'?'adusă de mine':'adusă de ambasadorul meu')+
+        ' • înscrisă: '+(firm.registered_at||'').slice(0,16)+
+        ' • '+(firm.payment_verified
+          ? 'Plată confirmată: '+(firm.first_payment_confirmed_at||'').slice(0,16)
+          : 'Plata încă neconfirmată');
+      firms.appendChild(div);
+    }
+    if(!(ledger.firm_activity||[]).length)firms.textContent='Încă nu există firme asociate.';
+    const container=document.getElementById('dashLedger');
+    container.replaceChildren();
+    if(!ledger.entries.length){container.textContent='Încă nu există comisioane verificate.';return;}
+    for(const row of ledger.entries){
+      const div=document.createElement('div');
+      div.style.borderBottom='1px solid #ddd';
+      div.style.padding='7px 0';
+      div.textContent=row.month+' • '+row.description+' • '+row.eur.toFixed(2)+
+        ' EUR • '+row.status;
+      container.appendChild(div);
+    }
   }
-
-  function copyRefUrl() {
-    const val = document.getElementById('dashRefUrl').value;
-    navigator.clipboard.writeText(val).then(() => {
-      const btn = document.getElementById('copyBtn');
-      btn.textContent = '✓ Link copiat! Trimite-l pe WhatsApp sau Email';
-      setTimeout(() => { btn.textContent = '📋 Copiază link-ul de Ambasador'; }, 2500);
-    });
-  }
-
-  function logoutAmb() {
-    localStorage.removeItem('loial_ambassador_session');
+  document.getElementById('ambWiseForm').onsubmit=async event=>{
+    event.preventDefault();
+    if(!ambassadorToken){fail('Autentificarea a expirat.');return;}
+    const details=document.getElementById('ambWiseDetails');
+    const password=document.getElementById('ambWisePassword');
+    const submit=event.currentTarget.querySelector('button[type="submit"]');
+    submit.disabled=true;
+    statusBox.textContent='';
+    try{
+      const response=await fetch('/api/loial-revenue/ambassador/wise-details',{
+        method:'PUT',
+        headers:{...authHeaders(),'Content-Type':'application/json'},
+        body:JSON.stringify({password:password.value,
+          account_details:details.value.trim()})});
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok)throw Error(payload.detail||'Actualizarea nu a reușit.');
+      details.value='';
+      password.value='';
+      document.getElementById('ambWiseStatus').textContent='Detaliile Wise au fost salvate.';
+      await reloadAmbassador();
+    }catch(error){fail(error.message);}
+    finally{password.value='';submit.disabled=false;}
+  };
+    function copyRefUrl(){navigator.clipboard.writeText(document.getElementById('dashRefUrl').value);}
+  function copyInvite(){navigator.clipboard.writeText(document.getElementById('dashRecruitUrl').value);}
+  function logoutAmb(){
+    ambassadorToken='';
+    sessionStorage.removeItem('loial_ambassador_token');
     document.getElementById('dashboardPanel').classList.add('hidden');
     document.getElementById('enrollPanel').classList.remove('hidden');
+    document.getElementById('loginPanel').classList.remove('hidden');
   }
 </script>
+<script src="/loial-i18n.js"></script>
 </body>
 </html>

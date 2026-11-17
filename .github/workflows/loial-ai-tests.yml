@@ -1,0 +1,108 @@
+name: Loial AI / Native Messaging Tests
+
+on:
+  push:
+    branches:
+      - chatgpt/loial-ai-business-foundation-20261116
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+      JWT_SECRET_KEY: "CI-only-testing-signing-secret-not-for-prod-2026"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test and application dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Compile Loial modules
+        run: python -m py_compile loial_financial_simulation.py loial_inbox.py loial_business_ai.py loial_analytics.py loial_industries.py loial_marketing.py loial_knowledge.py loial_identity.py loial_premium_wallet.py loial_weekly_jobs.py loial_receipts.py loial_wallet_sync.py loial_google_issuer.py loial_google_pilot.py loial_preflight.py loial_expenses.py loial_wallet_recovery.py loial_apple_updates.py loial_pwa.py loial_friend_referrals.py loial_revenue_commissions.py loial_stripe_billing.py loial_backup.py main.py
+      - name: Verify inline JavaScript syntax without browser or external calls
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          for(const file of ['join.html','loial-ai.html','loial-receipt.html','wallet-recovery.html','platform.html','scan.html','loial-wallet.html','ambasador.html']){
+            const html=fs.readFileSync(file,'utf8');
+            let n=0;
+            for(const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)){
+              new Function(match[1]);n++;
+            }
+            if(!n)throw Error('Script absent: '+file);
+            console.log(file+': '+n+' script valid');
+          }
+          NODE
+          node - <<'NODE'
+          const fs=require('fs'),vm=require('vm'),assert=require('assert');
+          const html=fs.readFileSync('loial-ai.html','utf8');
+          const src=html.slice(html.indexOf('function richInline('),html.indexOf('function setTopic('));
+          class Node{
+            constructor(tag,text=''){this.tag=tag;this.textContent=text;this.children=[];this.style={};}
+            append(...items){this.children.push(...items)}
+          }
+          const ctx={document:{createElement:x=>new Node(x),createTextNode:x=>new Node('#text',x)},language:()=> 'ro'};
+          vm.createContext(ctx);vm.runInContext(src,ctx);
+          const root=new Node('div'),fence=String.fromCharCode(96).repeat(3);
+          const chart=JSON.stringify({title:'Profit',unit:'RON',points:[{label:'Base',value:-10},{label:'Target',value:20}]});
+          ctx.renderRich(root,'### Titlu\n**Profit**\n| A | B |\n| --- | ---: |\n| Unu | 5 |\n'+fence+'loial-chart\n'+chart+'\n'+fence+'\n<img src=x onerror=alert(1)>');
+          const walk=n=>[n,...n.children.flatMap(walk)],all=walk(root);
+          for(const tag of ['h4','strong','table','th','td','figure'])assert(all.some(n=>n.tag===tag),tag);
+          assert(!all.some(n=>n.tag==='img'||n.tag==='script'));
+          assert(all.some(n=>n.tag==='#text'&&n.textContent.includes('<img')));
+          assert(all.some(n=>n.className==='chart-fill negative'));
+          const legacy=new Node('div');
+          const oldRows=['Creșterea bonului mediu  +2.028 lei  ██████████','Reducerea risipei           +935 lei  █████','Ajustarea prețului        +1.123 lei  ██████','Ținta de +30%             +3.498 lei  █████████████████'];
+          ctx.renderRich(legacy,fence+'text\n'+oldRows.join('\n')+'\n'+fence);
+          const oldNodes=walk(legacy);
+          assert.equal(oldNodes.filter(n=>n.className==='chart-track').length,4);
+          assert.equal(oldNodes.find(n=>n.className==='chart-fill target').style.width,'100%');
+          assert(oldNodes.some(n=>n.tag==='strong'&&n.textContent===new Intl.NumberFormat('ro').format(2028)+' RON'));
+          assert(!oldNodes.some(n=>n.tag==='pre'));
+          const plain=new Node('div');ctx.renderRich(plain,oldRows.join('\n'));assert(walk(plain).some(n=>n.tag==='figure'));
+          const ambiguous=new Node('div');assert.equal(ctx.legacyChart(ambiguous,'Cost 100 RON ███\nSales 25 EUR █'),false);
+          const roles=new Node('div');
+          assert(ctx.richChart(roles,JSON.stringify({title:'Profit',unit:'RON',points:[{label:'Base',value:100,kind:'baseline'},{label:'Scenario',value:120,kind:'scenario'},{label:'Target',value:130,kind:'target'}]})));
+          assert(walk(roles).some(n=>n.className==='chart-fill baseline'));assert(walk(roles).some(n=>n.className==='chart-fill target'));
+          const bad=new Node('div');assert.equal(ctx.richChart(bad,JSON.stringify({title:'bad',unit:'RON',points:[{label:'x',value:'<bad>'},{label:'y',value:10}]})),false);
+          NODE
+      - name: Validate PWA helper, service worker and manifest
+        run: |
+          node --check loial-i18n.js
+          node - <<'NODE'
+          const fs=require('fs'),vm=require('vm'),assert=require('assert');
+          const code=fs.readFileSync('loial-i18n.js','utf8');
+          const prefs=new Map();
+          const node={children:[],textContent:'Salvează profilul',closest:()=>null};
+          const document={readyState:'loading',documentElement:{},addEventListener(){},dispatchEvent(){},
+            querySelectorAll(q){return q.startsWith('h1')?[node]:[];},getElementById(){return null;}};
+          const context={document,localStorage:{getItem:k=>prefs.get(k),setItem:(k,v)=>prefs.set(k,v)},
+            window:{addEventListener(){}},CustomEvent:function(){}};
+          vm.runInNewContext(code,context);
+          const l=context.window.LoialLang;
+          for(const lang of ['en','de','fr','it','es','nl','pl','hu']){
+            l.set(lang);
+            assert.equal(document.documentElement.lang,lang);
+            assert.notEqual(node.textContent,'Salvează profilul');
+            assert.equal(node.textContent,l.t('Salvează profilul'));
+            assert.equal(l.t('customer-private text'),'customer-private text');
+            assert.equal(prefs.get('loial_language'),lang);
+          }
+          l.set('ro');assert.equal(node.textContent,'Salvează profilul');
+          NODE
+          node --check loial-pwa-install.js
+          node --check sw.js
+          node -e "const x=require('./manifest.json');if(x.start_url.slice(0,7)!='/wallet'||x.display!=='standalone'||x.icons.length<2)process.exit(1);"
+      - name: Isolated tests without external APIs
+        run: python -m pytest -q tests/test_loial_ai_core.py tests/test_loial_inbox.py tests/test_loial_premium_wallet.py tests/test_loial_weekly_jobs.py tests/test_loial_receipts.py tests/test_loial_wallet_sync.py tests/test_loial_google_issuer.py tests/test_loial_wallet_recovery.py tests/test_loial_apple_updates.py tests/test_loial_managerial_decisions.py tests/test_loial_preflight.py tests/test_loial_expenses.py tests/test_loial_friend_referrals.py tests/test_loial_wise_pilot.py test_loial_two_level_commissions.py tests/test_loial_stripe_billing.py tests/test_loial_backup.py tests/test_loial_release_ui.py
+      - name: Full FastAPI startup and enrollment on isolated SQLite
+        run: python -m pytest -q tests/test_loial_app_integration.py

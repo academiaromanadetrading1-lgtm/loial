@@ -23,6 +23,7 @@ import re
 import os
 import json
 import uuid
+import secrets
 from sales import create_sales_models, generate_agent_qr, calculate_commissions
 from dotenv import load_dotenv
 
@@ -48,7 +49,7 @@ WISE_PROFILE_ID = os.getenv("WISE_PROFILE_ID", "")
 SENDGRID_KEY = os.getenv("SENDGRID_API_KEY", "")
 WALLET_TEAM_ID = os.getenv("APPLE_TEAM_ID", "")
 WALLET_PASS_TYPE = os.getenv("APPLE_PASS_TYPE_ID", "pass.app.loial.loyalty")
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+ALLOWED_ORIGINS = [origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "https://loial.space").split(",") if origin.strip()]
 
 app = FastAPI(title="Loial Loyalty API", version="2.2")
 limiter = Limiter(key_func=get_remote_address)
@@ -77,7 +78,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 
 # Optimized SQLite with WAL mode and connection pooling
-DATABASE_URL = "sqlite:////data/loial.db"
+DATABASE_URL = os.getenv("LOIAL_DATABASE_URL", "sqlite:////data/loial.db")
+if not DATABASE_URL.startswith("sqlite:///"):
+    raise RuntimeError("LOIAL_DATABASE_URL accepta doar conexiuni SQLite pentru acest deployment")
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False},
@@ -87,7 +90,9 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "loial-secret-key-change-in-production-2026")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "").strip()
+if len(SECRET_KEY) < 32:
+    raise RuntimeError("Configurare obligatorie: JWT_SECRET_KEY unic, minimum 32 caractere in secret manager")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("TOKEN_EXPIRE_MINUTES", "1440"))
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -194,7 +199,7 @@ class BusinessAccount(Base):
     google_review_url = Column(String, nullable=True)
     reward_text = Column(String, default="A 6-a e din partea casei!")
     card_color = Column(String, default="#1e293b")
-    staff_pin = Column(String, default="1234")
+    staff_pin = Column(String, default=None)
     agent_id = Column(Integer, index=True, nullable=True)
     created_at = Column(String)
     birthday = Column(String, nullable=True)
@@ -308,8 +313,8 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         if email is None:
             raise HTTPException(status_code=401, detail="Invalid token")
         user = db.query(User).filter(User.email == email).first()
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
+        if not user or payload.get("role") != user.role:
+            raise HTTPException(status_code=401,detail="Sesiune de utilizator invalida")
         return user
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
@@ -318,8 +323,11 @@ def check_ownership(db: Session, user: User, customer_id: int):
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
-    if user.role != "admin" and customer.id != customer_id:
-        pass
+    if user.role != "admin":
+        # Legacy User accounts have no ownership relation to Customer records.
+        # Only the platform admin can access this legacy maintenance path.
+        # Customer self-service must authenticate with the private Wallet token.
+        raise HTTPException(status_code=403,detail="Acces la datele clientului refuzat")
     return customer
 
 def require_role(required: str):
@@ -343,16 +351,22 @@ def require_role(required: str):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 def seed_data(db: Session):
-    if db.query(User).count() == 0:
-        db.add(User(email="demo@loial.app", password=pwd_context.hash("demo123"), name="Demo Cafe", plan="pro", role="owner"))
-        db.add(Customer(name="Andrei", stamps=4, lang="ro", email="andrei@example.com", lat=44.4268, lng=26.1025, last_visit="2026-10-25"))
-        db.add(Location(name="Lejer Cafe", address="Str. Exemplu 1, Bucharest", lat=44.4268, lng=26.1025, radius=150))
-    admin_email = "ciprianpop@academiadetrading.llc"
-    existing_admin = db.query(User).filter(User.email == admin_email).first()
-    if not existing_admin:
-        db.add(User(email=admin_email, password=pwd_context.hash("Cod515900."), name="Ciprian Pop", plan="pro", role="admin"))
-    else:
-        existing_admin.role = "admin"
+    """Seeding explicit only. Never create admin/demo accounts with public passwords."""
+    if os.getenv("LOIAL_DEV_SEED_DATA", "0") == "1" and db.query(User).count() == 0:
+        demo_secret = os.getenv("LOIAL_DEV_DEMO_PASSWORD", "")
+        if len(demo_secret) < 12:
+            raise RuntimeError("Set LOIAL_DEV_DEMO_PASSWORD (minim 12 caractere) for explicit dev seed")
+        db.add(User(email="demo@loial.app", password=pwd_context.hash(demo_secret),
+                    name="Cont demo", plan="starter", role="owner"))
+    admin_email = os.getenv("LOIAL_ADMIN_BOOTSTRAP_EMAIL", "").strip().lower()
+    admin_secret = os.getenv("LOIAL_ADMIN_BOOTSTRAP_PASSWORD", "")
+    if admin_email:
+        if len(admin_secret) < 12:
+            raise RuntimeError("LOIAL_ADMIN_BOOTSTRAP_PASSWORD trebuie sa aiba minimum 12 caractere")
+        existing = db.query(User).filter(User.email == admin_email).first()
+        if not existing:
+            db.add(User(email=admin_email, password=pwd_context.hash(admin_secret),
+                        name="Administrator Loial", plan="pro", role="admin"))
     db.commit()
 
 def cleanup_old_data(db: Session):
@@ -395,10 +409,10 @@ def seed_pricing(db):
     pro_plan = db.query(Pricing).filter(Pricing.plan == "pro").first()
     if not pro_plan:
         db.add(Pricing(plan="starter", base_price=0, updated_at=datetime.now().isoformat()))
-        db.add(Pricing(plan="pro", base_price=65, updated_at=datetime.now().isoformat()))
+        db.add(Pricing(plan="pro", base_price=67, updated_at=datetime.now().isoformat()))
         db.add(Pricing(plan="network", base_price=199, updated_at=datetime.now().isoformat()))
     else:
-        pro_plan.base_price = 65
+        pro_plan.base_price = 67
         pro_plan.updated_at = datetime.now().isoformat()
     if db.query(VATRate).count() == 0:
         vat_rates = [
@@ -415,10 +429,20 @@ def seed_pricing(db):
 @app.on_event("startup")
 def startup():
     db = SessionLocal()
-    seed_data(db)
-    seed_pricing(db)
-    cleanup_old_data(db)
-    db.close()
+    try:
+        seed_data(db)
+        seed_pricing(db)
+        cleanup_old_data(db)
+    finally:
+        db.close()
+    # Cerere saptamanala fara email/SMS/AI: mesaj intern in chatul administratorului.
+    from loial_weekly_jobs import start_weekly_worker
+    from loial_business_ai import AIProfile, AIDocument, AIMessage, AISale
+    start_weekly_worker(engine, SessionLocal,
+                        (BusinessAccount, AIProfile, AIDocument, AIMessage, AISale))
+    # Sincronizarea externa Google Wallet este optionala si dezactivata fara emitent.
+    from loial_wallet_sync import start_google_sync_worker
+    start_google_sync_worker(engine, SessionLocal, (BusinessAccount, Customer))
 
 class LoginRequest(BaseModel):
     email: str
@@ -464,7 +488,14 @@ class NotificationRequest(BaseModel):
     message: str
     channel: str = "wallet"
 
-app.mount("/static", StaticFiles(directory="."), name="static")
+# Never serve the repository root: it can include source code, backups and secrets.
+# Public HTML and PWA assets are exposed via explicit FileResponse routes below.
+# Legacy /static was unused by current UI; requests now return 404.
+
+@app.get("/loial-i18n.js")
+def loial_localization_script():
+    return FileResponse("loial-i18n.js",media_type="application/javascript",
+                        headers={"Cache-Control":"no-cache"})
 
 @app.get("/login.html")
 def login_page():
@@ -538,9 +569,15 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
         raise HTTPException(status_code=401, detail="Email sau parolă incorectă")
 
     log_auth_event(email, True, ip)
-    token = create_access_token({"sub": email, "role": role})
-    biz_id_val = business.id if business else None
-    response.set_cookie(key="loial_token", value=token, httponly=True, max_age=86400, samesite="lax")
+    biz_id_val = business.id if role=="business" and business else None
+    claims={"sub":email,"role":role}
+    if biz_id_val is not None:claims["business_id"]=biz_id_val
+    if role=="ambassador" and agent:claims["agent_id"]=agent.id
+    token=create_access_token(claims)
+    response.set_cookie(key="loial_token",value=token,httponly=True,
+                        secure=os.getenv("LOIAL_PUBLIC_ORIGIN","https://loial.space").startswith("https://"),
+                        max_age=min(86400,ACCESS_TOKEN_EXPIRE_MINUTES*60),
+                        samesite="lax")
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -559,6 +596,7 @@ def logout_endpoint():
 
 @app.get("/customers")
 def get_customers(page: int = 1, limit: int = 20, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Lista globala de clienti a fost retrasa. Foloseste panoul firmei autentificate.")
     limit = min(limit, 100)
     offset = (page - 1) * limit
     customers = db.query(Customer).offset(offset).limit(limit).all()
@@ -568,6 +606,7 @@ def get_customers(page: int = 1, limit: int = 20, current_user: User = Depends(g
 @app.post("/customers")
 @limiter.limit("30/minute")
 def add_customer(request: Request, c: CustomerCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Inscrierea legacy fara atribuire la firma este dezactivata.")
     name = sanitize_input(c.name, 100)
     customer = Customer(name=name, lang=sanitize_input(c.lang, 5), email=sanitize_input(c.email or "", 100), lat=c.lat, lng=c.lng, last_visit=datetime.now().strftime("%Y-%m-%d"))
     db.add(customer)
@@ -578,6 +617,7 @@ def add_customer(request: Request, c: CustomerCreate, current_user: User = Depen
 @app.post("/stamp")
 @limiter.limit("60/minute")
 def add_stamp(request: Request, req: StampRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Stampilarea fara PIN si audit a fost retrasa. Foloseste scan-universal.")
     customer = db.query(Customer).filter(Customer.id == req.customer_id).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
@@ -594,6 +634,7 @@ def add_stamp(request: Request, req: StampRequest, current_user: User = Depends(
 
 @app.get("/stats")
 def get_stats(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Statisticile globale de clienti nu sunt disponibile intre firme.")
     total = db.query(func.count(Customer.id)).scalar()
     active = db.query(func.count(Customer.id)).filter(Customer.stamps > 0).scalar()
     at_risk = db.query(func.count(Customer.id)).filter(Customer.stamps == 0).scalar()
@@ -637,10 +678,12 @@ def generate_qr(customer_id: int, current_user: User = Depends(get_current_user)
 
 @app.get("/locations")
 def get_locations(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Locatiile legacy globale sunt dezactivate.")
     return db.query(Location).all()
 
 @app.post("/locations")
 def add_location(loc: LocationCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Adaugarea locatiilor fara verificarea firmei este dezactivata.")
     location = Location(**loc.dict())
     db.add(location)
     db.commit()
@@ -649,6 +692,7 @@ def add_location(loc: LocationCreate, current_user: User = Depends(get_current_u
 
 @app.post("/nearby")
 def nearby(lat: float, lng: float, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Cautarea veche a locatiilor partajate este retrasa.")
     locs = db.query(Location).all()
     results = []
     for loc in locs:
@@ -659,6 +703,7 @@ def nearby(lat: float, lng: float, current_user: User = Depends(get_current_user
 
 @app.post("/payment")
 def create_payment(req: PaymentRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410, detail="Abonamentele LOIAL se incaseaza exclusiv prin Stripe Checkout, dupa webhook verificat.")
     prices = {"starter": 0, "pro": 49, "network": 199}
     if req.plan not in prices:
         raise HTTPException(status_code=400, detail="Invalid plan")
@@ -674,6 +719,7 @@ def list_payments(current_user: User = Depends(get_current_user), db: Session = 
 
 @app.post("/notify")
 def send_notification(req: NotificationRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Notificarea arbitrarilor clienti fara proprietar verificat este retrasa.")
     notif = Notification(id=str(uuid.uuid4())[:8], customer_id=req.customer_id, message=req.message, channel=req.channel, date=datetime.now().isoformat(), status="sent")
     db.add(notif)
     db.commit()
@@ -687,40 +733,12 @@ def list_notifications(current_user: User = Depends(get_current_user), db: Sessi
     return [{"id": n.id, "type": n.type, "title": n.title, "message": n.message, "read": bool(n.read), "date": n.created_at} for n in notifs]
 
 @app.get("/wallet/{customer_id}")
-def generate_wallet_pass(customer_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    customer = db.query(Customer).filter(Customer.id == customer_id).first()
-    if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
-    pass_data = {
-        "formatVersion": 1,
-        "passTypeIdentifier": WALLET_PASS_TYPE,
-        "serialNumber": f"AETHER-{customer_id}",
-        "teamIdentifier": WALLET_TEAM_ID or "TEAMID",
-        "organizationName": "Loial",
-        "description": "Loyalty Card",
-        "logoText": "Loial",
-        "foregroundColor": "rgb(255,255,255)",
-        "backgroundColor": "rgb(124,92,255)",
-        "storeCard": {
-            "primaryFields": [{"key": "stamps", "label": "STAMPS", "value": f"{customer.stamps}/6"}],
-            "secondaryFields": [{"key": "name", "label": "MEMBER", "value": customer.name}],
-            "auxiliaryFields": [{"key": "reward", "label": "NEXT REWARD", "value": "Free coffee" if customer.stamps < 6 else "Ready!"}]
-        },
-        "barcode": {
-            "message": f"AETHER:{customer_id}:{customer.name}",
-            "format": "PKBarcodeFormatQR",
-            "messageEncoding": "iso-8859-1"
-        }
-    }
-    return {
-        "pass": pass_data,
-        "customer": {"id": customer.id, "name": customer.name, "stamps": customer.stamps},
-        "status": "ready_for_signing",
-        "note": "In production, this is signed with Apple certificate and returned as .pkpass"
-    }
+def legacy_apple_wallet_endpoint(customer_id:int):
+    raise HTTPException(status_code=410,detail="Cardul demo a fost retras. Foloseste Google Wallet din portofelul Loial verificat.")
 
 @app.post("/payment/stripe")
 def create_stripe_payment(req: PaymentRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410, detail="Checkout Stripe vechi este retras. Foloseste /api/loial-stripe/checkout.")
     prices = {"starter": 0, "pro": 4900, "network": 19900}
     if req.plan not in prices:
         raise HTTPException(status_code=400, detail="Invalid plan")
@@ -744,6 +762,7 @@ def create_stripe_payment(req: PaymentRequest, current_user: User = Depends(get_
 
 @app.post("/email")
 def send_email(to: str, subject: str, body: str, current_user: User = Depends(get_current_user)):
+    raise HTTPException(status_code=410,detail="Trimiterea de e-mailuri din endpointul generic a fost dezactivata.")
     if SENDGRID_KEY:
         try:
             from sendgrid import SendGridAPIClient
@@ -757,17 +776,9 @@ def send_email(to: str, subject: str, body: str, current_user: User = Depends(ge
     return {"status": "simulated", "to": to, "subject": subject, "note": "Set SENDGRID_API_KEY to send real emails"}
 
 @app.get("/wallet/google/{customer_id}")
-def google_wallet_link(customer_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    customer = db.query(Customer).filter(Customer.id == customer_id).first()
-    if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
-    return {
-        "customer_id": customer_id,
-        "add_to_wallet_url": f"https://pay.google.com/gp/v/save/AETHER-{customer_id}",
-        "object_id": f"loial.loyalty.{customer_id}",
-        "status": "ready",
-        "note": "In production, generate signed JWT for Google Wallet API"
-    }
+def legacy_google_wallet_endpoint(customer_id:int):
+    raise HTTPException(status_code=410,detail="Linkul demo Google Wallet nu este valid. Foloseste emiterea semnata din portofelul privat Loial.")
+
 @app.get("/gdpr/export/{customer_id}")
 def export_customer_data(customer_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     customer = check_ownership(db, current_user, customer_id)
@@ -800,6 +811,7 @@ def delete_customer_data(customer_id: int, current_user: User = Depends(get_curr
 
 @app.post("/gdpr/consent")
 def record_consent(customer_id: int, purpose: str, granted: bool = True, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    check_ownership(db,current_user,customer_id)
     consent = Consent(
         customer_id=customer_id,
         purpose=sanitize_input(purpose, 100),
@@ -1008,7 +1020,7 @@ def check_affiliate_status(db, agent):
 
 @app.post("/notifications/{notif_id}/read")
 def mark_read(notif_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    notif = db.query(PlatformNotification).filter(PlatformNotification.id == notif_id).first()
+    notif = db.query(PlatformNotification).filter(PlatformNotification.id == notif_id,PlatformNotification.user_email == current_user.email).first()
     if notif:
         notif.read = 1
         db.commit()
@@ -1016,6 +1028,7 @@ def mark_read(notif_id: int, current_user: User = Depends(get_current_user), db:
 
 @app.post("/sales/onboard")
 def onboard_business(qr_code: str, business_name: str, business_email: str, business_type: str = "cafe", plan: str = "pro", db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
     agent = db.query(SalesAgent).filter(SalesAgent.qr_code == qr_code).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Invalid QR code")
@@ -1076,11 +1089,13 @@ def onboard_business(qr_code: str, business_name: str, business_email: str, busi
 
 @app.get("/sales/live")
 def live_sales(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Legacy sales feed is replaced by verified administrator activity.")
     recent = db.query(Sale).order_by(Sale.id.desc()).limit(20).all()
     return [{"id": s.id, "business": s.business_name, "agent_id": s.agent_id, "type": s.business_type, "date": s.completed_at} for s in recent]
 
 @app.get("/sales/agent/{agent_id}/stats")
 def agent_stats(agent_id: int, month: str = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Legacy sales statistics are replaced by the private ambassador ledger.")
     if not month:
         month = datetime.now().strftime("%Y-%m")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
@@ -1106,6 +1121,7 @@ def create_team(name: str, manager_id: int, current_user: User = Depends(get_cur
 
 @app.post("/sales/team/{team_id}/add/{agent_id}")
 def add_to_team(team_id: int, agent_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410, detail="Structurile de echipa legacy nu influenteaza comisioanele LOIAL.")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if agent:
         agent.team_id = team_id
@@ -1114,12 +1130,14 @@ def add_to_team(team_id: int, agent_id: int, current_user: User = Depends(get_cu
 
 @app.post("/sales/commissions/calculate")
 def calc_commissions(month: str = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     return {"results": calculate_commissions(db, Sale, Commission, SalesAgent, month)}
 
 @app.post("/sales/commissions/pay/{agent_id}")
 def pay_commission(agent_id: int, month: str = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     if not month:
@@ -1134,6 +1152,7 @@ def pay_commission(agent_id: int, month: str = None, current_user: User = Depend
 
 @app.put("/sales/agent/{agent_id}/commission")
 def set_commission(agent_id: int, own: float = 20.0, team: float = 5.0, bonus: float = 5.0, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Comisioanele sunt fixe conform planului publicat, calculate exclusiv din incasari verificate")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
@@ -1238,6 +1257,7 @@ def admin_analytics(period: str = "month", current_user: User = Depends(get_curr
 
 @app.get("/analytics/agent/{agent_id}")
 def agent_analytics(agent_id: int, period: str = "month", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Other agents must not access private ambassador analytics.")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
@@ -1269,6 +1289,7 @@ def agent_analytics(agent_id: int, period: str = "month", current_user: User = D
 
 @app.get("/analytics/manager/{agent_id}")
 def manager_analytics(agent_id: int, period: str = "month", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Legacy team commission analytics are deprecated.")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent or not agent.is_manager:
         raise HTTPException(status_code=403, detail="Not a manager")
@@ -1315,6 +1336,7 @@ def manager_analytics(agent_id: int, period: str = "month", current_user: User =
 
 @app.get("/analytics/business/{business_id}")
 def business_analytics(business_id: int, period: str = "month", db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Business analytics is available only through the private business dashboard.")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Business not found")
@@ -1359,6 +1381,7 @@ def business_analytics(business_id: int, period: str = "month", db: Session = De
 
 @app.post("/analytics/purchase")
 def record_purchase(customer_id: int, business_id: int, product: str, amount: float, db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Unauthenticated purchase recording is disabled.")
     purchase = CustomerPurchase(customer_id=customer_id, business_id=business_id, product=product, amount=amount, date=datetime.now().strftime("%Y-%m-%d"))
     db.add(purchase)
     db.commit()
@@ -1366,6 +1389,7 @@ def record_purchase(customer_id: int, business_id: int, product: str, amount: fl
 
 @app.post("/analytics/cancel")
 def record_cancellation(business_id: int, reason: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Legacy cancellation endpoint does not verify merchant ownership.")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Business not found")
@@ -1376,11 +1400,12 @@ def record_cancellation(business_id: int, reason: str, current_user: User = Depe
 
 @app.put("/sales/agent/{agent_id}/payout")
 def set_payout_method(agent_id: int, method: str, details: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410, detail="Modificarea datelor de plata se face numai prin fluxul privat verificat al ambasadorului.")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-    if method not in ["bank", "revolut", "wise", "paypal"]:
-        raise HTTPException(status_code=400, detail="Method must be: bank, revolut, wise, paypal")
+    if method != "wise":
+        raise HTTPException(status_code=400, detail="Comisioanele LOIAL se platesc exclusiv din Wise Business")
     agent.payout_method = method
     agent.payout_details = details
     db.commit()
@@ -1388,6 +1413,7 @@ def set_payout_method(agent_id: int, method: str, details: str, current_user: Us
 
 @app.get("/admin/payouts/pending")
 def pending_payouts(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     month = datetime.now().strftime("%Y-%m")
@@ -1433,6 +1459,7 @@ def pending_payouts(current_user: User = Depends(get_current_user), db: Session 
 
 @app.post("/admin/payouts/pay/{agent_id}")
 def pay_agent(agent_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
@@ -1487,11 +1514,13 @@ def pay_agent(agent_id: int, current_user: User = Depends(get_current_user), db:
 
 @app.get("/sales/agent/{agent_id}/payouts")
 def agent_payouts(agent_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410, detail="Raportul vechi este retras; foloseste registrul privat verificat al ambasadorului.")
     payouts = db.query(Payout).filter(Payout.agent_id == agent_id).order_by(Payout.id.desc()).all()
     return [{"id": p.id, "amount": p.amount, "method": p.method, "status": p.status, "month": p.month, "paid_at": p.paid_at} for p in payouts]
 
 @app.post("/invoices/create")
 def create_invoice(business_id: int, amount: float, description: str = "Loial Pro Subscription", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Facturarea abonamentelor se face exclusiv prin fluxul Stripe.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
@@ -1523,6 +1552,7 @@ def list_invoices(current_user: User = Depends(get_current_user), db: Session = 
 
 @app.post("/invoices/{invoice_id}/paid")
 def mark_invoice_paid(invoice_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
@@ -1535,6 +1565,7 @@ def mark_invoice_paid(invoice_id: int, current_user: User = Depends(get_current_
 
 @app.post("/payouts/wise")
 def create_wise_payout(agent_id: int, amount: float, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
@@ -1574,6 +1605,12 @@ def create_wise_payout(agent_id: int, amount: float, current_user: User = Depend
 
 @app.get("/pricing")
 def get_pricing(country: str = "RO", db: Session = Depends(get_db)):
+    # LOIAL currently does not add VAT to its EUR 67 subscription price.
+    return [{"plan":"pro","base_price":67,"vat_rate":0,"vat_amount":0,
+             "total":67,"currency":"EUR","country":country.upper(),
+             "billing_provider":"stripe","interval":"month"},
+            {"plan":"starter","base_price":0,"vat_rate":0,"vat_amount":0,
+             "total":0,"currency":"EUR","country":country.upper()}]
     plans = db.query(Pricing).all()
     vat = db.query(VATRate).filter(VATRate.country_code == country.upper()).first()
     vat_rate = vat.rate if vat else 0
@@ -1593,6 +1630,7 @@ def get_pricing(country: str = "RO", db: Session = Depends(get_db)):
 
 @app.put("/pricing/{plan}")
 def update_pricing(plan: str, base_price: float, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Pretul LOIAL se schimba numai prin actualizarea verificata a configuratiei Stripe.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     pricing = db.query(Pricing).filter(Pricing.plan == plan).first()
@@ -1610,6 +1648,7 @@ def get_vat_rates(db: Session = Depends(get_db)):
 
 @app.put("/vat-rates/{country}")
 def update_vat_rate(country: str, rate: float, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Configurarea TVA a fluxului vechi este retrasa.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     vat = db.query(VATRate).filter(VATRate.country_code == country.upper()).first()
@@ -1623,6 +1662,7 @@ def update_vat_rate(country: str, rate: float, current_user: User = Depends(get_
 
 @app.post("/invoices/create")
 def create_invoice(business_id: int, plan: str = "pro", country: str = "RO", description: str = "", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Facturarea abonamentelor se face exclusiv prin fluxul Stripe.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
@@ -1797,13 +1837,24 @@ class QuickRegisterRequest(BaseModel):
 
 
 @app.post("/api/register")
-def quick_register(req: QuickRegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def quick_register(request: Request, req: QuickRegisterRequest, db: Session = Depends(get_db)):
     existing = db.query(BusinessAccount).filter(BusinessAccount.email == req.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email deja înregistrat")
 
     clean_ref = sanitize_input(req.ref_code or "", 60)
-    agent = db.query(SalesAgent).filter(SalesAgent.qr_code == clean_ref).first() if clean_ref else None
+    agent = db.query(SalesAgent).filter(
+        SalesAgent.qr_code==clean_ref,
+        SalesAgent.active.is_(True)).first() if clean_ref else None
+    if clean_ref and (not agent or agent.role!="ambassador"):
+        raise HTTPException(status_code=422,
+            detail="Cod de recomandare invalid sau inactiv. Verifica linkul ambasadorului.")
+
+    if len(req.password)<10:
+        raise HTTPException(status_code=422,detail="Parola trebuie sa aiba minimum 10 caractere")
+    if not req.business_name.strip() or len(req.business_name)>150:
+        raise HTTPException(status_code=422,detail="Denumire firma invalida")
 
     business = BusinessAccount(
         name=req.business_name,
@@ -1813,7 +1864,7 @@ def quick_register(req: QuickRegisterRequest, db: Session = Depends(get_db)):
         max_customers=50,
         reward_text=req.reward,
         card_color=req.color,
-        staff_pin="1234",
+        staff_pin=str(1000 + secrets.randbelow(9000)),
         agent_id=agent.id if agent else None,
         ref_code=clean_ref,
         created_at=datetime.now().isoformat()
@@ -1841,6 +1892,19 @@ def get_business_public(business_id: int, db: Session = Depends(get_db)):
 def join_qr_page(business_id: int):
     return FileResponse("join.html")
 
+def business_can_enroll_new_customers(db, business_id):
+    """Public QR enrollments must respect the PAID subscription, not plan labels.
+
+    Existing members can keep their own wallet. The free tier accepts up to
+    50 registered customers; Stripe/LOIAL reconciliation controls paid access.
+    """
+    from loial_stripe_billing import effective_entitlements
+    if effective_entitlements(db,business_id)["active"]:
+        return True
+    count=db.query(Customer).filter(Customer.business_id==business_id).count()
+    return count<50
+
+
 class QREnrollRequest(BaseModel):
     business_id: int
     name: str
@@ -1852,8 +1916,7 @@ def qr_enroll(req: QREnrollRequest, db: Session = Depends(get_db)):
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Business not found")
-    count = db.query(Customer).filter(Customer.business_id == req.business_id).count()
-    if biz.plan == "free" and count >= (biz.max_customers or 50):
+    if not business_can_enroll_new_customers(db,req.business_id):
         raise HTTPException(status_code=403, detail="LIMIT_REACHED")
     new_uuid = str(uuid.uuid4())[:8]
     customer = Customer(
@@ -1877,25 +1940,21 @@ class QRScanRequest(BaseModel):
     pin: str
     business_id: int
     customer_uuid: str
+    idempotency_key: Optional[str] = None
 
 @app.post("/api/scan")
-def qr_scan_stamp(req: QRScanRequest, db: Session = Depends(get_db)):
-    biz = db.query(BusinessAccount).filter(
-        BusinessAccount.id == req.business_id,
-        BusinessAccount.staff_pin == req.pin
-    ).first()
-    if not biz:
-        raise HTTPException(status_code=401, detail="PIN incorect")
-    customer = db.query(Customer).filter(
-        Customer.uuid == req.customer_uuid,
-        Customer.business_id == req.business_id
-    ).first()
-    if not customer:
-        raise HTTPException(status_code=404, detail="Client negăsit la această locație")
-    customer.stamps = (customer.stamps or 0) + 1
-    customer.last_visit = datetime.now().isoformat()
-    db.commit()
-    return {"stamps": customer.stamps, "name": customer.name, "business_id": biz.id}
+@limiter.limit("30/minute")
+def qr_scan_stamp(request: Request, req: QRScanRequest, db: Session = Depends(get_db)):
+    """Compatibility endpoint; all stamp grants use the audited universal path."""
+    biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
+    if not biz or not biz.staff_pin or biz.staff_pin == "1234" or req.pin != biz.staff_pin:
+        raise HTTPException(status_code=401, detail="PIN principal invalid sau schimbarea lui este necesara")
+    scanned = scan_universal_card(request, UniversalScanRequest(
+        pin=req.pin,business_id=req.business_id,
+        customer_uuid=req.customer_uuid,idempotency_key=req.idempotency_key),db)
+    return {"stamps":scanned["stamps"],"name":scanned["name"],
+            "business_id":req.business_id,
+            "duplicate_ignored":scanned.get("duplicate_ignored",False)}
 
 @app.get("/review/{business_id}")
 def review_gate_page(business_id: int):
@@ -2068,12 +2127,38 @@ def get_my_business(credentials: HTTPAuthorizationCredentials = Depends(security
         "max_customers": biz.max_customers or 50,
         "reward_text": biz.reward_text,
         "card_color": biz.card_color,
-        "staff_pin": biz.staff_pin or "1234",
+        "staff_pin": biz.staff_pin or "",
         "google_review_url": biz.google_review_url or "",
         "customers_count": len(customers),
         "customers": [{"name": c.name, "stamps": c.stamps or 0, "last_visit": c.last_visit} for c in customers[:20]],
         "feedbacks": [{"rating": f.rating, "message": f.message, "date": f.created_at} for f in feedbacks[:10]]
     }
+
+@app.post("/api/my-business/rotate-pin")
+def rotate_business_staff_pin(credentials: HTTPAuthorizationCredentials = Depends(security),
+                              db: Session = Depends(get_db)):
+    if not credentials:
+        raise HTTPException(status_code=401,detail="Autentificare obligatorie")
+    try:
+        claims=jwt.decode(credentials.credentials,SECRET_KEY,algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401,detail="Sesiune invalida")
+    if claims.get("role")!="business":
+        raise HTTPException(status_code=403,detail="Doar administratorul firmei poate schimba PIN-ul")
+    biz=db.query(BusinessAccount).filter(
+        BusinessAccount.email==claims.get("sub")).first()
+    if not biz:
+        raise HTTPException(status_code=403,detail="Firma nu a fost gasita")
+    staff_pins={p.pin for p in db.query(StaffMember).filter(
+        StaffMember.business_id==biz.id,StaffMember.active==1).all()}
+    for _ in range(100):
+        new_pin=str(1000+secrets.randbelow(9000))
+        if new_pin not in staff_pins and new_pin!=biz.staff_pin and new_pin!="1234":
+            biz.staff_pin=new_pin
+            db.commit()
+            return {"status":"rotated","staff_pin":new_pin,
+                    "notice":"Comunica PIN-ul doar persoanelor autorizate. PIN-ul vechi nu mai functioneaza."}
+    raise HTTPException(status_code=503,detail="Nu a putut fi generat un PIN disponibil")
 
 @app.post("/api/my-business/settings")
 def update_my_business_settings(req: BusinessSettingsUpdate, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
@@ -2085,8 +2170,11 @@ def update_my_business_settings(req: BusinessSettingsUpdate, credentials: HTTPAu
         raise HTTPException(status_code=404, detail="Afacere negăsită")
     if req.google_review_url is not None:
         biz.google_review_url = req.google_review_url.strip()
-    if req.staff_pin and len(req.staff_pin) == 4:
-        biz.staff_pin = req.staff_pin.strip()
+    if req.staff_pin is not None:
+        pin=req.staff_pin.strip()
+        if not re.fullmatch(r"\d{4}",pin) or pin=="1234":
+            raise HTTPException(status_code=422,detail="Alege un PIN diferit de 1234, format din 4 cifre")
+        biz.staff_pin=pin
     if req.reward_text:
         biz.reward_text = req.reward_text.strip()
     db.commit()
@@ -2203,8 +2291,8 @@ def add_staff_member(req: StaffCreateRequest, credentials: HTTPAuthorizationCred
     biz = db.query(BusinessAccount).filter(BusinessAccount.email == payload.get("sub")).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
-    if len(req.pin) != 4 or not req.pin.isdigit():
-        raise HTTPException(status_code=400, detail="PIN-ul trebuie să aibă exact 4 cifre")
+    if not re.fullmatch(r"\d{4}",req.pin) or req.pin=="1234" or req.pin==biz.staff_pin:
+        raise HTTPException(status_code=422,detail="PIN de 4 cifre, diferit de 1234 si de PIN-ul administratorului")
     existing_pin = db.query(StaffMember).filter(StaffMember.business_id == biz.id, StaffMember.pin == req.pin, StaffMember.active == 1).first()
     if existing_pin:
         raise HTTPException(status_code=400, detail="Acest PIN este deja folosit de alt angajat")
@@ -2255,53 +2343,63 @@ def update_business_offer(req: FullBusinessSettings, credentials: HTTPAuthorizat
     return {"status": "updated"}
 
 @app.post("/api/scan-v2")
-def qr_scan_with_staff(req: QRScanRequest, db: Session = Depends(get_db)):
-    biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
+@limiter.limit("30/minute")
+def qr_scan_with_staff(request: Request, req: QRScanRequest, db: Session = Depends(get_db)):
+    """Compatibility endpoint with shared idempotency, reward and inbox handling."""
+    scanned = scan_universal_card(request, UniversalScanRequest(
+        pin=req.pin,business_id=req.business_id,
+        customer_uuid=req.customer_uuid,idempotency_key=req.idempotency_key),db)
+    return {**scanned, "business_id":req.business_id}
+
+# Autorizare stricta pentru citirea/modificarea informatiilor private ale firmei.
+def require_business_owner_or_admin(business_id: int, credentials, db: Session):
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Autentificare obligatorie")
+    try:
+        claims = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Sesiune invalida")
+    email = claims.get("sub")
+    if not email:
+        raise HTTPException(status_code=403, detail="Acces interzis")
+    if claims.get("role") == "business":
+        account = db.query(BusinessAccount).filter(BusinessAccount.id == business_id,
+                          BusinessAccount.email == email).first()
+        if account:
+            return account
+    elif claims.get("role") in ("admin", "owner"):
+        operator = db.query(User).filter(User.email == email).first()
+        if operator and operator.role in ("admin", "owner"):
+            return operator
+    raise HTTPException(status_code=403, detail="Nu ai acces la aceasta firma")
+
+def require_platform_admin(credentials, db: Session):
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Autentificare obligatorie")
+    try:
+        claims = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Sesiune invalida")
+    admin = db.query(User).filter(User.email == claims.get("sub")).first()
+    if not admin or admin.role not in ("admin", "owner") or claims.get("role") not in ("admin", "owner"):
+        raise HTTPException(status_code=403, detail="Doar administratorul platformei")
+    return admin
+
+@app.get("/api/loial-public/{business_id}")
+def get_loial_public_business(business_id: int, db: Session = Depends(get_db)):
+    biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     if not biz:
-        raise HTTPException(status_code=404, detail="Afacere negăsită")
-    
-    staff = db.query(StaffMember).filter(
-        StaffMember.business_id == req.business_id,
-        StaffMember.pin == req.pin,
-        StaffMember.active == 1
-    ).first()
-    
-    # Acceptă fie PIN-ul unui angajat activ, fie PIN-ul principal al administratorului
-    if not staff and biz.staff_pin != req.pin:
-        raise HTTPException(status_code=401, detail="PIN incorect sau angajat dezactivat")
-    
-    customer = db.query(Customer).filter(
-        Customer.uuid == req.customer_uuid,
-        Customer.business_id == req.business_id
-    ).first()
-    if not customer:
-        raise HTTPException(status_code=404, detail="Client negăsit la această locație")
-    
-    target = getattr(biz, "stamps_required", None) or 6
-    customer.stamps = (customer.stamps or 0) + 1
-    reward_unlocked = False
-    if customer.stamps >= target:
-        reward_unlocked = True
-    
-    if staff:
-        staff.scans_count = (staff.scans_count or 0) + 1
-        
-    customer.last_visit = datetime.now().isoformat()
-    db.commit()
-    return {
-        "stamps": customer.stamps,
-        "target": target,
-        "reward_unlocked": reward_unlocked,
-        "name": customer.name,
-        "staff_name": staff.name if staff else "Administrator",
-        "business_id": biz.id
-    }
+        raise HTTPException(status_code=404, detail="Afacere negasita")
+    return {"name": biz.name, "reward_text": biz.reward_text or "Premiu fidelitate",
+            "stamps_required": getattr(biz, "stamps_required", None) or 6,
+            "card_color": biz.card_color or "#2d6a4f"}
 
 # ==========================================
 # DIRECT BUSINESS ID ROUTES (NO TOKEN ISSUES)
 # ==========================================
 @app.get("/api/biz-full/{business_id}")
-def get_biz_full_data(business_id: int, db: Session = Depends(get_db)):
+def get_biz_full_data(business_id: int, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_business_owner_or_admin(business_id, credentials, db)
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
@@ -2331,7 +2429,8 @@ def get_biz_full_data(business_id: int, db: Session = Depends(get_db)):
     }
 
 @app.post("/api/biz-full/{business_id}/offer")
-def save_biz_offer_direct(business_id: int, req: FullBusinessSettings, db: Session = Depends(get_db)):
+def save_biz_offer_direct(business_id: int, req: FullBusinessSettings, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_business_owner_or_admin(business_id, credentials, db)
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
@@ -2345,12 +2444,13 @@ def save_biz_offer_direct(business_id: int, req: FullBusinessSettings, db: Sessi
     return {"status": "ok"}
 
 @app.post("/api/biz-full/{business_id}/staff")
-def add_biz_staff_direct(business_id: int, req: StaffCreateRequest, db: Session = Depends(get_db)):
+def add_biz_staff_direct(business_id: int, req: StaffCreateRequest, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_business_owner_or_admin(business_id, credentials, db)
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
-    if len(req.pin) != 4 or not req.pin.isdigit():
-        raise HTTPException(status_code=400, detail="PIN-ul trebuie să aibă exact 4 cifre")
+    if not re.fullmatch(r"\d{4}",req.pin) or req.pin=="1234" or req.pin==biz.staff_pin:
+        raise HTTPException(status_code=422,detail="PIN de 4 cifre, diferit de 1234 si de PIN-ul administratorului")
     existing = db.query(StaffMember).filter(StaffMember.business_id == business_id, StaffMember.pin == req.pin, StaffMember.active == 1).first()
     if existing:
         raise HTTPException(status_code=400, detail="Acest PIN este deja folosit de alt angajat")
@@ -2367,7 +2467,8 @@ def add_biz_staff_direct(business_id: int, req: StaffCreateRequest, db: Session 
     return {"status": "added"}
 
 @app.delete("/api/biz-full/{business_id}/staff/{staff_id}")
-def delete_biz_staff_direct(business_id: int, staff_id: int, db: Session = Depends(get_db)):
+def delete_biz_staff_direct(business_id: int, staff_id: int, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_business_owner_or_admin(business_id, credentials, db)
     member = db.query(StaffMember).filter(StaffMember.id == staff_id, StaffMember.business_id == business_id).first()
     if member:
         member.active = 0
@@ -2392,12 +2493,13 @@ class RedeemRequest(BaseModel):
     customer_uuid: str
 
 @app.post("/api/redeem-reward")
-def redeem_customer_reward(req: RedeemRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def redeem_customer_reward(request: Request, req: RedeemRequest, db: Session = Depends(get_db)):
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
     staff = db.query(StaffMember).filter(StaffMember.business_id == biz.id, StaffMember.pin == req.pin, StaffMember.active == 1).first()
-    if not staff and req.pin != (biz.staff_pin or "1234"):
+    if not staff and (not biz.staff_pin or biz.staff_pin=="1234" or req.pin != biz.staff_pin):
         raise HTTPException(status_code=401, detail="PIN incorect")
     customer = db.query(Customer).filter(
         Customer.business_id == biz.id,
@@ -2405,14 +2507,32 @@ def redeem_customer_reward(req: RedeemRequest, db: Session = Depends(get_db)):
     ).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Cardul clientului nu există la această afacere")
+    target = getattr(biz, "stamps_required", None) or 6
+    if (customer.stamps or 0) < target:
+        raise HTTPException(status_code=409, detail="Recompensa nu este inca disponibila")
     customer.stamps = 0
     customer.last_visit = datetime.now().isoformat()
+    from loial_inbox import queue_service_event
+    from loial_scans import record_award
+    redeem_key=uuid.uuid4().hex
+    record_award(db,biz.id,customer.id,"redeem:"+redeem_key,"redeem",0)
+    queue_service_event(db, biz, customer, kind="redeem", event_key=redeem_key)
+    from loial_wallet_sync import queue_google_refresh
+    queue_google_refresh(db,biz.id,customer.wallet_uuid or customer.uuid)
+    from loial_apple_updates import mark_customer_pass_changed
+    mark_customer_pass_changed(db,biz.id,customer.wallet_uuid or customer.uuid)
     db.commit()
     return {"status": "redeemed", "name": customer.name, "stamps": 0}
 class InstantEnrollRequest(BaseModel):
     business_id: int
     name: str
     uuid: str
+    email: Optional[str] = None
+    consent_marketing_email: bool = False
+    consent_personalized_ads: bool = False
+    consent_loial_offers: bool = False
+    wallet_claim_token: Optional[str] = None
+    friend_referral_code: Optional[str] = None
 
 @app.post("/api/enroll-sync")
 def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db)):
@@ -2420,6 +2540,11 @@ def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
 
+    email_clean = sanitize_input(req.email or "", 160).lower()
+    if email_clean and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email_clean):
+        raise HTTPException(status_code=422, detail="Adresa de email nu este valida")
+    if (req.consent_marketing_email or req.consent_personalized_ads) and not email_clean:
+        raise HTTPException(status_code=422, detail="Pentru comunicari este necesara o adresa de email")
     wallet_id = req.uuid.strip()
     if not wallet_id:
         raise HTTPException(status_code=400, detail="Codul portofelului lipsește")
@@ -2432,15 +2557,34 @@ def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db
         (Customer.uuid == wallet_id) | (Customer.wallet_uuid == wallet_id),
     ).first()
     if card_at_business:
-        return {"status": "exists"}
+        from loial_inbox import issue_wallet_access
+        try:
+            verified_token = issue_wallet_access(db, wallet_id, False, req.wallet_claim_token)
+        except ValueError as exc:
+            raise HTTPException(status_code=422,detail=str(exc))
+        return {"status": "exists", "inbox_access": verified_token}
+
+    # A new card for this merchant counts toward the free-tier limit even
+    # when the customer already holds a LOIAL wallet elsewhere.
+    if not business_can_enroll_new_customers(db,req.business_id):
+        raise HTTPException(status_code=403,detail="LIMIT_REACHED")
 
     if existing:
+        # Nu asocia o firma noua la un portofel existent doar din QR-ul public.
+        # Dispozitivul trebuie sa prezinte secretul privat deja emis.
+        from loial_inbox import WalletInboxAccess, access_hash
+        secret_token=(req.wallet_claim_token or "").strip()
+        verified=db.query(WalletInboxAccess).filter(
+            WalletInboxAccess.wallet_uuid==(existing.wallet_uuid or existing.uuid),
+            WalletInboxAccess.token_hash==access_hash(secret_token)).first() if len(secret_token)>=40 else None
+        if not verified:
+            raise HTTPException(status_code=401,detail="Pentru acest card este necesara verificarea portofelului privat")
         # Un portofel universal, mai multe carduri cu progres independent.
         customer = Customer(
             uuid=str(uuid.uuid4()),
             wallet_uuid=existing.wallet_uuid or existing.uuid,
             name=existing.name,
-            email=existing.email,
+            email=email_clean or None,
             phone=existing.phone,
             stamps=0,
             business_id=req.business_id,
@@ -2451,13 +2595,37 @@ def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db
             uuid=wallet_id,
             wallet_uuid=wallet_id,
             name=sanitize_input(req.name, 80),
+            email=email_clean or None,
             stamps=0,
             business_id=req.business_id,
             last_visit=datetime.now().isoformat()
         )
     db.add(customer)
+    db.flush()
+    consent_time = datetime.now().isoformat()
+    if req.consent_marketing_email:
+        db.add(Consent(customer_id=customer.id, purpose="marketing_email",
+                       granted=1, date=consent_time, ip="join_form"))
+    if req.consent_personalized_ads:
+        db.add(Consent(customer_id=customer.id, purpose="personalized_ads",
+                       granted=1, date=consent_time, ip="join_form"))
+    from loial_inbox import issue_wallet_access, record_offer_choice, queue_service_event
+    try:
+        inbox_token = issue_wallet_access(db, wallet_id, is_new_wallet=(existing is None),
+                                         proposed_token=req.wallet_claim_token)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422,detail=str(exc))
+    if req.consent_loial_offers:
+        record_offer_choice(db, Consent, customer.id, True, "join_form")
+    friend_status="not_applicable"
+    if existing is None and inbox_token:
+        from loial_friend_referrals import attribute_new_wallet
+        friend_status=attribute_new_wallet(db,wallet_id,req.friend_referral_code)
+    queue_service_event(db, biz, customer, kind="welcome")
     db.commit()
-    return {"status": "saved"}
+    return {"status": "saved", "inbox_access": inbox_token,
+            "friend_invitation_status":friend_status}
 class ChangePasswordRequest(BaseModel):
     email: str
     old_password: str
@@ -2523,10 +2691,14 @@ class UniversalScanRequest(BaseModel):
     pin: str
     business_id: int
     customer_uuid: str
+    idempotency_key: Optional[str] = None
 
 
 @app.post("/api/scan-universal")
-def scan_universal_card(req: UniversalScanRequest, db: Session = Depends(get_db)):
+@limiter.limit("30/minute")
+def scan_universal_card(request: Request, req: UniversalScanRequest, db: Session = Depends(get_db)):
+    if req.pin=="1234":
+        raise HTTPException(status_code=401,detail="PIN vechi nesigur. Schimba-l din panoul firmei.")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
@@ -2536,7 +2708,7 @@ def scan_universal_card(req: UniversalScanRequest, db: Session = Depends(get_db)
         StaffMember.pin == req.pin,
         StaffMember.active == 1
     ).first()
-    if not staff and req.pin != (biz.staff_pin or "1234"):
+    if not staff and (not biz.staff_pin or biz.staff_pin=="1234" or req.pin!=biz.staff_pin):
         raise HTTPException(status_code=401, detail="PIN angajat incorect")
 
     code = req.customer_uuid.strip()
@@ -2551,6 +2723,10 @@ def scan_universal_card(req: UniversalScanRequest, db: Session = Depends(get_db)
         ).first()
         if not existing_profile:
             raise HTTPException(status_code=404, detail="Cardul nu a fost găsit")
+        # Scanning a universal wallet can create a NEW card at this merchant.
+        # It must respect the same customer cap as direct QR enrollment.
+        if not business_can_enroll_new_customers(db,biz.id):
+            raise HTTPException(status_code=403,detail="LIMIT_REACHED")
 
         wallet_id = existing_profile.wallet_uuid or existing_profile.uuid
         customer = Customer(
@@ -2567,6 +2743,25 @@ def scan_universal_card(req: UniversalScanRequest, db: Session = Depends(get_db)
         db.flush()
 
     target = getattr(biz, "stamps_required", None) or 6
+    from loial_scans import existing_operation, recent_duplicate, record_award
+    operation = req.idempotency_key or uuid.uuid4().hex
+    if len(operation)<8 or len(operation)>120:
+        raise HTTPException(status_code=422,detail="Identificatorul scanarii nu este valid")
+    prior = existing_operation(db,biz.id,operation)
+    if prior:
+        if prior.customer_id!=customer.id:
+            raise HTTPException(status_code=409,detail="Aceasta operatiune apartine altui card")
+        return {"name":customer.name,"stamps":prior.stamps_after,
+                "target":target,"staff_name":staff.name if staff else "Administrator",
+                "reward_unlocked":prior.stamps_after>=target,
+                "duplicate_ignored":True}
+    if recent_duplicate(db,biz.id,customer.id):
+        raise HTTPException(status_code=409,
+            detail="Acest card a fost scanat recent. Verifica daca e o cumparatura noua.")
+    if (customer.stamps or 0)>=target:
+        raise HTTPException(status_code=409,
+            detail="Recompensa este deja disponibila; acord-o inaintea unei noi stampile.")
+    previous_visit = customer.last_visit
     customer.stamps = (customer.stamps or 0) + 1
     customer.last_visit = datetime.now().isoformat()
     if staff:
@@ -2584,6 +2779,22 @@ def scan_universal_card(req: UniversalScanRequest, db: Session = Depends(get_db)
             for c in all_cards:
                 c.network_bonus_text = f"{rule.bonus_title}: {rule.bonus_message}"
 
+    from loial_inbox import queue_service_event
+    was_away = False
+    if previous_visit:
+        try:
+            was_away = (datetime.now() - datetime.fromisoformat(previous_visit)).days >= 30
+        except (ValueError, TypeError):
+            pass
+    queue_service_event(db, biz, customer, kind="stamp", returning=was_away,
+                        event_key=operation)
+    record_award(db,biz.id,customer.id,operation,"manual",customer.stamps)
+    from loial_friend_referrals import credit_after_valid_stamp
+    credit_after_valid_stamp(db,wallet_id,biz.id,"scan:"+operation)
+    from loial_wallet_sync import queue_google_refresh
+    queue_google_refresh(db,biz.id,customer.wallet_uuid or customer.uuid)
+    from loial_apple_updates import mark_customer_pass_changed
+    mark_customer_pass_changed(db,biz.id,customer.wallet_uuid or customer.uuid)
     db.commit()
     return {
         "name": customer.name,
@@ -2595,7 +2806,18 @@ def scan_universal_card(req: UniversalScanRequest, db: Session = Depends(get_db)
 
 
 @app.get("/api/wallet-profile/{wallet_uuid}")
-def get_universal_wallet_profile(wallet_uuid: str, db: Session = Depends(get_db)):
+def get_universal_wallet_profile(wallet_uuid: str, request: Request, db: Session = Depends(get_db)):
+    # QR-ul vizibil angajatului identifica doar cardul pentru scanare.
+    # Profilul, afacerile vizitate si stampilele sunt private titularului.
+    from loial_inbox import WalletInboxAccess, access_hash
+    private_token=(request.headers.get("X-Loial-Wallet-Token") or "").strip()
+    if len(wallet_uuid)>120 or len(private_token)<40 or len(private_token)>180:
+        raise HTTPException(status_code=401,detail="Verificarea portofelului este necesara")
+    verified=db.query(WalletInboxAccess).filter(
+        WalletInboxAccess.wallet_uuid==wallet_uuid,
+        WalletInboxAccess.token_hash==access_hash(private_token)).first()
+    if not verified:
+        raise HTTPException(status_code=401,detail="Acces privat invalid sau neactivat")
     cards = db.query(Customer).filter(
         (Customer.wallet_uuid == wallet_uuid) | (Customer.uuid == wallet_uuid)
     ).all()
@@ -2621,30 +2843,14 @@ def get_universal_wallet_profile(wallet_uuid: str, db: Session = Depends(get_db)
                 "unlocked": (c.stamps or 0) >= target
             })
 
+    # Datele ambasadorului sunt disponibile numai dupa autentificare;
+    # simpla posesie a QR-ului universal nu dovedeste identitatea titularului.
     ambassador_data = None
-    if primary.email:
-        agent = db.query(SalesAgent).filter(SalesAgent.email == primary.email).first()
-        if agent:
-            qr_info = generate_agent_qr(agent.id, agent.name, agent.qr_code)
-            sales_list = db.query(Sale).filter(Sale.agent_id == agent.id, Sale.status == "completed").all()
-            tier = get_ambassador_tier(len(sales_list))
-            ambassador_data = {
-                "id": agent.id,
-                "ref_code": agent.qr_code,
-                "referral_url": qr_info["referral_url"],
-                "qr_image": qr_info["qr_image"],
-                "rank": tier["rank"],
-                "active_businesses": len(sales_list),
-                "monthly_rate": tier["monthly_rate"],
-                "payout_method": agent.payout_method or "wise",
-                "payout_details": agent.payout_details or ""
-            }
 
     return {
         "wallet_uuid": primary.wallet_uuid or primary.uuid,
         "name": primary.name,
-        "email": primary.email or "",
-        "phone": primary.phone or "",
+        # Emailul si telefonul nu se expun prin simpla posesie a QR-ului.
         "businesses_count": len(card_items),
         "total_stamps": sum(item["stamps"] for item in card_items),
         "cards": card_items,
@@ -2653,28 +2859,56 @@ def get_universal_wallet_profile(wallet_uuid: str, db: Session = Depends(get_db)
     }
 
 
+class AmbassadorLoginRequest(BaseModel):
+    email: str
+    password: str
+
+@app.post("/api/ambassador/login")
+@limiter.limit("10/minute")
+def login_loial_ambassador(request: Request, req: AmbassadorLoginRequest, db: Session = Depends(get_db)):
+    email=sanitize_input(req.email,100).lower()
+    agent=db.query(SalesAgent).filter(SalesAgent.email==email,
+              SalesAgent.active.is_(True)).first()
+    if not agent or not agent.password or not pwd_context.verify(req.password,agent.password):
+        raise HTTPException(status_code=401, detail="Email sau parola incorecta")
+    if agent.status!="active" or agent.role!="ambassador":
+        raise HTTPException(status_code=403, detail="Contul nu este activ")
+    token=create_access_token({"sub":agent.email,"role":"ambassador","agent_id":agent.id})
+    return {"access_token":token,"token_type":"bearer",
+            "name":agent.name,"email":agent.email}
+
 class AmbassadorEnrollRequest(BaseModel):
     name: str
     email: str
+    sponsor_code: Optional[str] = None
     phone: Optional[str] = ""
-    password: Optional[str] = "loial2026"
+    password: str
     payout_method: str = "wise"
     payout_details: str = ""
 
 
 @app.post("/api/ambassador/join")
-def enroll_ambassador(req: AmbassadorEnrollRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def enroll_ambassador(request: Request, req: AmbassadorEnrollRequest, db: Session = Depends(get_db)):
     email = sanitize_input(req.email, 100).lower()
     if not email:
         raise HTTPException(status_code=400, detail="Email obligatoriu pentru contul de Ambasador")
+    if len(req.password) < 10:
+        raise HTTPException(status_code=422, detail="Parola necesita minimum 10 caractere")
+    from loial_manual_admin import AmbassadorInvite
+    invite=db.get(AmbassadorInvite,email)
+    if invite and not invite.used_at:
+        raise HTTPException(409,"Pentru acest cont exista o invitatie individuala. Solicita administratorului linkul de activare.")
     agent = db.query(SalesAgent).filter(SalesAgent.email == email).first()
+    if agent:
+        raise HTTPException(status_code=409, detail="Acest email are deja un cont de ambasador. Foloseste autentificarea contului.")
     if not agent:
         ref_code = f"LOIAL-{uuid.uuid4().hex[:6].upper()}"
         agent = SalesAgent(
             name=sanitize_input(req.name, 100) or "Ambasador Loial",
             email=email,
             phone=sanitize_input(req.phone or "", 40),
-            password=pwd_context.hash(req.password or "loial2026"),
+            password=pwd_context.hash(req.password),
             role="ambassador",
             rank="Ambasador",
             qr_code=ref_code,
@@ -2685,14 +2919,18 @@ def enroll_ambassador(req: AmbassadorEnrollRequest, db: Session = Depends(get_db
             created_at=datetime.now().isoformat()
         )
         db.add(agent)
+        db.flush()
+        from loial_revenue_commissions import sponsor_new_ambassador
+        linked_sponsor=sponsor_new_ambassador(db,agent,req.sponsor_code,SalesAgent)
+        if (req.sponsor_code or "").strip() and linked_sponsor is None:
+            db.rollback()
+            raise HTTPException(status_code=422,
+                detail="Cod de invitatie invalid. Verifica linkul ambasadorului.")
         db.commit()
         db.refresh(agent)
-    else:
-        if req.payout_details:
-            agent.payout_method = req.payout_method
-            agent.payout_details = sanitize_input(req.payout_details, 150)
-            db.commit()
-
+    from loial_revenue_commissions import SponsorRelationship
+    sponsor_link=db.query(SponsorRelationship).filter(
+        SponsorRelationship.ambassador_id==agent.id).first()
     qr_info = generate_agent_qr(agent.id, agent.name, agent.qr_code)
     sales_list = db.query(Sale).filter(Sale.agent_id == agent.id, Sale.status == "completed").all()
     tier = get_ambassador_tier(len(sales_list))
@@ -2706,31 +2944,74 @@ def enroll_ambassador(req: AmbassadorEnrollRequest, db: Session = Depends(get_db
         "rank": tier["rank"],
         "active_businesses": len(sales_list),
         "monthly_rate": tier["monthly_rate"],
-        "payout_method": agent.payout_method,
-        "payout_details": agent.payout_details or ""
+        "sponsored_by_another_ambassador":bool(sponsor_link),
+        "ambassador_invite_url":"https://loial.space/ambasador.html?ambref="+agent.qr_code,
+        "access_token":create_access_token({"sub":agent.email,"role":"ambassador","agent_id":agent.id}),
+        "message": "Contul a fost creat. Pastreaza parola in siguranta."
     }
 
 
 @app.get("/api/admin/overview")
-def admin_super_overview(db: Session = Depends(get_db)):
+def admin_super_overview(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_platform_admin(credentials, db)
     current_month = datetime.now().strftime("%Y-%m")
-    ambassador_stats = calculate_commissions(db, Sale, Commission, SalesAgent, current_month)
+    from loial_revenue_commissions import verified_ambassador_overview
+    ambassador_stats = verified_ambassador_overview(db,SalesAgent,current_month)
 
     businesses = db.query(BusinessAccount).order_by(BusinessAccount.id.desc()).all()
     biz_list = []
+    from loial_stripe_billing import effective_entitlements
+    from loial_manual_admin import manual_grant
     for b in businesses:
+        access=effective_entitlements(db,b.id)
         c_count = db.query(Customer).filter(Customer.business_id == b.id).count()
         agent = db.query(SalesAgent).filter(SalesAgent.id == b.agent_id).first() if b.agent_id else None
         biz_list.append({
             "id": b.id,
             "name": b.name,
             "email": b.email,
-            "plan": b.plan or "free",
+            "plan": "probusiness" if access["active"] else "free",
+            "manual_grant":manual_grant(db,b.id),
+            "access_status":access["status"],
             "customers_count": c_count,
             "ref_code": getattr(b, "ref_code", "") or "",
             "ambassador_name": agent.name if agent else "Direct",
             "created_at": (b.created_at or "")[:10]
         })
+
+    # Feed unificat: cont nou, ambasador recrutat, incasare confirmata.
+    # Evenimentele financiare sunt exclusiv din registrul Wise reconciliat.
+    from loial_revenue_commissions import (
+        SponsorRelationship, PaidMerchantInvoice)
+    activity=[]
+    for b in businesses:
+        activity.append({"type":"business_registered",
+            "date":b.created_at or "",
+            "business_id":b.id,"business":b.name,
+            "agent_id":b.agent_id,
+            "message":"Firma a creat contul LOIAL"})
+    ambassador_names={a.id:a.name for a in db.query(SalesAgent).all()}
+    for link in db.query(SponsorRelationship).all():
+        activity.append({"type":"ambassador_recruited",
+            "date":link.referred_at or "",
+            "agent_id":link.sponsor_id,
+            "message":ambassador_names.get(link.sponsor_id,"Ambasador")+
+                      " a recrutat "+ambassador_names.get(link.ambassador_id,"un ambasador")})
+    verified=db.query(PaidMerchantInvoice).filter(
+        PaidMerchantInvoice.eligible==1).order_by(
+        PaidMerchantInvoice.id.desc()).limit(200).all()
+    by_id={b.id:b.name for b in businesses}
+    for payment in verified:
+        activity.append({"type":"subscription_payment_confirmed",
+            "date":payment.created_at or "",
+            "business_id":payment.business_id,
+            "business":by_id.get(payment.business_id,"Firma"),
+            "agent_id":payment.agent_id,
+            "amount_eur":payment.gross_paid_cents/100,
+            "month":payment.period,
+            "message":"Plata abonamentului a fost confirmata"})
+    activity.sort(key=lambda item:item["date"],reverse=True)
+    activity=activity[:35]
 
     # Top clienți din rețeaua Loial
     all_cust = db.query(Customer).all()
@@ -2780,6 +3061,7 @@ def admin_super_overview(db: Session = Depends(get_db)):
         "month": current_month,
         "businesses": biz_list,
         "ambassadors": ambassador_stats,
+        "activity":activity,
         "top_customers": top_customers,
         "network_rule": {
             "min_businesses": rule.min_businesses,
@@ -2791,45 +3073,110 @@ def admin_super_overview(db: Session = Depends(get_db)):
     }
 
 
-@app.post("/api/admin/business/{biz_id}/toggle-pro")
-def admin_toggle_business_pro(biz_id: int, db: Session = Depends(get_db)):
-    biz = db.query(BusinessAccount).filter(BusinessAccount.id == biz_id).first()
-    if not biz:
-        raise HTTPException(status_code=404, detail="Afacere negăsită")
+class ManualPlanRequest(BaseModel):
+    active: bool
+    reason: str = "Acces acordat manual de administrator"
 
-    current_month = datetime.now().strftime("%Y-%m")
-    if biz.plan == "probusiness":
-        biz.plan = "free"
-        biz.max_customers = 50
-        sale = db.query(Sale).filter(Sale.business_id == biz.id).first()
-        if sale:
-            sale.status = "cancelled"
-    else:
-        biz.plan = "probusiness"
-        biz.max_customers = 999999
-        if biz.agent_id:
-            sale = db.query(Sale).filter(Sale.business_id == biz.id).first()
-            if not sale:
-                db.add(Sale(
-                    agent_id=biz.agent_id,
-                    business_id=biz.id,
-                    business_name=biz.name,
-                    business_email=biz.email,
-                    plan="probusiness",
-                    amount=65.0,
-                    commission=20.0,
-                    status="completed",
-                    activated_month=current_month,
-                    completed_at=datetime.now().isoformat(),
-                    month=current_month
-                ))
-            else:
-                sale.status = "completed"
-                if not sale.activated_month:
-                    sale.activated_month = current_month
-
+@app.put("/api/admin/business/{biz_id}/manual-plan")
+def admin_manual_plan(biz_id:int,req:ManualPlanRequest,
+                      credentials: HTTPAuthorizationCredentials=Depends(security),
+                      db:Session=Depends(get_db)):
+    actor=require_platform_admin(credentials,db)
+    if actor.role!="admin":
+        raise HTTPException(403,"Doar administratorul platformei")
+    biz=db.get(BusinessAccount,biz_id)
+    if not biz:raise HTTPException(404,"Firma negasita")
+    reason=req.reason.strip()
+    if not 3<=len(reason)<=300:raise HTTPException(422,"Motivul necesita 3–300 caractere")
+    from loial_manual_admin import ManualBusinessGrant, audit, utc_now
+    from loial_stripe_billing import effective_entitlements
+    row=db.get(ManualBusinessGrant,biz_id)
+    if not row:
+        row=ManualBusinessGrant(business_id=biz_id)
+        db.add(row)
+    row.active=int(req.active)
+    row.reason=reason
+    row.actor_id=actor.id
+    row.updated_at=utc_now().isoformat()
+    db.flush()
+    access=effective_entitlements(db,biz_id)
+    biz.plan="probusiness" if access["active"] else "free"
+    biz.max_customers=999999 if access["active"] else 50
+    audit(db,actor,"manual_plan_grant" if req.active else "manual_plan_revoke",biz_id,reason)
     db.commit()
-    return {"status": "updated", "plan": biz.plan}
+    return {"plan":biz.plan,"manual_grant":req.active,"access_status":access["status"]}
+
+@app.post("/api/admin/business/{biz_id}/toggle-pro")
+def retired_toggle(biz_id:int,credentials:HTTPAuthorizationCredentials=Depends(security),
+                   db:Session=Depends(get_db)):
+    require_platform_admin(credentials,db)
+    raise HTTPException(410,"Foloseste accesul manual din panoul de administrare.")
+
+class ManualAmbassadorRequest(BaseModel):
+    email:str
+    wallet_uuid:Optional[str]=None
+
+@app.post("/api/admin/ambassador/invite")
+def admin_invite_ambassador(req:ManualAmbassadorRequest,
+                            credentials:HTTPAuthorizationCredentials=Depends(security),
+                            db:Session=Depends(get_db)):
+    actor=require_platform_admin(credentials,db)
+    if actor.role!="admin":raise HTTPException(403,"Doar administratorul platformei")
+    email=req.email.strip().lower()
+    if len(email)>100 or not re.fullmatch(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+",email):
+        raise HTTPException(422,"Email invalid")
+    if db.query(SalesAgent).filter(func.lower(SalesAgent.email)==email).first():
+        raise HTTPException(409,"Exista deja un cont de ambasador pentru acest email")
+    biz=db.query(BusinessAccount).filter(func.lower(BusinessAccount.email)==email).first()
+    user=db.query(User).filter(func.lower(User.email)==email).first()
+    customer=db.query(Customer).filter(func.lower(Customer.email)==email).first()
+    if req.wallet_uuid:
+        customer=db.query(Customer).filter(
+            (Customer.wallet_uuid==req.wallet_uuid)|(Customer.uuid==req.wallet_uuid)).first()
+        if not customer:raise HTTPException(404,"Card negasit")
+        if customer.email and customer.email.strip().lower()!=email:
+            raise HTTPException(422,"Emailul nu coincide cu cel al titularului")
+    if req.wallet_uuid and customer:
+        name,source=customer.name,"customer:"+str(customer.id)
+    elif biz:
+        name,source=biz.name,"business:"+str(biz.id)
+    elif user:
+        name,source=user.name,"user:"+str(user.id)
+    elif customer:
+        name,source=customer.name,"customer:"+str(customer.id)
+    else:
+        raise HTTPException(404,"Membrul nu are un cont sau card LOIAL existent")
+    from loial_manual_admin import issue_invite
+    token=issue_invite(db,email,(name or "Ambasador LOIAL")[:120],source,actor)
+    db.commit()
+    return {"status":"invited","expires_hours":24,
+            "activation_url":"https://loial.space/ambasador.html#activate="+token}
+
+class ManualAmbassadorClaim(BaseModel):
+    activation_token:str
+    password:str
+
+@app.post("/api/ambassador/activate-invite")
+@limiter.limit("5/minute")
+def activate_manual_ambassador(request:Request,req:ManualAmbassadorClaim,
+                               db:Session=Depends(get_db)):
+    if len(req.password)<10 or len(req.password.encode("utf-8"))>72:
+        raise HTTPException(422,"Parola necesita minimum 10 caractere si maximum 72 bytes")
+    from loial_manual_admin import claim_invite
+    row=claim_invite(db,req.activation_token)
+    if not row:raise HTTPException(400,"Invitatie invalida, expirata sau deja folosita")
+    if db.query(SalesAgent).filter(func.lower(SalesAgent.email)==row.email).first():
+        db.rollback()
+        raise HTTPException(409,"Contul de ambasador exista deja; autentifica-te")
+    agent=SalesAgent(name=row.name,email=row.email,password=pwd_context.hash(req.password),
+        role="ambassador",rank="Ambasador",qr_code="LOIAL-"+uuid.uuid4().hex[:12].upper(),
+        status="active",active=True,payout_method="wise",payout_details="",
+        created_at=datetime.now().isoformat())
+    db.add(agent)
+    db.flush()
+    token=create_access_token({"sub":agent.email,"role":"ambassador","agent_id":agent.id})
+    db.commit()
+    return {"access_token":token}
 
 
 class NetworkBonusManualRequest(BaseModel):
@@ -2838,7 +3185,8 @@ class NetworkBonusManualRequest(BaseModel):
 
 
 @app.post("/api/admin/network-bonus/manual")
-def admin_send_manual_bonus(req: NetworkBonusManualRequest, db: Session = Depends(get_db)):
+def admin_send_manual_bonus(req: NetworkBonusManualRequest, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_platform_admin(credentials, db)
     cards = db.query(Customer).filter(
         (Customer.wallet_uuid == req.wallet_uuid) | (Customer.uuid == req.wallet_uuid)
     ).all()
@@ -2859,7 +3207,8 @@ class NetworkRuleUpdateRequest(BaseModel):
 
 
 @app.post("/api/admin/network-rule")
-def admin_update_network_rule(req: NetworkRuleUpdateRequest, db: Session = Depends(get_db)):
+def admin_update_network_rule(req: NetworkRuleUpdateRequest, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_platform_admin(credentials, db)
     rule = db.query(NetworkRule).first()
     if not rule:
         rule = NetworkRule()
@@ -2876,10 +3225,17 @@ def admin_update_network_rule(req: NetworkRuleUpdateRequest, db: Session = Depen
 def serve_ambasador_page():
     return FileResponse("ambasador.html")
 @app.delete("/api/admin/business/{biz_id}")
-def admin_delete_business(biz_id: int, db: Session = Depends(get_db)):
+def admin_delete_business(biz_id: int, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_platform_admin(credentials, db)
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == biz_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
+    from loial_revenue_commissions import PaidMerchantInvoice
+    if db.query(PaidMerchantInvoice).filter(PaidMerchantInvoice.business_id==biz_id).first():
+        raise HTTPException(status_code=409,detail="Firma are incasari sau comisioane istorice; arhiveaza, nu sterge.")
+    # A reused SQLite integer ID must never inherit a deleted firm's grant.
+    from loial_manual_admin import ManualBusinessGrant
+    db.query(ManualBusinessGrant).filter(ManualBusinessGrant.business_id==biz_id).delete()
     db.query(StaffMember).filter(StaffMember.business_id == biz_id).delete()
     db.query(Customer).filter(Customer.business_id == biz_id).delete()
     db.query(Sale).filter(Sale.business_id == biz_id).delete()
@@ -2889,10 +3245,16 @@ def admin_delete_business(biz_id: int, db: Session = Depends(get_db)):
 
 
 @app.delete("/api/admin/ambassador/{agent_id}")
-def admin_delete_ambassador(agent_id: int, db: Session = Depends(get_db)):
+def admin_delete_ambassador(agent_id: int, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_platform_admin(credentials, db)
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Ambasador negăsit")
+    from loial_revenue_commissions import AmbassadorCommission, SponsorRelationship
+    if db.query(AmbassadorCommission).filter(AmbassadorCommission.agent_id==agent_id).first():
+        raise HTTPException(status_code=409,detail="Ambasador cu comisioane istorice: suspenda contul, nu sterge.")
+    if db.query(SponsorRelationship).filter((SponsorRelationship.ambassador_id==agent_id)|(SponsorRelationship.sponsor_id==agent_id)).first():
+        raise HTTPException(status_code=409,detail="Ambasador cu legaturi de recrutare: nu sterge istoricul.")
     db.query(BusinessAccount).filter(BusinessAccount.agent_id == agent_id).update({"agent_id": None, "ref_code": ""})
     db.query(Sale).filter(Sale.agent_id == agent_id).delete()
     db.query(Commission).filter(Commission.agent_id == agent_id).delete()
@@ -2901,7 +3263,8 @@ def admin_delete_ambassador(agent_id: int, db: Session = Depends(get_db)):
     return {"status": "deleted"}
 
 @app.delete("/api/admin/customer/{wallet_uuid}")
-def admin_delete_customer(wallet_uuid: str, db: Session = Depends(get_db)):
+def admin_delete_customer(wallet_uuid: str, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    require_platform_admin(credentials, db)
     db.query(Customer).filter(
         (Customer.wallet_uuid == wallet_uuid) | (Customer.uuid == wallet_uuid)
     ).delete(synchronize_session=False)
@@ -2916,3 +3279,168 @@ def generate_qr_from_query(url: str, color: str = "#2d6a4f", initial: str = "L")
         media_type="image/png",
         headers={"Cache-Control": "no-store"},
     )
+
+
+# Wise payment link is optional during preparation. No automatic credit
+# is granted by opening the link or returning from Wise.
+@app.get("/api/loial/checkout")
+def loial_wise_checkout(credentials: HTTPAuthorizationCredentials = Depends(security),
+
+                        db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Abonamentele LOIAL sunt administrate prin Stripe.")
+    from urllib.parse import urlsplit
+    if not credentials:
+        raise HTTPException(status_code=401,detail="Cont de firma necesar")
+    try:
+        claims=jwt.decode(credentials.credentials,SECRET_KEY,algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401,detail="Sesiune invalida")
+    if claims.get("role")!="business":
+        raise HTTPException(status_code=403,detail="Doar firmele pot achita abonamentul")
+    business=db.query(BusinessAccount).filter(
+        BusinessAccount.id==claims.get("business_id"),
+        BusinessAccount.email==claims.get("sub")).first()
+    if not business:
+        raise HTTPException(status_code=403,detail="Firma invalida")
+    raw=os.getenv("LOIAL_WISE_PAYMENT_URL","").strip()
+    parsed=urlsplit(raw)
+    host=(parsed.hostname or "").lower()
+    enabled=(parsed.scheme=="https" and
+             (host=="wise.com" or host.endswith(".wise.com")) and
+             not parsed.username and not parsed.password)
+    month=datetime.now().strftime("%Y%m")
+    return {"available":enabled,"payment_url":raw if enabled else None,
+            "amount_eur":67,"currency":"EUR","vat_added":False,
+            "business_id":business.id,
+            "payment_reference":f"LOIAL-{business.id}-{month}",
+            "confirmation":"manual_wise_reconciliation_only",
+            "notice":"Butonul de plata nu activeaza abonamentul automat."}
+
+# Loial AI Business - module independent from existing QR and loyalty routes.
+from loial_business_ai import install_loial_ai
+install_loial_ai(app, engine, SessionLocal, BusinessAccount, Customer, Consent, SECRET_KEY, ALGORITHM)
+
+# Mesagerie Loial in-app, fara email, SMS sau servicii externe.
+from loial_business_ai import AISale
+from loial_inbox import install_loial_inbox
+install_loial_inbox(app, engine, SessionLocal, BusinessAccount, Customer, Consent,
+                    AISale, SECRET_KEY, ALGORITHM)
+
+# Roluri independente: administratorul firmei poate fi si ambasador si client Loial.
+from loial_inbox import WalletInboxAccess, access_hash
+from loial_identity import install_loial_identity, BusinessAmbassadorLink
+from loial_premium_wallet import install_premium_wallet
+install_loial_identity(app, engine, SessionLocal, BusinessAccount, SalesAgent,
+                       Sale, pwd_context, SECRET_KEY, ALGORITHM, WalletInboxAccess,
+                       access_hash, get_ambassador_tier)
+install_premium_wallet(app, engine, SessionLocal, BusinessAccount, Customer,
+                       SalesAgent, Sale, SECRET_KEY, ALGORITHM,
+                       get_ambassador_tier, BusinessAmbassadorLink)
+
+# Serviciul standard Apple PassKit permite re-descarcarea cardurilor modificate.
+from loial_premium_wallet import premium_card, signed_apple_pkpass, apple_pass_json
+from loial_apple_updates import install_apple_pass_updates
+install_apple_pass_updates(app, engine, SessionLocal, BusinessAccount, Customer,
+                           SalesAgent, Sale, apple_pass_json, signed_apple_pkpass,
+                           premium_card, get_ambassador_tier)
+
+
+# Bon QR unic, verificare la nivel de tranzactie si asociere cu cumparaturile clientului.
+from loial_business_ai import AIDocument
+from loial_scans import ScanBase
+ScanBase.metadata.create_all(bind=engine)
+from loial_receipts import install_receipts
+install_receipts(app, engine, SessionLocal, BusinessAccount, Customer,
+                 AIDocument, AISale, SECRET_KEY, ALGORITHM)
+
+# Cheltuieli din facturi confirmate explicit de antreprenor (nu estimari AI).
+from loial_expenses import install_expenses
+install_expenses(app,engine,SessionLocal,BusinessAccount,AIDocument,SECRET_KEY,ALGORITHM)
+
+# Portofelul Loial instalabil pe ecranul telefonului (PWA), fara Apple/Google.
+from loial_pwa import install_pwa
+install_pwa(app)
+
+@app.get("/loial-pwa-install.js")
+def loial_install_script():
+    return FileResponse("loial-pwa-install.js",media_type="application/javascript",
+                        headers={"Cache-Control":"public, max-age=3600"})
+
+# Recomandari client-catre-client, distincte de comisioanele ambasadorilor.
+from loial_friend_referrals import install_friend_referrals
+install_friend_referrals(app,engine,SessionLocal)
+
+# Registrul de comisioane LOIAL: Wise Business este sursa financiara aprobata.
+# Stripe legacy se retrage; 20 EUR vanzator + 10 EUR sponsor direct doar la prima incasare.
+# Urmeaza reconcilierea dedicata Wise inainte de activarea platilor in productie.
+from loial_revenue_commissions import install_revenue
+install_revenue(app,engine,SessionLocal,SalesAgent,BusinessAccount,User,SECRET_KEY,ALGORITHM,pwd_context)
+# Stripe = subscriptions and automatic access; Wise = ambassador payouts only.
+from loial_manual_admin import GrantBase
+GrantBase.metadata.create_all(bind=engine)
+from loial_stripe_billing import install_stripe_billing
+from loial_revenue_commissions import (PaidMerchantInvoice,AmbassadorCommission,
+    SponsorRelationship,tier,recompute_recurring)
+install_stripe_billing(app,engine,SessionLocal,BusinessAccount,SalesAgent,
+    PaidMerchantInvoice,AmbassadorCommission,SponsorRelationship,tier,
+    recompute_recurring,SECRET_KEY,ALGORITHM)
+
+
+
+
+# Recuperare izolata a cardurilor legacy, cu verificare in persoana si cod de unica folosinta.
+from loial_wallet_recovery import install_wallet_recovery
+install_wallet_recovery(app, engine, SessionLocal, BusinessAccount, Customer,
+                        AIDocument, AISale, SECRET_KEY, ALGORITHM)
+
+@app.get("/wallet-recovery.html")
+def loial_wallet_recovery_page():
+    return FileResponse("wallet-recovery.html")
+
+@app.get("/api/admin/google-wallet-pilot")
+def admin_google_pilot(current_user: User = Depends(get_current_user),
+                       db: Session = Depends(get_db)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403,detail="Doar administratorul Loial")
+    from loial_google_pilot import google_pilot_snapshot
+    return google_pilot_snapshot(db,BusinessAccount,Customer)
+
+@app.get("/api/loial-scans/history")
+def business_stamp_audit(limit: int = 40, credentials: HTTPAuthorizationCredentials = Depends(security),
+                         db: Session = Depends(get_db)):
+    """Owner-only loyalty ledger: manual scans, receipts, rewards and reversals."""
+    if not credentials:
+        raise HTTPException(status_code=401,detail="Autentificare obligatorie")
+    try:
+        claims=jwt.decode(credentials.credentials,SECRET_KEY,algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401,detail="Sesiune invalida")
+    if claims.get("role")!="business":
+        raise HTTPException(status_code=403,detail="Doar administratorul firmei")
+    biz=db.query(BusinessAccount).filter(BusinessAccount.email==claims.get("sub")).first()
+    if not biz or (claims.get("business_id") and biz.id!=claims.get("business_id")):
+        raise HTTPException(status_code=403,detail="Firma nu este disponibila")
+    from loial_scans import StampAward
+    safe_limit=max(1,min(int(limit),100))
+    entries=db.query(StampAward).filter(
+        StampAward.business_id==biz.id).order_by(StampAward.id.desc()).limit(safe_limit).all()
+    customer_ids={x.customer_id for x in entries}
+    customers=db.query(Customer).filter(
+        Customer.business_id==biz.id,Customer.id.in_(customer_ids)).all() if customer_ids else []
+    names={x.id:x.name for x in customers}
+    return {"business_id":biz.id,"items":[{
+        "id":x.id,"source":x.source,"customer_id":x.customer_id,
+        "customer":names.get(x.customer_id,"Client indisponibil"),
+        "stamps_after":x.stamps_after,"at":x.created_at
+    } for x in entries],"limit":safe_limit}
+
+@app.get("/loial-receipt.html")
+def loial_receipt_page():
+    return FileResponse("loial-receipt.html")
+
+
+
+@app.get("/loial-ai.html")
+@app.get("/loial-ai")
+def loial_ai_page():
+    return FileResponse("loial-ai.html")

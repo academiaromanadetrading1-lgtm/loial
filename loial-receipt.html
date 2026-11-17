@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Bon Loial • Activează ștampila</title>
+<style>
+:root{color-scheme:light;--green:#2d6a4f;--ink:#142c1e;--line:#dfe7e0}
+*{box-sizing:border-box}body{margin:0;background:#eef2ef;color:var(--ink);font:15px system-ui,Arial}
+main{max-width:480px;margin:5vh auto;padding:16px}
+.panel{border-radius:20px;padding:24px;background:#fff;border:1px solid var(--line);box-shadow:0 12px 44px #142b1b13}
+.brand{font-size:20px;font-weight:900;letter-spacing:.15em;color:var(--green)}
+h1{font-size:23px;line-height:1.22;margin:20px 0 8px}
+p{color:#5b6b60;line-height:1.55}#merchant{font-size:17px;font-weight:800}
+#lines{margin:15px 0;border-top:1px solid var(--line)}
+.item{padding:10px 0;display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line)}
+.item strong{font-weight:650}button,a.button{display:block;width:100%;cursor:pointer;padding:14px;border-radius:12px;background:var(--green);color:#fff;border:0;font:inherit;font-weight:750;text-align:center;text-decoration:none;margin-top:12px}
+a.secondary{background:white;color:var(--green);border:1px solid var(--green)}
+button:disabled{opacity:.55;cursor:wait}.notice{font-size:12px;color:#617367}
+#state{margin:12px 0;font-size:13px;font-weight:700}#state.error{color:#a73726}#state.ok{color:#126338}
+</style></head>
+<body><main><section class="panel">
+<div class="brand">LOIAL <span style="font-size:10px;color:#837453">BLACK METAL</span></div>
+<h1>O ștampilă pentru cumpărătura ta</h1>
+<p>Bonul este verificat de Loial. Scanezi o singură dată, iar ștampila este adăugată cardului digital.</p>
+<div id="merchant"></div>
+<div id="lines"></div>
+<strong id="total"></strong>
+<div id="state" role="status"></div>
+<button type="button" id="claim" disabled>Adaugă ștampila în Loial</button>
+<a class="button secondary" id="join" hidden>Activează întâi cardul Loial</a>
+<p class="notice">Acest QR Loial este asociat unei tranzacții, nu înlocuiește bonul fiscal. Nu trebuie să introduci email, parolă sau date bancare pentru revendicare.</p>
+</section></main>
+<script>
+const $=id=>document.getElementById(id);
+const token=new URLSearchParams(location.search).get('token')||'';
+let receipt=null;
+function state(message,type){$('state').textContent=message;$('state').className=type||'';}
+async function preview(){
+  if(token.length<32||token.length>200){state('Linkul bonului nu este valid.','error');return;}
+  try{
+    const res=await fetch('/api/loial-receipts/preview?'+new URLSearchParams({token}),{
+      headers:{'Cache-Control':'no-store'}});
+    const data=await res.json();
+    if(!res.ok)throw Error(data.detail||'Bonul nu poate fi verificat');
+    receipt=data;$('merchant').textContent=data.merchant+' • Bon '+data.receipt_ref;
+    $('lines').replaceChildren();
+    for(const item of data.products){
+      const div=document.createElement('div');div.className='item';
+      const name=document.createElement('span');name.textContent=item.name+' × '+item.qty;
+      const cost=document.createElement('strong');cost.textContent=(item.qty*item.price).toFixed(2)+' '+data.currency;
+      div.append(name,cost);$('lines').appendChild(div);
+    }
+    $('total').textContent='Total înregistrat: '+data.total.toFixed(2)+' '+data.currency;
+    if(data.status!=='issued'){
+      state('Acest bon a fost deja revendicat sau a fost anulat.','error');return;
+    }
+    if(new Date(data.expires_at).getTime()<Date.now()){
+      state('Termenul de revendicare a expirat.','error');return;
+    }
+    const wallet=localStorage.getItem('loial_wallet_inbox_token');
+    if(!wallet){
+      state('Activează portofelul Loial pe acest dispozitiv înainte de revendicare.');
+      $('join').href='/join/'+Number(data.business_id);
+      $('join').hidden=false;
+      return;
+    }
+    $('claim').disabled=false;
+    state('Bon valid. Poți revendica o ștampilă.');
+  }catch(err){state(err.message,'error');}
+}
+$('claim').onclick=async()=>{
+  const privateWallet=localStorage.getItem('loial_wallet_inbox_token');
+  if(!receipt||!privateWallet)return;
+  $('claim').disabled=true;
+  try{
+    const res=await fetch('/api/loial-receipts/claim',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Loial-Wallet-Token':privateWallet},
+      body:JSON.stringify({receipt_token:token})
+    });
+    const result=await res.json();
+    if(!res.ok)throw Error(result.detail||'Nu s-a putut revendica bonul');
+    state('✓ Ștampilă adăugată! Ai acum '+result.stamps+' din '+result.target+
+       ' ștampile'+(result.reward_unlocked?' și recompensa este disponibilă!':'.'),'ok');
+    $('claim').textContent='Bon revendicat';
+  }catch(err){state(err.message,'error');$('claim').disabled=false;}
+};
+preview();
+</script><script src="/loial-i18n.js"></script>
+</body></html>

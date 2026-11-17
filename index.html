@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Loial - Carduri digitale de loialitate fără aplicații</title>
-<meta name="description" content="Creează carduri digitale de loialitate fără aplicații în 3 minute. Gratuit până la 50 de clienți, apoi 65 EUR/lună + TVA.">
+<meta name="description" content="Creează carduri digitale de loialitate fără aplicații în 3 minute. Gratuit până la 50 de clienți, apoi 67 EUR/lună, fără TVA adăugat.">
 <link rel="preconnect" href="https://googleapis.com">
 <link rel="preconnect" href="https://gstatic.com" crossorigin>
 <link href="https://googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -202,7 +202,7 @@
 <section class="hero">
   <div>
     <span class="badge">✨ Fără aplicații de descărcat. Direct prin cod QR & Wallet.</span>
-    <h1>Transformă clienții<br><span class="gradient-text">ocazionali în fideli.</span></h1>
+    <h1><span class="hero-title-line">Transformă clienții</span><br><span class="gradient-text">ocazionali în fideli.</span></h1>
     <p class="subtitle">Creează carduri digitale cu ștampile, puncte sau cashback în 3 minute. Clienții le salvează în telefon printr-o simplă scanare QR, iar tu îi aduci înapoi și crești recenziile pe Google.</p>
     <button class="btn-primary cta-big" onclick="goRegister()">Creează-ți primul card gratuit →</button>
     <p class="micro">Gratuit până la primii 50 de clienți • Fără card bancar • Gata în 3 minute</p>
@@ -331,8 +331,8 @@
       <div>
         <div class="plan-name">ProBusiness</div>
         <div class="plan-desc">Toată puterea de fidelizare, control pe echipă și creștere fără limite.</div>
-        <div class="plan-price">65 EUR <span>/ lună</span></div>
-        <div class="vat-note">+ TVA aplicabil conform țării (taxare inversă pentru firme UE plătitoare de TVA)</div>
+        <div class="plan-price">67 EUR <span>/ lună</span></div>
+        <div class="vat-note">Fără TVA adăugat în prezent</div>
         <ul class="feature-list">
           <li><span class="check-icon">✓</span> <strong>Clienți activi nelimitați</strong></li>
           <li><span class="check-icon">✓</span> <strong>Angajați nelimitați</strong> cu PIN individual de 4 cifre</li>
@@ -373,8 +373,8 @@
       <p>Prin funcția Review Gate: clienții mulțumiți (4–5 stele) sunt direcționați automat către pagina ta de Google Maps pentru a lăsa o recenzie publică, iar cei nemulțumiți (1–3 stele) îți trimit feedback privat.</p>
     </details>
     <details class="faq-item">
-      <summary>Cum se facturează planul ProBusiness (65 EUR + TVA)?</summary>
-      <p>Începi complet gratuit până la primii 50 de clienți. Când depășești acest prag, poți activa abonamentul ProBusiness la 65 EUR/lună, la care se adaugă TVA-ul din țara ta (sau 0% TVA prin taxare inversă pentru companiile din UE cu cod valid de TVA).</p>
+      <summary>Cum se facturează planul ProBusiness (67 EUR/lună)?</summary>
+      <p>Începi complet gratuit până la primii 50 de clienți. Când depășești acest prag, poți activa abonamentul ProBusiness la 67 EUR/lună, fără TVA adăugat în prezent. Activarea se face automat după confirmarea încasării prin Stripe.</p>
     </details>
   </div>
 </section>
@@ -409,6 +409,7 @@
   toggleBtn.addEventListener('click', () => {
     const isExpanded = grid.classList.toggle('expanded');
     toggleBtn.textContent = isExpanded ? 'Restrânge lista de industrii ↑' : 'Vezi toate cele 10 industrii la care ne adresăm ↓';
+    if(window.LoialLang)LoialLang.apply();
   });
 
   let stamps = 5;
@@ -455,6 +456,7 @@
 
   renderStamps();
 </script>
+<script src="/loial-i18n.js"></script>
 </body>
 </html>
 

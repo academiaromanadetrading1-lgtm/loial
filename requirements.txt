@@ -11,3 +11,8 @@ python-dotenv
 pytest
 httpx
 bcrypt==4.0.1
+
+python-multipart
+openpyxl
+pypdf
+stripe>=11,<15

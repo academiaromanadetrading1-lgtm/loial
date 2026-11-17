@@ -7,6 +7,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#2d6a4f">
 <link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/pwa-icon-192.png">
+<script src="/loial-pwa-install.js" defer></script>
 <title>Portofelul meu - Loial.space</title>
 <style>
   :root { --brand: #2d6a4f; --gold: #f59e0b; }
@@ -130,6 +132,8 @@
     outline: none;
   }
   input:focus, select:focus { border-color: var(--brand); background: #ffffff; }
+  .consent-choice { display:flex;align-items:flex-start;gap:8px;margin:10px 0;text-align:left;font-size:11.5px;line-height:1.45;color:#475d52; }
+  .consent-choice input[type="checkbox"] {width:17px;height:17px;min-width:17px;margin:1px 0 0;padding:0;accent-color:var(--brand);}
 
   .btn-main { width: 100%; padding: 14px; border: none; border-radius: 12px; background: var(--brand); color: #ffffff; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; font-family: inherit; }
   .btn-save { width: 100%; padding: 13px; border: 1.5px solid #dce6e0; border-radius: 12px; background: #f6f9f7; color: #111f18; font-size: 13.5px; font-weight: 700; cursor: pointer; margin-top: 6px; font-family: inherit; }
@@ -156,7 +160,47 @@
   .amb-stat strong { display: block; font-size: 18px; color: var(--brand); }
   .amb-stat span { font-size: 11px; color: #475d52; font-weight: 600; }
 
+  /* Black Metal Edition: card de fidelitate, NU un instrument de plata. */
+  .metal-card { position:relative;overflow:hidden;isolation:isolate;text-align:left;
+    margin:0 auto 17px;min-height:199px;max-width:352px;aspect-ratio:1.586/1;
+    padding:23px 24px;border-radius:20px;color:#eee4c9;
+    background:linear-gradient(117deg,#050609 4%,#22252c 23%,#101115 45%,#323338 62%,#0b0d11 85%,#191b21 100%);
+    box-shadow:0 18px 35px rgba(1,3,7,.35),inset 0 1px 0 rgba(236,219,169,.55),inset 0 -1px 0 rgba(0,0,0,.7);
+    border:1px solid rgba(222,195,128,.4); }
+  .metal-card::before {content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+    background:repeating-linear-gradient(0deg,rgba(255,255,255,.026) 0px,rgba(255,255,255,.026) 1px,transparent 1px,transparent 3px),
+      linear-gradient(145deg,transparent 30%,rgba(244,223,171,.08) 48%,transparent 54%);}
+  .metal-card::after { content:"";position:absolute;right:-15%;top:-65%;
+    width:75%;height:155%;transform:rotate(25deg);border-radius:50%;
+    border:1px solid rgba(224,196,132,.12);box-shadow:0 0 0 22px rgba(245,217,161,.025),
+      0 0 0 53px rgba(245,217,161,.025);pointer-events:none; }
+  .metal-top {display:flex;align-items:start;justify-content:space-between;gap:8px}
+  .metal-mark {font-size:22px;letter-spacing:.24em;font-weight:850;color:#e7d29c;text-shadow:0 1px 2px #000}
+  .metal-edition {font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:#c6b789;
+    margin-top:4px;font-weight:750}
+  .metal-status {font-size:9px;font-weight:800;letter-spacing:.12em;text-align:right;
+    color:#f2dc9e;max-width:138px;text-transform:uppercase;line-height:1.5}
+  .metal-bottom {position:absolute;bottom:20px;left:24px;right:24px;z-index:2}
+  .metal-holder-caption{font-size:8px;letter-spacing:.18em;opacity:.72;font-weight:700}
+  .metal-holder{font-size:18px;line-height:1.25;font-weight:750;white-space:nowrap;
+    text-overflow:ellipsis;overflow:hidden;max-width:96%;letter-spacing:.03em;margin-top:5px}
+  .metal-meta {display:flex;justify-content:space-between;gap:10px;margin-top:8px;
+    font-size:9px;letter-spacing:.09em;color:#cfbd91;text-transform:uppercase}
+  .wallet-add-row {display:none;grid-template-columns:1fr;gap:8px;margin:12px 0 6px}
+  .wallet-add-row button {padding:11px 8px;border:1px solid #c5b485;border-radius:10px;
+    background:#15171c;color:#f5e5b9;font-weight:700;font-size:12px;cursor:pointer}
+  .wallet-add-row button:disabled {opacity:.45;cursor:not-allowed}
+  .wallet-availability {text-align:center;font-size:11px;color:#6a776e;
+    line-height:1.5;margin:8px 0 3px}
   .hidden { display: none; }
+  .inbox-item { padding:12px 0;border-bottom:1px solid #dce6e0;text-align:left; }
+  .inbox-item strong {display:block;color:#1b4332;font-size:13px}
+  .inbox-item p {font-size:12.5px;line-height:1.55;color:#475d52;white-space:pre-wrap;margin:7px 0}
+  .inbox-item.unread {background:#edf7ef;margin:0 -8px;padding:12px 8px;border-radius:9px}
+  .inbox-action {font-size:12px;background:#fff;border:1px solid var(--brand);color:var(--brand);padding:7px 12px;border-radius:8px;cursor:pointer}
+  .preference {display:flex;align-items:center;gap:9px;text-align:left;font-size:12px;margin:10px 0}
+  .preference input {width:18px;height:18px;min-width:18px;margin:0;accent-color:var(--brand)}
+  @media(max-width:440px){.top-tab{font-size:11px;padding:9px 3px}}
 </style>
 </head>
 <body>
@@ -164,6 +208,7 @@
   <div class="top-tabs" id="walletTabs">
     <button type="button" class="top-tab active" id="tabBtnCard" onclick="switchTab('card')">Cardul curent</button>
     <button type="button" class="top-tab" id="tabBtnWallet" onclick="switchTab('wallet')">Portofel (<span id="walletCount">1</span>)</button>
+    <button type="button" class="top-tab" id="tabBtnInbox" onclick="switchTab('inbox')">💬 Mesaje <span id="inboxUnread"></span></button>
     <button type="button" class="top-tab" id="tabBtnAmb" onclick="switchTab('ambassador')">🤝 Ambasador</button>
   </div>
 
@@ -173,6 +218,13 @@
   </div>
 
   <div class="reminder-pill" id="reminderBanner">💡 Codul tău QR universal funcționează la orice afacere Loial</div>
+  <section style="max-width:400px;width:100%;background:#111318;border:1px solid #c9aa69;border-radius:15px;padding:14px;margin:0 0 14px;text-align:center;color:#f0ddac;">
+    <strong style="font-size:15px">LOIAL · DIRECT PE TELEFON</strong>
+    <p style="font-size:12px;color:#d9d3c5;margin:6px 0">Adaugă Loial pe ecran. O apăsare deschide toate cardurile tale, fără Google Wallet sau Apple Wallet.</p>
+    <button type="button" id="pwaInstallBtn" style="background:#dbbf82;color:#151619;border:0;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:800;width:100%;">Adaugă Loial pe telefon</button>
+    <div id="pwaInstallHelp" style="font-size:11px;color:#dbcfae;margin-top:6px;" role="status"></div>
+    <a href="/wallet" style="display:inline-block;color:#ebd9a7;font-size:12px;margin-top:9px">Deschide portofelul meu universal</a>
+  </section>
 
   <!-- TAB 1: CARDUL CURENT -->
   <div class="wallet-pass" id="panelCard">
@@ -187,12 +239,23 @@
         <p style="font-size:13.5px;color:#475d52;margin-bottom:10px;">Activează-ți portofelul universal în 3 secunde (fără aplicații):</p>
         <form id="enrollForm">
           <input type="text" id="nameInput" placeholder="Prenumele tău (obligatoriu)..." required autocomplete="given-name">
-          <input type="email" id="emailInput" placeholder="Email (opțional – pentru bonusuri Loial & Ambasador)" autocomplete="email">
+          <input type="email" id="emailInput" placeholder="Email (opțional)" autocomplete="email">
+          <label class="consent-choice"><input id="consentInApp" type="checkbox"><span>Vreau să primesc oferte și noutăți direct în portofelul Loial de la această afacere. Pot opri oricând ofertele din secțiunea Mesaje.</span></label>
+          <label class="consent-choice"><input id="consentAds" type="checkbox"><span>Sunt de acord ca această afacere să folosească emailul meu pentru audiențe publicitare personalizate (Meta/Google), conform informării de confidențialitate.</span></label>
           <button type="submit" class="btn-main">Activează cardul meu instant →</button>
         </form>
       </div>
 
       <div id="cardView" class="hidden">
+        <div class="metal-card" aria-label="Card de fidelitate Loial Black Metal">
+          <div class="metal-top"><div><div class="metal-mark">LOIAL</div>
+            <div class="metal-edition">BLACK METAL • LOYALTY</div></div>
+            <div class="metal-status" id="premiumCustomerStatus">MEMBRU LOIAL</div></div>
+          <div class="metal-bottom"><div class="metal-holder-caption">TITULAR / CARDHOLDER</div>
+            <div class="metal-holder" id="premiumCustomerName">Membru Loial</div>
+            <div class="metal-meta"><span id="premiumCustomerBiz">CARD UNIVERSAL</span>
+              <span>NU ESTE CARD DE PLATĂ</span></div></div>
+        </div>
         <div class="qr-stage"><img id="qrImg" crossorigin="anonymous" src="" alt="Cod QR Universal"></div>
         <div class="scan-hint" id="holderLabel">Arată acest QR la casă</div>
         <div class="progress-header">
@@ -200,7 +263,12 @@
           <span id="progressText">0 / 6 ștampile</span>
         </div>
         <div class="stamps-row" id="stampsRow"></div>
-        <button type="button" class="btn-save" id="saveImgBtn" onclick="saveCardImageDirect()">📥 Salvează Cardul în Galerie (1 clic)</button>
+        <div class="wallet-add-row">
+          <button id="appleMemberButton" type="button" onclick="addCustomerToWallet('apple')" disabled style="display:none">Apple Wallet</button>
+          <button id="googleMemberButton" type="button" onclick="addCustomerToWallet('google')" disabled>Google Wallet</button>
+        </div>
+        <div class="wallet-availability" id="memberWalletAvailability"></div>
+        <button type="button" class="btn-save" id="saveImgBtn" onclick="saveCardImageDirect()">📥 Salvează cardul Black Metal ca imagine</button>
       </div>
     </div>
   </div>
@@ -214,6 +282,25 @@
     </div>
     <div class="pass-body" id="walletCardsList">
       <p style="font-size:13.5px;color:#475d52;">Activează mai întâi cardul tău pentru a vedea toate afacerile din portofel.</p>
+    </div>
+  </div>
+
+  <!-- MESAJE PRIMITE IN LOIAL, FARA EMAIL -->
+  <div class="wallet-pass hidden" id="panelInbox">
+    <div class="pass-top" style="background:linear-gradient(135deg,#1b4332,#2d6a4f);">
+      <div class="pass-brand">PORTOFELUL MEU LOIAL</div>
+      <div class="pass-biz">Mesajele tale</div>
+      <div class="pass-reward">Oferte, ștampile și recompense, direct în Loial</div>
+    </div>
+    <div class="pass-body">
+      <div id="inboxStatus" style="font-size:12px;color:#475d52;margin-bottom:9px;"></div>
+      <div id="inboxItems"></div>
+      <button type="button" class="btn-save" onclick="loadLoialInbox()">↻ Actualizează mesajele</button>
+      <div style="border-top:1px solid #dce6e0;margin-top:17px;padding-top:14px;">
+        <strong style="font-size:13px;">Preferințe pentru oferte</strong>
+        <p style="font-size:11.5px;color:#475d52;margin:5px 0 8px;">Poți alege de la ce firme primești mesaje comerciale. Notificările despre card și ștampile rămân disponibile.</p>
+        <div id="inboxPreferences"></div>
+      </div>
     </div>
   </div>
 
@@ -234,6 +321,7 @@
       <div id="ambEnrollBox">
         <input type="text" id="ambName" placeholder="Numele tău complet">
         <input type="email" id="ambEmail" placeholder="Email-ul tău (pentru statistici și plăți)">
+        <input type="password" id="ambPassword" minlength="10" autocomplete="new-password" placeholder="Parolă nouă (minim 10 caractere)">
         <select id="ambPayoutMethod">
           <option value="wise">Plată prin Wise Business (Email / Tag)</option>
           <option value="iban">Transfer Bancar (IBAN EUR/RON)</option>
@@ -244,6 +332,20 @@
       </div>
 
       <div id="ambActiveBox" class="hidden">
+        <div class="metal-card" aria-label="Card de ambasador Loial Black Metal">
+          <div class="metal-top"><div><div class="metal-mark">LOIAL</div>
+            <div class="metal-edition">BLACK METAL • AMBASSADOR</div></div>
+            <div class="metal-status" id="premiumAmbStatus">AMBASADOR</div></div>
+          <div class="metal-bottom"><div class="metal-holder-caption">TITULAR / AMBASSADOR</div>
+            <div class="metal-holder" id="premiumAmbName">Ambasador Loial</div>
+            <div class="metal-meta"><span id="premiumAmbCode">LOIAL REFERRAL</span>
+              <span>PARTENER LOIAL</span></div></div>
+        </div>
+        <div class="wallet-add-row">
+          <button id="appleAmbButton" type="button" onclick="addAmbassadorToWallet('apple')" disabled style="display:none">Apple Wallet</button>
+          <button id="googleAmbButton" type="button" onclick="addAmbassadorToWallet('google')" disabled>Google Wallet</button>
+        </div>
+        <div class="wallet-availability" id="ambWalletAvailability">Autentifică-te ca ambasador pentru a adăuga acest card în Wallet.</div>
         <div class="amb-stat-row">
           <div class="amb-stat"><strong id="ambRankLabel">Ambasador</strong><span>Rang curent</span></div>
           <div class="amb-stat"><strong id="ambBizCount">0 firme</strong><span id="ambRateLabel">5 EUR / lună / firmă</span></div>
@@ -252,6 +354,7 @@
         <p style="font-size:12px;color:#475d52;margin-bottom:8px;">Arată acest QR patronilor sau trimite link-ul tău:</p>
         <input type="text" id="ambRefUrl" readonly style="font-size:12px;text-align:center;">
         <button type="button" class="btn-save" id="copyAmbBtn" onclick="copyAmbLink()">📋 Copiază link-ul meu de Ambasador</button>
+        <button type="button" class="btn-save" onclick="saveAmbassadorCardImage()">📥 Salvează cardul meu Black Metal</button>
       </div>
     </div>
   </div>
@@ -261,7 +364,8 @@
   let globalWalletUuid = localStorage.getItem('loial_universal_uuid');
   if (!globalWalletUuid) {
     const legacy = JSON.parse(localStorage.getItem('loial_card_' + bizId) || 'null');
-    globalWalletUuid = (legacy && legacy.uuid) ? legacy.uuid : ('W-' + Math.random().toString(36).substring(2, 10).toUpperCase());
+    // 122+ biți de entropie: UUID public nu este credențial, dar evităm coliziunile.
+    globalWalletUuid = (legacy && legacy.uuid) ? legacy.uuid : ('W-' + crypto.randomUUID());
     localStorage.setItem('loial_universal_uuid', globalWalletUuid);
   }
 
@@ -270,15 +374,20 @@
   let targetStamps = 6;
   let currentBizName = 'Card Loial';
   let currentBrandColor = '#2d6a4f';
+  let officialWalletAvailability = null;
+  let premiumAmbassadorAuthenticated = false;
 
   function switchTab(tab) {
     document.getElementById('tabBtnCard').classList.toggle('active', tab === 'card');
     document.getElementById('tabBtnWallet').classList.toggle('active', tab === 'wallet');
     document.getElementById('tabBtnAmb').classList.toggle('active', tab === 'ambassador');
+    document.getElementById('tabBtnInbox').classList.toggle('active', tab === 'inbox');
     document.getElementById('panelCard').classList.toggle('hidden', tab !== 'card');
     document.getElementById('panelWallet').classList.toggle('hidden', tab !== 'wallet');
     document.getElementById('panelAmbassador').classList.toggle('hidden', tab !== 'ambassador');
+    document.getElementById('panelInbox').classList.toggle('hidden', tab !== 'inbox');
     if (tab === 'wallet' || tab === 'ambassador') loadUniversalWallet();
+    if (tab === 'inbox') loadLoialInbox();
   }
 
   function applyBrandTheme(name, color) {
@@ -287,10 +396,11 @@
     document.documentElement.style.setProperty('--brand', currentBrandColor);
     document.querySelector('meta[name="theme-color"]').setAttribute('content', currentBrandColor);
     document.getElementById('bizName').textContent = currentBizName;
+    document.getElementById('premiumCustomerBiz').textContent = currentBizName;
     document.getElementById('passTop').style.background = `linear-gradient(135deg, ${currentBrandColor} 0%, #111f18 100%)`;
   }
 
-  fetch('/api/biz-full/' + bizId)
+  fetch('/api/loial-public/' + bizId)
     .then(r => r.json())
     .then(d => {
       applyBrandTheme(d.name, d.card_color);
@@ -310,22 +420,56 @@
   document.getElementById('qrImg').src = `/api/qr-link?url=${scanUrl}&color=${cleanColor}&initial=${initial}`;
 }
 
-  async function synchronizeCard(name, email) {
-    const response = await fetch('/api/enroll-sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ business_id: bizId, name, email, uuid: globalWalletUuid })
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(typeof error.detail === 'string' ? error.detail : `HTTP ${response.status}`);
+  // Pastram un secret separat de QR inainte de primul apel de inregistrare.
+  // Daca reteaua cade, acelasi dispozitiv poate relua sigur activarea.
+  function walletClaim() {
+    const pendingKey='loial_wallet_claim_pending_'+globalWalletUuid;
+    const known=localStorage.getItem('loial_wallet_inbox_token');
+    if(known)return known;
+    let pending=localStorage.getItem(pendingKey);
+    if(!pending) {
+      const bytes=crypto.getRandomValues(new Uint8Array(36));
+      pending=btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-')
+        .replace(/\//g,'_').replace(/=+$/,'');
+      localStorage.setItem(pendingKey,pending);
     }
-    return response.json();
+    return pending;
+  }
+  async function synchronizeCard(name,email,options={}) {
+    const claim=walletClaim();
+    const response=await fetch('/api/enroll-sync',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        business_id:bizId,name,email,uuid:globalWalletUuid,
+        wallet_claim_token:claim,consent_marketing_email:false,
+        consent_loial_offers:!!options.inApp,consent_personalized_ads:!!options.ads,
+        friend_referral_code:localStorage.getItem('loial_friend_invite')||null
+      })
+    });
+    if(!response.ok){
+      const error=await response.json().catch(()=>({}));
+      throw Error(typeof error.detail==='string'?error.detail:'HTTP '+response.status);
+    }
+    const result=await response.json();
+    if(result.inbox_access && result.inbox_access===claim){
+      localStorage.setItem('loial_wallet_inbox_token',claim);
+      localStorage.removeItem('loial_wallet_claim_pending_'+globalWalletUuid);
+    }
+    if(result.friend_invitation_status){
+      if(result.friend_invitation_status==='pending_first_verified_visit'){
+        localStorage.removeItem('loial_friend_invite');
+        document.getElementById('reminderBanner').textContent=
+          'Invitația prietenului este înregistrată. Punctele-pilot apar după prima ștampilă validată.';
+      }else if(['invalid','self_referral','already_attributed'].includes(result.friend_invitation_status)){
+        localStorage.removeItem('loial_friend_invite');
+      }
+    }
+    return result;
   }
 
   if (savedProfile && savedProfile.name) {
     // Un profil salvat într-o versiune anterioară poate să nu existe încă în baza de date.
-    synchronizeCard(savedProfile.name, savedProfile.email || '')
+    synchronizeCard(savedProfile.name, '')
       .then(() => {
         showCardInstant(globalWalletUuid, savedProfile.name, 0);
         loadUniversalWallet();
@@ -347,12 +491,19 @@
       e.preventDefault();
       const nameVal = document.getElementById('nameInput').value.trim();
       const emailVal = document.getElementById('emailInput').value.trim();
+      const inApp = document.getElementById('consentInApp').checked;
+      const ads = document.getElementById('consentAds').checked;
       if (!nameVal) return;
+      if (!emailVal && ads) {
+        alert('Pentru audiențele publicitare este necesară o adresă de email. Mesajele Loial nu necesită email.');
+        return;
+      }
       const button = activeForm.querySelector('button[type="submit"]');
       button.disabled = true;
       try {
         // Afișăm codul QR numai după confirmarea înregistrării de către server.
-        await synchronizeCard(nameVal, emailVal);
+        const result = await synchronizeCard(nameVal, emailVal, { inApp, ads });
+        if (result.inbox_access) localStorage.setItem('loial_wallet_inbox_token', result.inbox_access);
         savedProfile = { uuid: globalWalletUuid, name: nameVal, email: emailVal };
         localStorage.setItem('loial_universal_profile', JSON.stringify(savedProfile));
         document.getElementById('reminderBanner').textContent =
@@ -375,6 +526,10 @@
     document.getElementById('enrollView').classList.add('hidden');
     document.getElementById('cardView').classList.remove('hidden');
     document.getElementById('holderLabel').textContent = `Titular: ${name} • Cod QR Universal`;
+    document.getElementById('premiumCustomerName').textContent = name;
+    document.getElementById('premiumCustomerStatus').textContent = stamps >= targetStamps
+      ? 'RECOMPENSĂ DISPONIBILĂ' : 'MEMBRU LOIAL';
+    refreshOfficialWalletButtons();
     if (savedProfile && savedProfile.email) {
       document.getElementById('ambName').value = name;
       document.getElementById('ambEmail').value = savedProfile.email;
@@ -393,6 +548,7 @@
             const increased = st.stamps > knownStamps;
             knownStamps = st.stamps;
             renderDots(st.stamps, targetStamps);
+            document.getElementById('premiumCustomerStatus').textContent = st.stamps >= targetStamps ? 'RECOMPENSĂ DISPONIBILĂ' : 'MEMBRU LOIAL';
             if (increased && navigator.vibrate) navigator.vibrate();
             const banner = document.getElementById('reminderBanner');
             if (st.stamps >= targetStamps) {
@@ -410,8 +566,20 @@
 
   async function loadUniversalWallet() {
     try {
-      const r = await fetch('/api/wallet-profile/' + globalWalletUuid);
-      if (!r.ok) return;
+      const privateToken=localStorage.getItem('loial_wallet_inbox_token')||'';
+      if(!privateToken){
+        document.getElementById('walletStatsPill').textContent=
+          'Cardul vechi necesită verificarea titularului pentru afișarea istoricului.';
+        return;
+      }
+      const r = await fetch('/api/wallet-profile/' + encodeURIComponent(globalWalletUuid),{
+        headers:{'X-Loial-Wallet-Token':privateToken}
+      });
+      if(!r.ok) {
+        document.getElementById('walletStatsPill').textContent=
+          'Datele private ale cardului nu pot fi accesate pe acest dispozitiv.';
+        return;
+      }
       const data = await r.json();
 
       document.getElementById('walletCount').textContent = data.businesses_count || 1;
@@ -432,15 +600,25 @@
 
       const listEl = document.getElementById('walletCardsList');
       if (data.cards && data.cards.length > 0) {
-        listEl.innerHTML = data.cards.map(c => `
-          <div class="mini-card" onclick="location.href='/join/${c.business_id}'">
-            <div>
-              <strong style="font-size:15px;display:block;color:#111f18;">${c.business_name}</strong>
-              <span style="font-size:12px;color:#475d52;">🎁 ${c.reward_text}</span>
-            </div>
-            <span class="mini-badge" style="background:${c.card_color};">${c.stamps} / ${c.target} ★</span>
-          </div>
-        `).join('');
+        // Datele afacerii raman text: nu interpretam HTML furnizat de comerciant.
+        listEl.replaceChildren();
+        for (const c of data.cards) {
+          const card=document.createElement('div');card.className='mini-card';
+          card.onclick=()=>{location.href='/join/'+Number(c.business_id);};
+          const content=document.createElement('div');
+          const title=document.createElement('strong');
+          title.style.cssText='font-size:15px;display:block;color:#111f18;';
+          title.textContent=c.business_name||'Afacere Loial';
+          const reward=document.createElement('span');
+          reward.style.cssText='font-size:12px;color:#475d52;';
+          reward.textContent='🎁 '+(c.reward_text||'Recompensă');
+          content.append(title,reward);
+          const badge=document.createElement('span');badge.className='mini-badge';
+          badge.style.background=/^#[0-9a-fA-F]{6}$/.test(c.card_color||'')
+            ?c.card_color:'#2d6a4f';
+          badge.textContent=Number(c.stamps||0)+' / '+Number(c.target||6)+' ★';
+          card.append(content,badge);listEl.appendChild(card);
+        }
       }
 
       if (data.ambassador) {
@@ -475,66 +653,249 @@
     }
   }
 
+  // QR-ul afișat angajaților NU conține cheia de acces la mesaje.
+  async function inboxRequest(path, options={}) {
+    const token = localStorage.getItem('loial_wallet_inbox_token') || '';
+    if (!token) throw Error('Accesul privat la mesaje nu este activat pe acest dispozitiv.');
+    const response = await fetch('/api/loial-inbox'+path,{
+      ...options, headers:{'X-Loial-Wallet-Token': token,
+        ...(options.body?{'Content-Type':'application/json'}:{}), ...(options.headers||{})}
+    });
+    const result = await response.json().catch(()=>({}));
+    if(!response.ok) throw Error(result.detail||'Mesajele nu sunt disponibile.');
+    return result;
+  }
+  async function loadLoialInbox() {
+    const box=document.getElementById('inboxItems');
+    const status=document.getElementById('inboxStatus');
+    try {
+      const data = await inboxRequest('/me');
+      status.textContent=data.unread+' mesaje necitite';
+      document.getElementById('inboxUnread').textContent=data.unread?'('+data.unread+')':'';
+      box.replaceChildren();
+      if(!data.messages.length)box.textContent='Nu ai primit încă mesaje.';
+      for (const m of data.messages){
+        const item=document.createElement('div');item.className='inbox-item'+(m.read?'':' unread');
+        const company=document.createElement('strong');company.textContent=m.business_name+' · '+m.subject;
+        const body=document.createElement('p');body.textContent=m.text;
+        const timestamp=document.createElement('small');timestamp.textContent=new Date(m.created_at).toLocaleString('ro-RO');
+        item.append(company,body,timestamp);
+        if(!m.read){
+          const button=document.createElement('button');button.type='button';button.className='inbox-action';
+          button.textContent='Marchează ca citit';
+          button.onclick=async()=>{try{await inboxRequest('/read/'+m.delivery_id,{method:'POST'});await loadLoialInbox();}catch(e){status.textContent=e.message;}};
+          item.appendChild(button);
+        }
+        box.appendChild(item);
+      }
+      const prefs=await inboxRequest('/preferences');
+      const prefBox=document.getElementById('inboxPreferences');prefBox.replaceChildren();
+      for(const p of prefs){
+        const label=document.createElement('label');label.className='preference';
+        const toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=p.offers_enabled;
+        const name=document.createElement('span');name.textContent=p.business_name+' · oferte în Loial';
+        toggle.onchange=async()=>{try{
+          await inboxRequest('/preferences',{method:'POST',body:JSON.stringify({business_id:p.business_id,enabled:toggle.checked})});
+        }catch(e){toggle.checked=!toggle.checked;status.textContent=e.message;}};
+        label.append(toggle,name);prefBox.appendChild(label);
+      }
+    } catch(err) {
+      status.textContent=err.message;
+      if(!localStorage.getItem('loial_wallet_inbox_token')) {
+        box.textContent='Pentru protejarea mesajelor personale, portofelele mai vechi au nevoie de verificarea titularului înainte de activarea inboxului privat. Cardul și ștampilele funcționează în continuare.';
+      }
+    }
+  }
+  // Mesajele nu se trimit prin SMS sau email; clientul le vede în portofel.
+  setInterval(()=>{
+    if (!document.hidden && localStorage.getItem('loial_wallet_inbox_token')) {
+      const open=!document.getElementById('panelInbox').classList.contains('hidden');
+      if(open)loadLoialInbox();
+      else inboxRequest('/me').then(x=>{document.getElementById('inboxUnread').textContent=x.unread?'('+x.unread+')':'';}).catch(()=>{});
+    }
+  },45000);
+
+  async function loadWalletReadiness() {
+    try {
+      const res=await fetch('/api/premium-wallet/availability');
+      if(res.ok)officialWalletAvailability=await res.json();
+    }catch(error){officialWalletAvailability=null;}
+    refreshOfficialWalletButtons();
+  }
+  function refreshOfficialWalletButtons() {
+    const ready=officialWalletAvailability||{};
+    const privateWallet=!!localStorage.getItem('loial_wallet_inbox_token');
+    const authToken=!!localStorage.getItem('token');
+    document.getElementById('appleMemberButton').disabled=!(privateWallet&&ready.apple_ready);
+    document.getElementById('googleMemberButton').disabled=!(privateWallet&&ready.google_customer_ready);
+    document.getElementById('appleAmbButton').disabled=!(authToken&&premiumAmbassadorAuthenticated&&ready.apple_ready);
+    document.getElementById('googleAmbButton').disabled=!(authToken&&premiumAmbassadorAuthenticated&&ready.google_ambassador_ready);
+    document.getElementById('memberWalletAvailability').textContent=!privateWallet
+      ?'Pentru a adăuga în Wallet, acest dispozitiv trebuie verificat ca titular al cardului.'
+      :(!ready.apple_ready&&!ready.google_customer_ready
+        ?'Cardul Black Metal este activ în Loial. Integrarea oficială Google Wallet necesită configurarea emitentului.'
+        :'Adaugă cardul premium direct în Google Wallet.');
+    if(premiumAmbassadorAuthenticated){
+      document.getElementById('ambWalletAvailability').textContent=
+        ready.apple_ready||ready.google_ambassador_ready
+          ?'Cardul de ambasador este pregătit pentru portofelele configurate.'
+          :'Cardul premium este vizibil în Loial; Google Wallet necesită credențiale de emitent.';
+    }
+  }
+  async function actualWalletTransfer(path,headers,kind) {
+    try{
+      const response=await fetch('/api/premium-wallet/'+path+(kind==='apple'?'-ticket':''),{
+        method:kind==='apple'?'POST':'GET',headers});
+      if(!response.ok){
+        const err=await response.json().catch(()=>({}));
+        throw Error(err.detail||'Portofelul oficial nu este configurat.');
+      }
+      if(kind==='google') {
+        const data=await response.json();
+        if(!data.url||!data.url.startsWith('https://pay.google.com/gp/v/save/'))throw Error('Link invalid');
+        window.location.href=data.url;
+        return;
+      }
+      const ticket=await response.json();
+      if(!ticket.url||!ticket.url.startsWith('/api/premium-wallet/apple/claim?')){
+        throw Error('Linkul Apple Wallet nu este valid.');
+      }
+      window.location.assign(ticket.url);
+    }catch(error){alert(error.message);}
+  }
+  function addCustomerToWallet(kind) {
+    const privateToken=localStorage.getItem('loial_wallet_inbox_token');
+    if(!privateToken){alert('Este necesara verificarea titularului portofelului.');return;}
+    return actualWalletTransfer('customer/'+bizId+'/'+kind,
+      {'X-Loial-Wallet-Token':privateToken},kind);
+  }
+  function addAmbassadorToWallet(kind) {
+    const token=localStorage.getItem('token');
+    if(!token||!premiumAmbassadorAuthenticated){alert('Autentifica-te ca ambasador.');return;}
+    return actualWalletTransfer('ambassador/'+kind,{Authorization:'Bearer '+token},kind);
+  }
+  async function loadVerifiedAmbassador() {
+    const token=localStorage.getItem('token');
+    if(!token)return;
+    try{
+      const res=await fetch('/api/premium-wallet/ambassador/card',{
+        headers:{Authorization:'Bearer '+token}});
+      if(!res.ok)return;
+      const card=await res.json();
+      premiumAmbassadorAuthenticated=true;
+      const profileRes=await fetch('/api/loial-identity/me',{
+        headers:{Authorization:'Bearer '+token}});
+      if(profileRes.ok){
+        const identity=await profileRes.json();
+        if(identity.ambassador)renderAmbassadorActive(identity.ambassador);
+      }
+      document.getElementById('ambEnrollBox').classList.add('hidden');
+      document.getElementById('ambActiveBox').classList.remove('hidden');
+      document.getElementById('premiumAmbName').textContent=card.holder;
+      document.getElementById('premiumAmbStatus').textContent=card.status;
+      document.getElementById('premiumAmbCode').textContent='CARD AMBASADOR';
+      refreshOfficialWalletButtons();
+    }catch(error){/* Platform role remains unaffected. */}
+  }
+  loadWalletReadiness();
+  loadVerifiedAmbassador();
   function saveCardImageDirect() {
-    const img = document.getElementById('qrImg');
-    const canvas = document.createElement('canvas');
-    canvas.width = 600;
-    canvas.height = 780;
-    const ctx = canvas.getContext('2d');
-
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, 600, 780);
-
-    ctx.fillStyle = currentBrandColor;
-    ctx.fillRect(0, 0, 600, 180);
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 34px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(currentBizName, 300, 88);
-
-    ctx.font = '22px sans-serif';
-    ctx.fillText('Titular: ' + (savedProfile ? savedProfile.name : ''), 300, 136);
-
-    ctx.drawImage(img, 125, 225, 350, 350);
-
-    ctx.fillStyle = '#111f18';
-    ctx.font = 'bold 24px sans-serif';
-    ctx.fillText('Cod QR Universal • Arată la casă', 300, 645);
-
-    ctx.fillStyle = '#475d52';
-    ctx.font = '18px sans-serif';
-    ctx.fillText('Portofel Digital • Loial.space', 300, 690);
-
-    const link = document.createElement('a');
-    link.download = `Card-Loial-${currentBizName.replace(/\s+/g, '-')}.png`;
-    link.href = canvas.toDataURL('image/png');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    const btn = document.getElementById('saveImgBtn');
-    btn.textContent = '✓ Card salvat direct în galerie!';
-    setTimeout(() => { btn.textContent = '📥 Salvează Cardul în Galerie (1 clic)'; }, 2500);
+    const img=document.getElementById('qrImg');
+    if(!img.complete || !img.naturalWidth){
+      alert('Codul QR se încarcă. Încearcă din nou când apare pe card.');
+      return;
+    }
+    const canvas=document.createElement('canvas');canvas.width=800;canvas.height=1050;
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#e9edec';ctx.fillRect(0,0,800,1050);
+    const x=48,y=56,w=704,h=444,r=36;
+    ctx.save();
+    ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.clip();
+    const background=ctx.createLinearGradient(x,y,x+w,y+h);
+    background.addColorStop(0,'#030408');background.addColorStop(.27,'#2e3037');
+    background.addColorStop(.47,'#101116');background.addColorStop(.66,'#383b40');
+    background.addColorStop(1,'#090b11');
+    ctx.fillStyle=background;ctx.fillRect(x,y,w,h);
+    for(let i=0;i<145;i++){
+      ctx.strokeStyle='rgba(255,255,255,'+(i%5===0?.047:.012)+')';
+      ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,y+i*3.1);
+      ctx.lineTo(x+w,y+i*3.1);ctx.stroke();
+    }
+    ctx.strokeStyle='rgba(218,194,136,.2)';ctx.lineWidth=2;
+    for(const radius of [150,190,232]){
+      ctx.beginPath();ctx.arc(730,62,radius,0,2*Math.PI);ctx.stroke();
+    }
+    ctx.restore();
+    ctx.strokeStyle='#c7b17d';ctx.lineWidth=2;ctx.beginPath();
+    ctx.roundRect(x,y,w,h,r);ctx.stroke();
+    ctx.fillStyle='#ecd7a8';ctx.font='800 49px sans-serif';ctx.textAlign='left';
+    ctx.fillText('LOIAL',88,136);
+    ctx.font='bold 14px sans-serif';ctx.letterSpacing='2px';
+    ctx.fillText('BLACK METAL  •  LOYALTY',91,165);
+    const status=document.getElementById('premiumCustomerStatus').textContent;
+    ctx.font='bold 19px sans-serif';ctx.fillText(status.slice(0,25),89,328);
+    ctx.fillStyle='#bdad8a';ctx.font='bold 14px sans-serif';
+    ctx.fillText('TITULAR',90,382);
+    ctx.fillStyle='#f2e4c1';ctx.font='bold 29px sans-serif';
+    ctx.fillText((savedProfile?.name||'MEMBRU LOIAL').slice(0,30),90,421);
+    ctx.font='bold 15px sans-serif';
+    ctx.fillText(currentBizName.slice(0,32),90,460);
+    ctx.textAlign='right';ctx.font='12px sans-serif';
+    ctx.fillText('CARD DE FIDELITATE • NU ESTE CARD DE PLATĂ',710,460);
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.roundRect(204,535,392,392,25);ctx.fill();
+    ctx.drawImage(img,223,555,354,354);
+    ctx.fillStyle='#172b22';ctx.textAlign='center';
+    ctx.font='bold 22px sans-serif';ctx.fillText('Arată acest QR la casă',400,964);
+    ctx.font='16px sans-serif';ctx.fillText('Card digital de fidelitate · loial.space',400,998);
+    const link=document.createElement('a');
+    link.download='Loial-Black-Metal-'+currentBizName.replace(/[^A-Za-z0-9_-]+/g,'-')+'.png';
+    link.href=canvas.toDataURL('image/png');link.click();
+    const button=document.getElementById('saveImgBtn');
+    button.textContent='✓ Card Black Metal salvat ca imagine';
+    setTimeout(()=>{button.textContent='📥 Salvează cardul Black Metal ca imagine';},2500);
   }
 
   async function activateAmbassador() {
     const name = document.getElementById('ambName').value.trim();
     const email = document.getElementById('ambEmail').value.trim();
+    const password = document.getElementById('ambPassword').value;
     const payout_method = document.getElementById('ambPayoutMethod').value;
     const payout_details = document.getElementById('ambPayoutDetails').value.trim();
-    if (!email) return;
-
-    const btn = document.getElementById('ambJoinBtn');
-    btn.textContent = 'Se activează...';
-    const res = await fetch('/api/ambassador/join', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, payout_method, payout_details })
-    });
+    const authToken=localStorage.getItem('token');
+    if(!authToken && (!email || password.length < 10)) {
+      alert('Completează emailul și alege o parolă de minimum 10 caractere.');
+      return;
+    }
+    if(authToken && !name){
+      alert('Completează numele care va apărea pe cardul de ambasador.');
+      return;
+    }
+    const btn=document.getElementById('ambJoinBtn');
+    btn.textContent='Se activează...';
+    let res;
+    if(authToken){
+      // Administratorii Business isi activeaza rolul aditional, fara alt cont/parola.
+      res=await fetch('/api/loial-identity/ambassador/activate',{
+        method:'POST',headers:{Authorization:'Bearer '+authToken,
+          'Content-Type':'application/json'},
+        body:JSON.stringify({display_name:name})
+      });
+    }else{
+      res=await fetch('/api/ambassador/join',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name,email,password,payout_method,payout_details})
+      });
+    }
     if (res.ok) {
       const data = await res.json();
-      renderAmbassadorActive(data);
+      renderAmbassadorActive(data.ambassador||data);
+      if(authToken){
+        premiumAmbassadorAuthenticated=true;
+        refreshOfficialWalletButtons();
+      }
+    } else {
+      const error = await res.json().catch(() => ({}));
+      alert(error.detail || 'Nu am putut activa contul de ambasador.');
     }
     btn.textContent = 'Activează contul de Ambasador →';
   }
@@ -543,10 +904,62 @@
     document.getElementById('ambEnrollBox').classList.add('hidden');
     document.getElementById('ambActiveBox').classList.remove('hidden');
     document.getElementById('ambRankLabel').textContent = amb.rank;
+    document.getElementById('premiumAmbName').textContent = amb.name ||
+      (document.getElementById('ambName').value || 'Ambasador Loial');
+    document.getElementById('premiumAmbStatus').textContent = amb.rank;
+    document.getElementById('premiumAmbCode').textContent = amb.ref_code || 'AMBASADOR LOIAL';
+    refreshOfficialWalletButtons();
     document.getElementById('ambBizCount').textContent = `${amb.active_businesses} firme`;
     document.getElementById('ambRateLabel').textContent = `${amb.monthly_rate} EUR / lună / firmă`;
-    document.getElementById('ambQrImg').src = amb.qr_image;
+    document.getElementById('ambQrImg').src = amb.qr_image ||
+      ('/api/qr-link?url='+encodeURIComponent(amb.referral_url||'')+'&color=%23D8BE7A&initial=L');
     document.getElementById('ambRefUrl').value = amb.referral_url;
+    if(!premiumAmbassadorAuthenticated){
+      document.getElementById('ambWalletAvailability').textContent=
+        'Cardul premium este vizibil în Loial. Conectează-te pentru a-l emite în Apple/Google Wallet.';
+    }
+  }
+
+  function saveAmbassadorCardImage() {
+    const image=document.getElementById('ambQrImg');
+    if(!image.complete||!image.naturalWidth){
+      alert('Codul de recomandare nu este încă încărcat.');
+      return;
+    }
+    const canvas=document.createElement('canvas');canvas.width=800;canvas.height=1050;
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#eff1ee';ctx.fillRect(0,0,800,1050);
+    ctx.save();ctx.beginPath();ctx.roundRect(48,52,704,450,36);ctx.clip();
+    const gradient=ctx.createLinearGradient(48,52,752,502);
+    gradient.addColorStop(0,'#040507');gradient.addColorStop(.3,'#303239');
+    gradient.addColorStop(.53,'#0b0d12');gradient.addColorStop(.7,'#34353c');
+    gradient.addColorStop(1,'#050609');
+    ctx.fillStyle=gradient;ctx.fillRect(48,52,704,450);
+    for(let i=0;i<160;i++){
+      ctx.strokeStyle='rgba(255,255,255,'+(i%5===0?.04:.012)+')';
+      ctx.beginPath();ctx.moveTo(48,52+i*2.9);ctx.lineTo(752,52+i*2.9);ctx.stroke();
+    }
+    ctx.restore();
+    ctx.strokeStyle='#ccb785';ctx.lineWidth=2;
+    ctx.beginPath();ctx.roundRect(48,52,704,450,36);ctx.stroke();
+    ctx.textAlign='left';ctx.fillStyle='#eddba9';
+    ctx.font='bold 52px sans-serif';ctx.fillText('LOIAL',90,137);
+    ctx.font='bold 15px sans-serif';ctx.fillText('BLACK METAL • AMBASSADOR',92,172);
+    ctx.fillStyle='#ccb88e';ctx.font='bold 18px sans-serif';
+    ctx.fillText(document.getElementById('premiumAmbStatus').textContent.slice(0,32),90,329);
+    ctx.font='14px sans-serif';ctx.fillText('TITULAR',90,382);
+    ctx.fillStyle='#f3e3c0';ctx.font='bold 32px sans-serif';
+    ctx.fillText(document.getElementById('premiumAmbName').textContent.slice(0,29),90,423);
+    ctx.font='bold 16px sans-serif';
+    ctx.fillText(document.getElementById('premiumAmbCode').textContent.slice(0,36),90,465);
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.roundRect(205,538,390,390,22);ctx.fill();
+    ctx.drawImage(image,226,558,348,348);
+    ctx.fillStyle='#172b22';ctx.textAlign='center';
+    ctx.font='bold 22px sans-serif';ctx.fillText('Scanează pentru recomandare',400,966);
+    ctx.font='16px sans-serif';ctx.fillText('Partener Loial • loial.space',400,1000);
+    const link=document.createElement('a');
+    link.download='Loial-Ambasador-Black-Metal.png';
+    link.href=canvas.toDataURL('image/png');link.click();
   }
 
   function copyAmbLink() {
@@ -558,5 +971,6 @@
     });
   }
 </script>
+<script src="/loial-i18n.js"></script>
 </body>
 </html>
