@@ -191,6 +191,8 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
     from sqlalchemy.exc import IntegrityError
     from fastapi.responses import JSONResponse
     BillingBase.metadata.create_all(bind=engine)
+    from loial_manual_admin import GrantBase
+    GrantBase.metadata.create_all(bind=engine)
     api=APIRouter(prefix="/api/loial-stripe",tags=["LOIAL Stripe subscriptions"])
 
     def session():
