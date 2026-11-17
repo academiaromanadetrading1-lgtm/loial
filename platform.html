@@ -356,6 +356,7 @@
 
     <div class="card">
       <h2>2. Ambasadori & Plăți Lunare Wise Business</h2>
+      <button type="button" class="btn-secondary" onclick="downloadCommissionXlsx()">Descarcă raportul Excel al lunii (comisioane / Wise)</button>
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px;">
         Luna 1: <strong>20 EUR</strong> direct + <strong>10 EUR</strong> recrutorului direct, o singură dată • Luna 2+: <strong>5 EUR</strong> (1–25 firme), <strong>10 EUR</strong> Manager (26–50), <strong>15 EUR</strong> Senior (51+).
       </p>
@@ -877,7 +878,19 @@
     else if(action==='deleteCust'&&wallet)deleteCust(wallet,name);
   });
 
-  async function confirmWisePlan(id) {
+  async function downloadCommissionXlsx() {
+    const month=document.getElementById('adminMonthBadge').textContent.replace('Luna: ','').trim();
+    if(!/^\\d{4}-\\d{2}$/.test(month)){alert('Lună invalidă');return;}
+    const res=await authorizedFetch('/api/loial-revenue/admin/export/'+month+'.xlsx');
+    if(!res.ok){alert('Exportul nu este disponibil.');return;}
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement('a');
+    link.href=url;link.download='loial-comisioane-'+month+'.xlsx';
+    document.body.appendChild(link);link.click();link.remove();
+    URL.revokeObjectURL(url);
+  }
+    async function confirmWisePlan(id) {
     const reference=prompt('Referința exactă a plății verificate în Wise Business:');
     if(!reference)return;
     const paymentMonth=prompt('Luna plătită (YYYY-MM):',new Date().toISOString().slice(0,7));
