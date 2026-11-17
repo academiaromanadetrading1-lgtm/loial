@@ -37,6 +37,29 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                 assert icon.headers["content-type"]=="image/png"
                 assert icon.content.startswith(b"\x89PNG\r\n\x1a\n")
             assert client.get("/sw.js").status_code==200
+            # Verify public commercial policy in the actual assembled app.
+            catalog=client.get("/api/loial-plans")
+            assert catalog.status_code==200
+            assert [(p["code"],p["price_eur"],p["customer_cap"],p["location_cap"])
+                    for p in catalog.json()]==[
+                ("start",0,50,1),("business",67,None,1),("probusiness",270,None,5)]
+            simulation=client.get("/api/loial-plans/simulate",params={
+                "new_business":10,"renewed_business":30,"new_pro":5,
+                "renewed_pro":10,"recruited_business":5})
+            assert simulation.status_code==200
+            assert simulation.json()["total_commission_cents"]==170000
+            assert simulation.json()["illustrative_subscription_revenue_cents"]==706500
+            assert simulation.json()["scenario_only"] is True
+            assert client.get("/api/loial-plans/simulate?new_business=-1").status_code==422
+            for path in ("/demo","/ambasadori","/robots.txt","/sitemap.xml",
+                         "/en/","/de/","/fr/","/it/","/es/","/nl/","/pl/","/hu/"):
+                assert client.get(path).status_code==200,path
+            for path in ("/api/loial-friends/me","/api/admin/pilot-metrics"):
+                assert client.get(path).status_code==401,path
+            program=client.get("/api/loial-friends/program").json()
+            assert program["cash_withdrawal"] is False
+            assert program["merchant_redemption_enabled"] is False
+            assert program["requires_ambassador_role"] is False
             # Nothing in the repository root (DB, source, secret manager files)
             # may be disclosed over the former /static mount.
             for sensitive in ("/static/main.py","/static/.env",
