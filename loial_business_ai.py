@@ -21,6 +21,7 @@ from sqlalchemy import Column, Float, Integer, String, Text, UniqueConstraint, o
 from sqlalchemy.orm import Session, declarative_base
 
 from loial_industries import PROFILES, canonical, profile, weekly_request
+from loial_financial_simulation import RULES as SIMULATION_RULES, enrich_answer
 from loial_analytics import customer_segments, sector_summary, abc_products, money, manager_findings, break_even_analysis
 from loial_academic_methods import context_for
 from loial_knowledge import guidance
@@ -568,7 +569,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                   json.dumps({"rows":extracted.get("rows",[])[:50],"notes":extracted.get("notes",[]),
                     "uncertain_fields":extracted.get("uncertain_fields",[])},ensure_ascii=False)[:12000]}
         recent_messages = db.query(AIMessage).filter(AIMessage.business_id == biz.id).order_by(AIMessage.id.desc()).limit(12).all()
-        conversation = "\n".join(x.role + ": " + x.content[:1000] for x in reversed(recent_messages))
+        conversation = "\n".join(x.role + ": " + x.content[:(2000 if x.role=="user" else 800)] for x in reversed(recent_messages))
         languages={"ro":"Romanian","en":"English","de":"German","fr":"French","it":"Italian","es":"Spanish","nl":"Dutch","pl":"Polish","hu":"Hungarian"}
         language=languages.get(req.language,"Romanian")
         system = ("Respond naturally in "+language+". Esti Loial, consultantul managerial al acestei afaceri. Vorbesti natural, "
@@ -583,7 +584,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                   + "\n" + guidance(p.sector) + "\n" +
                   context_for(req.topic,p.sector,
                               confirmed_sales=bool(sales["sales_lines"]),
-                              confirmed_costs=bool(sales["margin_data_complete"])))
+                              confirmed_costs=bool(sales["margin_data_complete"])) + "\n" + SIMULATION_RULES)
         # Preserve the newest question before the bounded context; do not let
         # long uploaded documents displace the actual user request.
         contextual=("Intrebarea curenta (raspunde direct):\n"+req.text.strip()+
@@ -595,12 +596,14 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         if not answer:
             raise HTTPException(503,detail={"code":"provider_unavailable",
                 "message":"Furnizorul AI nu a raspuns. Pastreaza intrebarea si incearca din nou."})
+        answer=enrich_answer(answer,p.currency,req.language)
+        if not answer.strip():raise HTTPException(503,detail="Raspuns AI incomplet. Incearca din nou.")
         db.add_all([AIMessage(business_id=biz.id,role="user",topic=req.topic,
                               content=req.text.strip(),created_at=now()),
                     AIMessage(business_id=biz.id,role="assistant",topic=req.topic,
-                              content=answer[:12000],created_at=now())])
+                              content=answer,created_at=now())])
         db.commit()
-        return {"answer":answer,"mode":"ai","source":"profilul firmei si date agregate confirmate"}
+        return {"answer":answer,"mode":"ai","source":"profil, conversatie, date confirmate si ipoteze explicite"}
     @r.post("/campaigns")
     async def draft_campaign(req: CampaignRequest, biz=Depends(owner), db: Session = Depends(db_session)):
         allowed = {"all", "active_0_7", "inactive_8_30", "inactive_31_90", "inactive_91_365", "product_buyers"}
