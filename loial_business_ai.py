@@ -26,7 +26,7 @@ from loial_financial_simulation import RULES as SIMULATION_RULES, enrich_answer
 from loial_analytics import customer_segments, sector_summary, abc_products, money, manager_findings, break_even_analysis
 from loial_academic_methods import context_for
 from loial_knowledge import guidance
-from loial_marketing import TEMPLATES, render as render_template, campaign_message, validate_promotion_deadline
+from loial_marketing import TEMPLATES, render as render_template, campaign_message, validate_promotion_deadline, RETENTION_STRATEGIES, CAMPAIGN_PROMPT, campaign_has_temporal
 
 BaseAI = declarative_base()
 
@@ -673,18 +673,17 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
             raise HTTPException(422, str(exc))
         p = account_profile(db, biz)
         subject = "Noutati de la " + biz.name[:100]
-        message = ("Buna! " + req.offer if req.offer else
-                   "Buna! Te asteptam sa descoperi noutatile noastre.")
-        summary = sector_summary(p.sector, rows(db, biz))
+        strategy, guidance_text = RETENTION_STRATEGIES[req.audience]
+        message = "Bună! Te așteptăm cu drag la " + biz.name + "."
+        if req.product.strip() and req.language == "ro":
+            subject = ("Ofertă: " + req.product.strip())[:120]
+        if req.offer.strip() and not campaign_has_temporal(req.offer):
+            message += " " + req.offer.strip()
         structured = {"business": biz.name, "sector": profile(p.sector)["label"],
                       "objective": req.objective, "audience": req.audience,
-                      "promoted_product_or_service": req.product, "offer_explicit": req.offer, "deadline": deadline, "language": req.language, "products": summary["products"][:5]}
-        prompt = ("Esti redactorul campaniilor Loial. Propune un mesaj scurt, clar si natural pentru "
-                  "afacerea descrisa. Returneaza NUMAI JSON valid cu cheile subject si text. "
-                   "Scrie in limba indicata. Daca produsul sau serviciul este completat, mentioneaza explicit promotia si incurajeaza cumpararea sau programarea acum. Foloseste o data limita numai daca a fost furnizata. Nu inventa urgenta, raritate sau reduceri. "
-                  "Nu inventa reduceri, preturi, promisiuni, stocuri, termene ori performante. "
-                  "Nu mentiona public ca destinatarul a fost profilat dupa cumparaturi. "
-                  "Nu comunica produse sensibile. Include doar oferte aprobate explicit de administrator.")
+                      "promoted_product_or_service": req.product, "offer_explicit": req.offer, "language": req.language,
+                      "strategy": strategy, "guidance": guidance_text}
+        prompt = CAMPAIGN_PROMPT
         result = await ask_model(prompt, json.dumps(structured, ensure_ascii=False),
                                  usage_now(db, biz), db)
         generated = False
@@ -693,7 +692,9 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                 candidate = json.loads(result.strip().replace(chr(96)*3 + "json", "").replace(chr(96)*3, ""))
                 if (isinstance(candidate, dict) and isinstance(candidate.get("subject"), str)
                     and isinstance(candidate.get("text"), str) and
-                        candidate["subject"].strip() and candidate["text"].strip()):
+                        candidate["subject"].strip() and candidate["text"].strip()
+                        and not campaign_has_temporal(candidate["subject"])
+                        and not campaign_has_temporal(candidate["text"])):
                     subject = candidate["subject"].strip()[:120]
                     message = candidate["text"].strip()[:2000]
                     generated = True
@@ -706,6 +707,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         db.commit()
         return {"id": draft.id, "status": "draft", "subject": draft.subject,
                 "text": draft.content, "generated_by_ai": generated, "sent": 0,
+                "strategy": strategy, "strategy_guidance": guidance_text,
                 "notice": "Previzualizare neexpediata. Administratorul verifica oferta si publicul."}
     @r.get("/campaigns")
     def campaigns(biz=Depends(owner), db: Session = Depends(db_session)):
