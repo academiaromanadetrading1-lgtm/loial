@@ -64,7 +64,17 @@ def preflight(env=None,stage="production"):
     webhook_key=env.get("LOIAL_STRIPE_WEBHOOK_SECRET","")
     price_id=env.get("LOIAL_STRIPE_PRICE_ID","")
     origin=env.get("LOIAL_PUBLIC_ORIGIN","https://loial.space").rstrip("/")
-    stripe_severity="blocker" if strict else "warning"
+    public_free_pilot=env.get("LOIAL_PUBLIC_FREE_PILOT","0")=="1"
+    # Free-only public launch can proceed before Stripe credentials exist.
+    # Fail closed when credentials are partly set, or live charges requested.
+    stripe_values=(stripe_key,webhook_key,price_id)
+    no_stripe_config=not any(stripe_values)
+    if public_free_pilot:
+        add("free_pilot_stripe_disabled",no_stripe_config,
+            "Free-only pilot must not carry partial or active Stripe credentials",
+            severity="blocker" if strict else "warning")
+    stripe_severity=("warning" if public_free_pilot and no_stripe_config else
+                     "blocker" if strict else "warning")
     add("loial_stripe_live_key",stripe_key.startswith("sk_live_") and
         len(stripe_key)>=25,"Use the LOIAL live Stripe secret key only in production",
         severity=stripe_severity)
