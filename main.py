@@ -3249,7 +3249,7 @@ install_friend_referrals(app,engine,SessionLocal)
 # Stripe legacy se retrage; 20 EUR vanzator + 10 EUR sponsor direct doar la prima incasare.
 # Urmeaza reconcilierea dedicata Wise inainte de activarea platilor in productie.
 from loial_revenue_commissions import install_revenue
-install_revenue(app,engine,SessionLocal,SalesAgent,BusinessAccount,User,SECRET_KEY,ALGORITHM)
+install_revenue(app,engine,SessionLocal,SalesAgent,BusinessAccount,User,SECRET_KEY,ALGORITHM,pwd_context)
 # Stripe = subscriptions and automatic access; Wise = ambassador payouts only.
 from loial_stripe_billing import install_stripe_billing
 from loial_revenue_commissions import (PaidMerchantInvoice,AmbassadorCommission,
