@@ -204,9 +204,14 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
     def status(biz=Depends(own_business),db=Depends(session)):
         state=db.query(LoialSubscription).filter(
             LoialSubscription.business_id==biz.id).first()
+        configured=(os.getenv("LOIAL_STRIPE_SECRET_KEY","").startswith(
+            ("sk_test_","sk_live_")) and
+            os.getenv("LOIAL_STRIPE_PRICE_ID","").startswith("price_") and
+            bool(os.getenv("LOIAL_STRIPE_WEBHOOK_SECRET","")))
         return {"plan_price_eur":67,"subscription":entitlements(state),
                 "status":state.status if state else "not_started",
-                "paid_until":state.paid_until if state else None}
+                "paid_until":state.paid_until if state else None,
+                "checkout_configured":configured}
 
     @api.post("/checkout")
     def checkout(biz=Depends(own_business),db=Depends(session)):
@@ -344,6 +349,11 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
             if not state:
                 raise HTTPException(status_code=503,
                     detail="Abonamentul necesita reconciliere; Stripe poate reincerca evenimentul")
+            if state.status in ("canceled","unpaid","incomplete_expired"):
+                outcome={"ignored":"terminated_subscription_no_reactivation"}
+                db.add(StripeWebhookEvent(id=eid,type=typ,received_at=utc_iso(now_utc())))
+                db.commit()
+                return {"status":"recorded",**outcome}
             business=db.query(Business).filter(Business.id==state.business_id).first()
             outcome=process_paid_invoice(db,obj,state,business,Agent,
                 os.getenv("LOIAL_STRIPE_PRICE_ID",""),PaidMerchantInvoice,
