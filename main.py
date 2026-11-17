@@ -3017,7 +3017,7 @@ def admin_toggle_business_pro(biz_id: int, credentials: HTTPAuthorizationCredent
                     business_name=biz.name,
                     business_email=biz.email,
                     plan="probusiness",
-                    amount=65.0,
+                    amount=67.0,
                     commission=20.0,
                     status="completed",
                     activated_month=current_month,
@@ -3159,7 +3159,7 @@ def loial_wise_checkout(credentials: HTTPAuthorizationCredentials = Depends(secu
              not parsed.username and not parsed.password)
     month=datetime.now().strftime("%Y%m")
     return {"available":enabled,"payment_url":raw if enabled else None,
-            "amount_eur":65,"currency":"EUR","vat_added":False,
+            "amount_eur":67,"currency":"EUR","vat_added":False,
             "business_id":business.id,
             "payment_reference":f"LOIAL-{business.id}-{month}",
             "confirmation":"manual_wise_reconciliation_only",
