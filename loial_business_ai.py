@@ -369,7 +369,10 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         biz = db.query(BusinessAccount).filter(BusinessAccount.email == payload["sub"]).first()
         if not biz or (payload.get("business_id") and payload["business_id"] != biz.id):
             raise HTTPException(status_code=403, detail="Acces interzis")
-        if (biz.plan or "").lower() not in ("business", "probusiness", "pro", "premium", "enterprise"):
+        # A cached plan label is not proof of an active subscription or grant.
+        from loial_stripe_billing import effective_entitlements
+        access=effective_entitlements(db,biz.id)
+        if not access["active"] or access.get("plan") not in ("business","probusiness"):
             raise HTTPException(status_code=403, detail="Disponibil in Loial Business")
         return biz
     def account_profile(db, biz):
