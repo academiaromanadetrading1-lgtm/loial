@@ -61,6 +61,8 @@ class DirectMessage(BaseModel):
     product: str = Field(default="", max_length=200)
     language: str = Field(default="ro", max_length=2)
     deadline: str = Field(default="", max_length=10)
+    deadline_time: str = Field(default="", max_length=5)
+    terms: str = Field(default="", max_length=300)
     customer_ids: Optional[List[int]] = None
     idempotency_key: Optional[str] = Field(default=None, min_length=8, max_length=120)
 
@@ -252,13 +254,19 @@ def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent
 
     @route.post("/send")
     def send_direct(req: DirectMessage, biz=Depends(owner), db: Session = Depends(db_session)):
-        from loial_marketing import campaign_message, validate_promotion_deadline
+        from loial_marketing import campaign_message, validate_promotion_deadline, validate_offer_terms, validate_expiry_time, campaign_base, campaign_has_temporal
         # Product inclusion must be approved in the exact text shown in the UI.
         try:
             deadline = validate_promotion_deadline(req.deadline) if req.product.strip() else ""
+            expiry_time = validate_expiry_time(req.deadline_time, deadline) if req.product.strip() else ""
+            terms = validate_offer_terms(req.terms) if req.product.strip() else ""
+            if expiry_time:
+                deadline += " " + expiry_time
         except ValueError as exc:
             raise HTTPException(422, str(exc))
-        if campaign_message(req.text, req.product, req.language, deadline) != req.text.strip():
+        if req.product.strip() and (campaign_has_temporal(req.subject) or campaign_has_temporal(campaign_base(req.text, req.product, req.language, deadline, terms))):
+            raise HTTPException(422, "Elimină data și ora din titlu și text. Folosește câmpurile dedicate promoției.")
+        if campaign_message(req.text, req.product, req.language, deadline, terms) != req.text.strip():
             raise HTTPException(status_code=422, detail="Verifica promotia, indemnul la actiune si previzualizarea inainte de trimitere.")
         event = "direct:" + req.idempotency_key if req.idempotency_key else None
         if event:
