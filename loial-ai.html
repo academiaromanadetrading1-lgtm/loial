@@ -252,7 +252,7 @@ function bubble(role,text){
 }
 function setTopic(key,label){currentTopic=key;
   document.querySelectorAll('.topic').forEach(x=>x.classList.toggle('active',x.dataset.topic===key));
-  $('message').value=''; $('message').placeholder='Întreabă Loial: '+label;
+  $('message').value=''; $('message').placeholder=tr('Scrie întrebarea ta...');
   $('message').focus();
 }
 async function init(){
@@ -276,7 +276,7 @@ async function init(){
     c.topics.forEach(t=>{const b=document.createElement('button');b.type='button';b.className='topic';b.dataset.topic=t.key;b.textContent=t.label;
       b.addEventListener('click',()=>setTopic(t.key,t.label));$('topics').appendChild(b);});
     if(window.LoialLang)LoialLang.apply();
-    const h=await api('/history');if(h.length){h.forEach(x=>bubble(x.role,x.text));}else{bubble('assistant','Bun venit! Spune-mi ce tip de activitate ai sau alege o temă din stânga. Te voi întreba doar ce date sunt necesare pentru analiză.');}
+    const h=await api('/history');if(h.length){h.forEach(x=>bubble(x.role,x.text));}else{bubble('assistant',tr('Bun venit! Spune-mi ce tip de activitate ai sau alege o temă din stânga. Te voi întreba doar ce date sunt necesare pentru analiză.'));}
     await loadFiles();
     await loadMessageRecipients();
     await refreshSent();
