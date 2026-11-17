@@ -239,8 +239,12 @@ Ex.: Revizie auto;1;220;65"></textarea>
 <select id="singleRecipient"><option value="">Toți cei din segmentul ales</option></select>
 <label for="productFilter">Produs sau serviciu (opțional)</label>
 <input id="productFilter" maxlength="200" placeholder="Ex.: croissant / revizie auto / spălare">
+<label for="promotionTerms" id="promotionTermsLabel">Beneficiul concret al ofertei (opțional)</label>
+<input id="promotionTerms" maxlength="300" placeholder="Ex.: 20% reducere / 6 lei în loc de 8 lei">
 <label for="promotionDeadline" id="promotionDeadlineLabel">Promoție valabilă până la (opțional)</label>
 <input id="promotionDeadline" type="date">
+<label for="promotionTime" id="promotionTimeLabel">Ora expirării (opțional, ora locală)</label>
+<input id="promotionTime" type="time">
 <label for="offer">Textul care ajunge în Loial</label>
 <textarea id="offer" rows="4" maxlength="2000" placeholder="Ex.: Revino pentru o surpriză la următoarea vizită."></textarea>
 <div class="actions">
@@ -259,6 +263,7 @@ Ex.: Revizie auto;1;220;65"></textarea>
   <p class="wallet-note" id="walletPreviewNote">Previzualizare • Nu trimite niciun mesaj.</p>
 </section>
 <button id="sendCampaign" style="width:100%;margin-top:9px">Trimite acum în Loial</button>
+<div class="report" id="campaignStrategy" aria-live="polite"></div>
 <div class="report" id="campaignPreview" style="margin-top:11px"></div>
 <p class="tiny">Mesajul apare în portofelul Loial al destinatarilor eligibili. Nu se folosește emailul. Clientul poate opri ofertele din preferințele portofelului.</p>
 <hr>
@@ -752,8 +757,9 @@ $('draftCampaign').onclick=async()=>{
     const promo=promotionFields();
     const r=await api('/campaigns',{method:'POST',body:JSON.stringify({
       objective:$('objective').value||'Informarea clienților',
-      audience:$('audience').value,...promo,offer:$('offer').value})});
+      audience:$('audience').value,...promo,offer:promo.product?'':$('offer').value})});
     currentCampaignId=r.id;
+    $('campaignStrategy').textContent=[r.strategy,r.strategy_guidance].filter(Boolean).join(' — ');
     $('subject').value=r.subject;
     $('offer').value=campaignBaseText(r.text,promo);
     renderWalletMessagePreview();
@@ -766,6 +772,9 @@ $('draftCampaign').onclick=async()=>{
 $('sendCampaign').onclick=async()=>{
   const subject=$('subject').value.trim();
   const message=campaignMessageText();
+  const promo=promotionFields();
+  const temporal=/(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{1,2}:\d{2})/;
+  if(promo.product&&[subject,$('offer').value,promo.terms].some(v=>temporal.test(v))){status('Elimină data și ora din titlu și text. Folosește câmpurile dedicate promoției.',true);return;}
   if(subject.length<2||message.length<2){status('Completează titlul și textul mesajului.',true);return;}
   $('sendCampaign').disabled=true;
   try{
@@ -899,12 +908,12 @@ const promotionCopy={
 };
 function promotionFields(){
   const product=$('productFilter').value.trim();
-  return {product,language:language(),deadline:product?$('promotionDeadline').value:''};
+  return {product,language:language(),deadline:product?$('promotionDeadline').value:'',deadline_time:product?$('promotionTime').value:'',terms:product?$('promotionTerms').value.trim():''};
 }
 function promotionFooter(promo){
   if(!promo.product)return '';
   const [prefix,action,validity]=promotionCopy[promo.language]||promotionCopy.ro;
-  return [prefix+promo.product+'.',...(promo.deadline?[validity+promo.deadline+'.']:[]),action].join('\n');
+  return [prefix+promo.product+'.',...(promo.terms?[promo.terms]:[]),...(promo.deadline?[validity+promo.deadline+(promo.deadline_time?' '+promo.deadline_time:'')+'.']:[]),action].join('\n');
 }
 function campaignBaseText(text,promo){
   const msg=text.trim(),footer=promotionFooter(promo);
@@ -922,6 +931,9 @@ function renderWalletMessagePreview(){
   const title=$('subject').value.trim(),body=campaignMessageText();
   $('promotionDeadlineLabel').textContent=(promotionCopy[language()]||promotionCopy.ro)[3];
   $('promotionDeadline').disabled=!$('productFilter').value.trim();
+  $('promotionTerms').disabled=!$('productFilter').value.trim();
+  $('promotionTime').disabled=!$('productFilter').value.trim()||!$('promotionDeadline').value;
+  if($('promotionTime').disabled)$('promotionTime').value='';
   const preview=$('walletMessagePreview');
   preview.hidden=!title&&!body;
   $('walletPreviewTitle').textContent=title;
@@ -929,7 +941,7 @@ function renderWalletMessagePreview(){
   const copy=walletPreviewCopy[language()]||walletPreviewCopy.ro;
   for(const [id,t] of [['walletPreviewCaption',copy[0]],['walletPreviewHeading',copy[1]],['walletPreviewNote',copy[2]]])$(id).textContent=t;
 }
-for(const id of ['subject','offer','productFilter','promotionDeadline'])$(id).addEventListener('input',renderWalletMessagePreview);
+for(const id of ['subject','offer','productFilter','promotionDeadline','promotionTime','promotionTerms'])$(id).addEventListener('input',renderWalletMessagePreview);
 document.addEventListener('loial:language',renderWalletMessagePreview);
 renderWalletMessagePreview();
 init();
