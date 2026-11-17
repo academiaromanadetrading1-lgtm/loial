@@ -99,6 +99,10 @@ class WiseReceiptInput(BaseModel):
     confirmed_in_wise:bool=False
     evidence_note:str=Field(min_length=12,max_length=400)
 
+class AmbassadorWiseDetails(BaseModel):
+    password:str=Field(min_length=1,max_length=200)
+    account_details:str=Field(min_length=6,max_length=150)
+
 class MerchantLinkInput(BaseModel):
     business_id:int=Field(gt=0)
     stripe_customer_id:str=Field(min_length=7,max_length=130)
@@ -476,7 +480,7 @@ def verified_ambassador_overview(db,Agent,period):
     return result
 
 
-def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm):
+def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm,password_hasher=None):
     RevenueBase.metadata.create_all(bind=engine)
     router=APIRouter(prefix="/api/loial-revenue",tags=["Verified Loial Revenue"])
     def session():
@@ -506,6 +510,25 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm):
             Agent.active.is_(True)).first()
         if not a:raise HTTPException(status_code=403,detail="Ambasador invalid")
         return a
+
+    @router.put("/ambassador/wise-details")
+    def update_wise_details(req:AmbassadorWiseDetails,
+                            agent=Depends(ambassador),db:Session=Depends(session)):
+        """Only the authenticated ambassador may update their own payout details.
+
+        Password re-verification protects against stale session-token theft.
+        The API never returns the bank / Wise account value.
+        """
+        if not password_hasher or not agent.password or not password_hasher.verify(
+                req.password,agent.password):
+            raise HTTPException(status_code=403,detail="Parola nu a fost confirmata")
+        details=req.account_details.strip()
+        if len(details)<6 or any(ord(ch)<32 for ch in details):
+            raise HTTPException(status_code=422,detail="Detalii Wise invalide")
+        agent.payout_method="wise"
+        agent.payout_details=details
+        db.commit()
+        return {"status":"updated","provider":"wise","details_saved":True}
 
     @router.get("/ambassador/me")
     def my_revenue(agent=Depends(ambassador),db:Session=Depends(session)):
@@ -553,6 +576,7 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm):
                 "approved_eur":sum(x.amount_cents for x in rows if x.status=="approved")/100,
                 "paid_eur":sum(x.amount_cents for x in rows if x.status=="paid")/100,
                 "direct_paid_businesses":len({x.business_id for x in personal}),
+                "wise_details_saved":bool(agent.payout_details),
                 "firm_activity":firm_activity[:100],
                 "month":datetime.now(timezone.utc).strftime("%Y-%m"),
                 "recruits":[{"name":x.name,"joined_at":next(
