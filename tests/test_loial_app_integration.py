@@ -252,6 +252,47 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert client.get("/api/loial-friends/me",headers=client_headers).json()["points"]==10
             assert client.get("/api/loial-friends/me",headers={
                 "X-Loial-Wallet-Token":"F"*48}).json()["points"]==10
+            # Ambassadors recruit via /ambasador.html, not a customer wallet page.
+            def create_ambassador(email, sponsor_code=None):
+                result=client.post("/api/ambassador/join",json={
+                    "email":email,"name":email.split("@")[0],
+                    "password":"test-ambassador-password-2026",
+                    "sponsor_code":sponsor_code,"payout_method":"wise",
+                    "payout_details":"ambassador@example.invalid"})
+                assert result.status_code==200,result.text
+                return result.json()
+            ambassador_a=create_ambassador("ambassador-a@example.invalid")
+            ambassador_b=create_ambassador("ambassador-b@example.invalid",
+                ambassador_a["ref_code"])
+            assert ambassador_b["sponsored_by_another_ambassador"] is True
+            assert ambassador_b["ambassador_invite_url"].startswith(
+                "https://loial.space/ambasador.html?ambref=")
+            from loial_revenue_commissions import SponsorRelationship
+            with main.SessionLocal() as db:
+                link=db.query(SponsorRelationship).filter(
+                    SponsorRelationship.ambassador_id==ambassador_b["id"]).one()
+                assert link.sponsor_id==ambassador_a["id"]
+            session_a={"Authorization":"Bearer "+ambassador_a["access_token"]}
+            ambassador_status=client.get("/api/loial-revenue/ambassador/me",
+                headers=session_a)
+            assert ambassador_status.status_code==200
+            assert ambassador_status.json()["sponsored_ambassadors"]==1
+            assert ambassador_status.json()["pending_eur"]==0
+            firm_b=client.post("/api/register",json={
+                "email":"firm-recruited-by-b@example.invalid",
+                "password":"secure-firm-test-password",
+                "business_name":"Firma adusă de B",
+                "ref_code":ambassador_b["ref_code"]})
+            assert firm_b.status_code==200,firm_b.text
+            with main.SessionLocal() as db:
+                firm=db.query(main.BusinessAccount).filter(
+                    main.BusinessAccount.id==firm_b.json()["business_id"]).one()
+                assert firm.agent_id==ambassador_b["id"]
+            status_a=client.get("/api/loial-revenue/ambassador/me",
+                headers=session_a).json()
+            assert status_a["pending_eur"]==0
+            assert status_a["sponsored_ambassadors"]==1
+            # Paid state must never be inferred solely from registration.
             # No external provider or recipient data is needed for this scenario.
     finally:
         main.engine.dispose()
