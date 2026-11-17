@@ -115,14 +115,31 @@
   </div>
 
   <div class="card" id="wiseBillingCard">
-    <span class="step-tag">ABONAMENT LOIAL PROBUSINESS</span>
+    <span class="step-tag">ABONAMENT LOIAL BUSINESS</span>
     <h2>67 EUR / lună, fără TVA adăugat</h2>
     <p style="font-size:13px;color:var(--text-muted)">Abonamentul se plătește lunar prin Stripe. Accesul se activează după încasarea verificată și poate fi suspendat după 3 zile de neplată.</p>
     <p id="wiseReference" style="font-weight:700;margin-top:10px"></p>
-    <button id="stripePayButton" class="btn-primary" type="button" onclick="startStripeCheckout()" style="width:max-content">Activează ProBusiness – 67 EUR/lună</button>
+    <button id="stripePayButton" class="btn-primary" type="button" onclick="startStripeCheckout()" style="width:max-content">Activează Business – 67 EUR/lună</button>
     <button id="stripePortalButton" class="btn-secondary" type="button" onclick="manageStripeBilling()" style="display:none;width:max-content">Gestionează abonamentul Stripe</button>
     <p id="wisePayHint" style="font-size:12px;color:var(--text-muted)">Stripe LOIAL se configurează în contul dedicat. Plata activează automat abonamentul.</p>
   </div>
+  <section class="card" id="locationPanel" hidden>
+    <span class="step-tag">LOIAL PROBUSINESS</span>
+    <h2>Locații și performanță</h2>
+    <p id="locationStatus" role="status"></p>
+    <div id="locationAccept"><label>Cod de invitație primit <input id="locationCode" maxlength="100" autocomplete="off"></label>
+      <button type="button" class="btn-secondary" id="locationAcceptBtn">Asociază locația</button></div>
+    <div id="locationManage" hidden>
+      <p id="locationCount"></p><ul id="locationList"></ul>
+      <label>ID-ul firmei invitate <input type="number" min="1" id="locationTarget"></label>
+      <button type="button" class="btn-secondary" id="locationInviteBtn">Generează invitație</button>
+      <input id="locationInviteCode" readonly hidden aria-label="Cod privat de invitație">
+      <p><label>Luna raportului <input type="month" id="locationMonth"></label>
+      <button type="button" class="btn-primary" id="locationReportBtn">Compară locațiile</button></p>
+      <div id="locationReport" style="overflow-x:auto"></div>
+    </div>
+    <button type="button" class="btn-secondary" id="locationLeave" hidden>Retrage locația din grup</button>
+  </section>
   <div id="loialAiEntry" style="background:#fff;border:1px solid #dfeae2;border-radius:15px;padding:16px 20px;margin:0 0 18px;display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;">
     <div><strong style="font-size:17px;color:#2d6a4f;">🤖 Loial AI • Consultantul afacerii</strong><div style="color:#61766a;font-size:13px;margin-top:3px;">Analizează documente, vânzări, marje, clienți și campanii pentru domeniul tău.</div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
@@ -360,7 +377,7 @@
       <div id="adminActivity" aria-live="polite" style="font-size:13px;line-height:1.7"></div>
     </div>
     <div class="card">
-      <h2>1. Firme înscrise & planuri LOIAL (67 EUR/lună, fără TVA adăugat)</h2><p style="font-size:13px;color:var(--text-muted)">Accesul ProBusiness acordat manual este gratuit până la retragere și nu generează comisioane. Abonamentele Stripe sunt independente.</p>
+      <h2>1. Firme înscrise & planuri LOIAL (67 EUR/lună, fără TVA adăugat)</h2><p style="font-size:13px;color:var(--text-muted)">Accesul Business acordat manual este gratuit până la retragere și nu generează comisioane. Abonamentele Stripe sunt independente.</p>
       <table>
         <thead>
           <tr><th>Firmă</th><th>Email</th><th>Adusă de</th><th>Clienți</th><th>Plan</th><th>Acțiune</th></tr>
@@ -434,7 +451,7 @@
       button.disabled=!data.checkout_configured;
       portal.style.display=(!data.checkout_configured||data.status==='not_started')?'none':'inline-block';
       hint.textContent=data.subscription.status==='manual_grant'
-        ?'Acces ProBusiness gratuit acordat de administrator, până la retragere.'
+        ?'Acces Business gratuit acordat de administrator, până la retragere.'
         :data.free_pilot_only&&!active
         ?'LOIAL este disponibil în pilot gratuit. Abonamentele de 67 EUR/lună vor fi activate după configurarea Stripe.'
         :active
@@ -444,6 +461,7 @@
         ?'Abonamentul este inactiv. Confirmarea plății se face automat prin Stripe.'
         :'Stripe LOIAL nu este configurat încă; plata nu poate fi inițiată.';
       document.getElementById('wiseReference').textContent='Status: '+data.subscription.status;
+      loadLocations();
     }catch(error){hint.textContent=error.message;}
   }
   async function stripeLink(path){
@@ -614,7 +632,7 @@
     document.getElementById('stampsInput').value = data.stamps_required;
     document.getElementById('googleUrlInput').value = data.google_review_url || '';
 
-    const planLabel = (data.plan === 'pro' || data.plan === 'probusiness') ? 'ProBusiness: Nelimitat' : `Plan Start: ${data.customers_count} / ${data.max_customers} clienți`;
+    const planLabel = (data.plan === 'pro' || data.plan === 'probusiness' || data.plan === 'business') ? 'Business: Nelimitat' : `Plan Start: ${data.customers_count} / ${data.max_customers} clienți`;
     document.getElementById('planBadge').textContent = planLabel;
 
     if (data.qr_base64) document.getElementById('qrImage').src = data.qr_base64;
@@ -1061,6 +1079,61 @@
   }
 </script>
 <script src="/loial-i18n.js"></script>
+<script>
+async function loadLocations(){
+  const panel=document.getElementById('locationPanel');
+  if(!panel)return;
+  const q=id=>document.getElementById(id);
+  const say=t=>q('locationStatus').textContent=t;
+  async function api(path,method='GET',data){
+    const res=await authorizedFetch('/api/loial-locations/'+path,{method,headers:{'Content-Type':'application/json'},...(data?{body:JSON.stringify(data)}:{})});
+    const out=await res.json().catch(()=>({}));
+    if(!res.ok)throw Error(typeof out.detail==='string'?out.detail:'Operațiunea nu a fost confirmată.');
+    return out;
+  }
+  try{
+    const state=await api('me');
+    panel.hidden=false;
+    const names={start:'Start',business:'Business',probusiness:'ProBusiness',probusiness_member:'ProBusiness · locație asociată'};
+    say('ID locație: '+state.business_id+' · '+(names[state.plan]||'Start'));
+    q('locationManage').hidden=!state.can_manage;
+    q('locationAccept').hidden=!!state.member_of||state.can_manage;
+    q('locationLeave').hidden=!state.member_of;
+    if(state.plan!=='start')q('planBadge').textContent=(names[state.plan]||'Business')+': Nelimitat';
+    const report=q('locationReport');report.replaceChildren();
+    q('locationInviteCode').hidden=true;q('locationInviteCode').value='';
+    q('locationCount').textContent=(1+state.locations.length)+' / 5 locații (inclusiv sediul principal)';
+    const list=q('locationList');list.replaceChildren();
+    for(const loc of state.locations){
+      const li=document.createElement('li');li.textContent='Locație #'+loc.business_id+' ';
+      const b=document.createElement('button');b.type='button';b.textContent='Dezasociază';
+      b.onclick=()=>run(async()=>{if(confirm('Elimini asocierea cu această locație?')){await api('member/'+loc.business_id,'DELETE');await loadLocations();}});li.append(b);list.append(li);
+    }
+    async function run(action){try{await action()}catch(err){say(err.message)}}
+    q('locationInviteBtn').onclick=()=>run(async()=>{
+      const id=Number(q('locationTarget').value);if(!Number.isSafeInteger(id)||id<1)throw Error('Introdu un ID valid.');
+      const result=await api('invite','POST',{business_id:id});q('locationInviteCode').value=result.code;q('locationInviteCode').hidden=false;say('Trimite codul numai administratorului locației invitate. Valabil 24 de ore.');
+    });
+    q('locationAcceptBtn').onclick=()=>run(async()=>{
+      if(!confirm('Confirmi asocierea și partajarea rapoartelor agregate cu organizația?'))return;
+      await api('accept','POST',{code:q('locationCode').value.trim()});q('locationCode').value='';await loadLocations();
+    });
+    q('locationLeave').onclick=()=>run(async()=>{if(confirm('Retragi locația din organizație?')){await api('member/'+state.business_id,'DELETE');await loadLocations();}});
+    if(!q('locationMonth').value){const now=new Date();q('locationMonth').value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');}
+    q('locationReportBtn').onclick=()=>run(async()=>{
+      report.replaceChildren();
+      const data=await api('report?'+new URLSearchParams({period:q('locationMonth').value}));
+      const table=document.createElement('table');const row=values=>{const tr=document.createElement('tr');for(const v of values){const td=document.createElement('td');td.textContent=v;tr.append(td)}table.append(tr)};
+      const fmt=(n,c)=>n==null?'Nedeterminat':Number(n).toLocaleString('ro-RO',{maximumFractionDigits:2})+' '+(c||'monedă neconfirmată');
+      row(['Locație','Carduri înregistrate','Operațiuni de ștampilare','Vânzări înregistrate','Contribuție']);
+      for(const x of data.locations){row([x.name,x.registered_cards,x.stamp_operations,fmt(x.recorded_sales,x.currency),fmt(x.recorded_contribution,x.currency)]);}
+      report.append(table);
+      for(const [currency,value] of Object.entries(data.recorded_sales_by_declared_currency)){const p=document.createElement('p');p.textContent='Vânzări înregistrate: '+fmt(value,currency);report.append(p);}
+      for(const v of data.caveats){const p=document.createElement('p');p.textContent=v;report.append(p);}
+    });
+  }catch(err){panel.hidden=true;}
+}
+</script>
 </body>
 </html>
 
