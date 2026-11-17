@@ -59,7 +59,7 @@ def create_sales_models(Base):
         business_email = Column(String)
         business_type = Column(String, nullable=True)
         plan = Column(String, default="probusiness")
-        amount = Column(Float, default=65.0)
+        amount = Column(Float, default=67.0)
         commission = Column(Float, default=20.0)
         status = Column(String, default="pending")
         activated_month = Column(String, index=True, nullable=True)
