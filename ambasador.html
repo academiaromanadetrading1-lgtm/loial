@@ -307,6 +307,14 @@
     }catch(error){fail(error.message);logoutAmb();}
   }
   if(ambassadorToken)reloadAmbassador();
+  // Poll only while the ambassador dashboard is visible; registration never
+  // triggers simulated commissions. Verified payments appear on next refresh.
+  setInterval(()=>{
+    if(ambassadorToken && !document.hidden)reloadAmbassador();
+  },60000);
+  document.addEventListener('visibilitychange',()=>{
+    if(ambassadorToken && !document.hidden)reloadAmbassador();
+  });
 
   document.getElementById('ambForm').onsubmit=async event=>{
     event.preventDefault();
@@ -359,7 +367,7 @@
     document.getElementById('dashRefCode').textContent=data.ref_code;
     document.getElementById('dashRefUrl').value=data.referral_url;
     document.getElementById('dashRecruitUrl').value=
-      'https://loial.space/join.html?ambref='+encodeURIComponent(data.ref_code);
+      'https://loial.space/ambasador.html?ambref='+encodeURIComponent(data.ref_code);
     document.getElementById('dashQrImg').src='/api/qr-link?url='+
       encodeURIComponent(data.referral_url);
     document.getElementById('dashAmounts').textContent=
