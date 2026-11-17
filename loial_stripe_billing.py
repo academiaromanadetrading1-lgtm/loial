@@ -125,6 +125,10 @@ def process_paid_invoice(db, invoice, state, business, Agent, price_id,
         return {"review":"missing_service_period"}
     invoice_sub=invoice.get("subscription")
     if isinstance(invoice_sub,dict):invoice_sub=invoice_sub.get("id")
+    invoice_customer=invoice.get("customer")
+    if isinstance(invoice_customer,dict):invoice_customer=invoice_customer.get("id")
+    if not state.customer_id or invoice_customer!=state.customer_id:
+        return {"review":"customer_mismatch"}
     if invoice_sub and state.subscription_id and invoice_sub!=state.subscription_id:
         return {"review":"subscription_mismatch"}
     if not invoice_sub and not state.subscription_id:
@@ -172,10 +176,11 @@ def process_paid_invoice(db, invoice, state, business, Agent, price_id,
     existing_paid=parse_utc(state.paid_until)
     if not existing_paid or covered_until>existing_paid:
         state.paid_until=utc_iso(covered_until)
-    state.grace_until=None
-    state.last_paid_invoice=invoice_id
-    state.status="active"
+        state.grace_until=None
+        state.last_paid_invoice=invoice_id
+        state.status="active"
     state.updated_at=stamp
+    # Legacy flags are used by existing feature checks; commercial plan is derived from verified invoices.
     business.plan="probusiness"
     business.max_customers=999999
     return {"credited":True,"first":first,"period":period}
