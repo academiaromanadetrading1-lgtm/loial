@@ -1097,6 +1097,7 @@ def create_team(name: str, manager_id: int, current_user: User = Depends(get_cur
 
 @app.post("/sales/team/{team_id}/add/{agent_id}")
 def add_to_team(team_id: int, agent_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410, detail="Structurile de echipa legacy nu influenteaza comisioanele LOIAL.")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if agent:
         agent.team_id = team_id
@@ -1370,6 +1371,7 @@ def record_cancellation(business_id: int, reason: str, current_user: User = Depe
 
 @app.put("/sales/agent/{agent_id}/payout")
 def set_payout_method(agent_id: int, method: str, details: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410, detail="Modificarea datelor de plata se face numai prin fluxul privat verificat al ambasadorului.")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
@@ -1483,6 +1485,7 @@ def pay_agent(agent_id: int, current_user: User = Depends(get_current_user), db:
 
 @app.get("/sales/agent/{agent_id}/payouts")
 def agent_payouts(agent_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410, detail="Raportul vechi este retras; foloseste registrul privat verificat al ambasadorului.")
     payouts = db.query(Payout).filter(Payout.agent_id == agent_id).order_by(Payout.id.desc()).all()
     return [{"id": p.id, "amount": p.amount, "method": p.method, "status": p.status, "month": p.month, "paid_at": p.paid_at} for p in payouts]
 
