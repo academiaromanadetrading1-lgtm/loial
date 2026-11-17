@@ -201,3 +201,17 @@ def test_wrong_customer_and_second_invoice_same_month_do_not_pay():
         assert db.query(AmbassadorCommission).count()==2
     finally:
         db.close()
+
+
+def test_delayed_payment_failure_must_match_current_subscription():
+    from loial_stripe_billing import subscription_event_matches
+    db,state=db_fixture()
+    try:
+        assert subscription_event_matches(state,"cus_loial","sub_loial")
+        assert subscription_event_matches(state,{"id":"cus_loial"},{"id":"sub_loial"})
+        assert not subscription_event_matches(state,"cus_loial","sub_old")
+        assert not subscription_event_matches(state,"cus_other","sub_loial")
+        assert not subscription_event_matches(state,"cus_loial",None)
+        assert not subscription_event_matches(None,"cus_loial","sub_loial")
+    finally:
+        db.close()
