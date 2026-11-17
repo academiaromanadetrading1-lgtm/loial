@@ -1,16 +1,10 @@
-"""Loial income-backed ambassador commissions, pilot (no automated money transfers).
+"""LOIAL verified income ledger. Pilot: manual Wise Business reconciliation.
 
-A direct sponsor earns EUR 10 once per DISTINCT merchant that the
-recruited ambassador converts to an eligible, VERIFIED paid subscription.
-The direct ambassador earns EUR 20 on the first qualified invoice and EUR 5/10/15
-on monthly renewals per the number of directly-owned paying merchants.
-No bonus for recruiting a person; no second-level or recursive compensation.
-No commissions from registration, simulated payments or paid-out-of-band invoices.
-
-A signed Stripe webhook is the ONLY normal channel creating verified receipts.
-For production, Stripe Customer IDs are bound to Loial businesses by platform
-admin after confirmation. No Stripe account is accessed while running tests.
-Legacy sales/payouts are separate and must stay disabled for real money.
+Only a platform administrator who has independently checked a real Wise receipt
+may credit a business. No API-driven transfers and no simulated payments.
+Only the direct recruiter earns a one-time EUR 10 bonus per new paying business.
+Subsequent paid months reward only the ambassador who brought that business.
+Legacy Stripe webhook is disabled.
 """
 import hashlib
 import hmac
@@ -96,6 +90,14 @@ class AmbassadorSettlement(RevenueBase):
     paid_reference=Column(String(110),nullable=False,unique=True)
     paid_at=Column(String(40),nullable=False)
     approved_by=Column(String(120),nullable=False)
+
+class WiseReceiptInput(BaseModel):
+    business_id:int=Field(gt=0)
+    wise_reference:str=Field(min_length=8,max_length=110)
+    payment_month:str=Field(pattern=r"^\\d{4}-(0[1-9]|1[0-2])$")
+    paid_amount_eur_cents:int=Field(ge=SUBSCRIPTION_PRICE_EUR_CENTS)
+    confirmed_in_wise:bool=False
+    evidence_note:str=Field(min_length=12,max_length=400)
 
 class MerchantLinkInput(BaseModel):
     business_id:int=Field(gt=0)
@@ -311,6 +313,81 @@ def apply_verified_invoice(db,invoice,Agent,Business):
     return {"invoice_id":record.id,"eligible":True,"kind":kind,
             "activation":activation,"pending_commission_cents":credited}
 
+def apply_verified_wise_receipt(db, business, Agent, reference, period,
+                                gross_cents, evidence_note):
+    """Admin-reconciled Wise receipt. Caller owns the DB transaction.
+
+    The Wise reference must correspond to one genuine transfer verified by the
+    admin. Never call from untrusted customer-facing UI. Immutable activation:
+    a business only ever earns one first-payment bonus.
+    """
+    reference=(reference or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._ /:-]{7,109}",reference):
+        raise ValueError("Referinta Wise invalida")
+    try:
+        year, month=map(int,period.split("-"))
+        datetime(year,month,1)
+    except (ValueError,AttributeError):
+        raise ValueError("Luna incasarii invalida")
+    if type(gross_cents) is not int or gross_cents<SUBSCRIPTION_PRICE_EUR_CENTS:
+        raise ValueError("Suma incasata sub pretul abonamentului")
+    if not evidence_note or len(evidence_note.strip())<12:
+        raise ValueError("Dovada reconcilierii este obligatorie")
+    receipt_id="wise_"+hashlib.sha256(reference.casefold().encode()).hexdigest()
+    if db.query(PaidMerchantInvoice).filter(
+        PaidMerchantInvoice.external_invoice_id==receipt_id).first():
+        raise ValueError("Aceasta referinta Wise a fost deja folosita")
+    if db.query(PaidMerchantInvoice).filter(
+        PaidMerchantInvoice.business_id==business.id,
+        PaidMerchantInvoice.period==period,
+        PaidMerchantInvoice.eligible==1).first():
+        raise ValueError("Firma are deja o incasare eligibila in aceasta luna")
+    agent=(db.query(Agent).filter(Agent.id==business.agent_id,
+           Agent.active.is_(True)).first()) if business.agent_id else None
+    # A direct merchant (no ambassador) may still be a paying LOIAL business.
+    ever_paid=db.query(PaidMerchantInvoice).filter(
+        PaidMerchantInvoice.business_id==business.id,
+        PaidMerchantInvoice.eligible==1).count()>0
+    first=not ever_paid
+    now=now_iso()
+    row=PaidMerchantInvoice(
+        external_invoice_id=receipt_id,business_id=business.id,
+        agent_id=agent.id if agent else None,payment_intent_id=None,
+        subscription_id="wise_manually_reconciled",
+        provider_customer_id="wise_business",
+        currency="eur",gross_paid_cents=gross_cents,
+        net_revenue_cents=gross_cents,eligible=1,
+        review_reason="wise_verified_admin:"+evidence_note.strip()[:120],
+        refunded=0,paid_at=now,period=period,created_at=now)
+    db.add(row);db.flush()
+    awards=[]
+    if agent:
+        kind="activation" if first else "recurring"
+        cents=ACTIVATION_EUR_CENTS if first else tier(1)["rate_cents"]
+        db.add(AmbassadorCommission(
+            invoice_id=row.id,agent_id=agent.id,kind=kind,
+            amount_cents=cents,period=period,status="pending",created_at=now))
+        awards.append({"agent_id":agent.id,"kind":kind,"eur":cents/100})
+        if first:
+            edge=db.query(SponsorRelationship).filter(
+                SponsorRelationship.ambassador_id==agent.id).first()
+            if edge and edge.sponsor_id!=agent.id:
+                recruiter=db.query(Agent).filter(
+                    Agent.id==edge.sponsor_id,Agent.active.is_(True)).first()
+                if recruiter:
+                    db.add(AmbassadorCommission(
+                        invoice_id=row.id,agent_id=recruiter.id,
+                        kind="sponsor",amount_cents=SPONSOR_EUR_CENTS,
+                        period=period,status="pending",created_at=now))
+                    awards.append({"agent_id":recruiter.id,
+                                   "kind":"sponsor","eur":10})
+        else:
+            recompute_recurring(db,Agent,period,agent.id)
+    return {"receipt_id":row.id,"first_payment":first,
+            "business_id":business.id,"period":period,"awards":awards,
+            "verified_by_admin":True,"wise_reference":reference}
+
+
 def reverse_invoice(db,invoice):
     """Refund/revocation must not silently reverse money already paid out."""
     if not invoice:return {"ignored":"unknown_invoice"}
@@ -451,6 +528,46 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm):
         try:return simulate(own_new,own_active,
                             friend_ambassadors,new_firms_per_friend)
         except ValueError as e:raise HTTPException(status_code=422,detail=str(e))
+
+    @router.post("/admin/wise/confirm")
+    def confirm_wise_payment(req:WiseReceiptInput,
+                             actor=Depends(admin),db:Session=Depends(session)):
+        if not req.confirmed_in_wise:
+            raise HTTPException(status_code=422,
+                detail="Verifica incasarea reala din extrasul Wise Business")
+        business=db.query(Business).filter(Business.id==req.business_id).first()
+        if not business:
+            raise HTTPException(status_code=404,detail="Firma inexistenta")
+        try:
+            result=apply_verified_wise_receipt(
+                db,business,Agent,req.wise_reference,req.payment_month,
+                req.paid_amount_eur_cents,req.evidence_note)
+            business.plan="probusiness"
+            business.max_customers=999999
+            db.commit()
+        except ValueError as exc:
+            db.rollback()
+            raise HTTPException(status_code=409,detail=str(exc))
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(status_code=409,
+                detail="Incasare Wise deja reconciliata")
+        return {"status":"reconciled","verified_by":actor.email,**result}
+
+    @router.get("/admin/wise/receipts")
+    def wise_receipts(period:Optional[str]=None,actor=Depends(admin),
+                      db:Session=Depends(session)):
+        if period and not re.fullmatch(r"\\d{4}-(0[1-9]|1[0-2])",period):
+            raise HTTPException(status_code=422,detail="Luna invalida")
+        q=db.query(PaidMerchantInvoice).filter(
+            PaidMerchantInvoice.provider_customer_id=="wise_business")
+        if period:q=q.filter(PaidMerchantInvoice.period==period)
+        rows=q.order_by(PaidMerchantInvoice.id.desc()).limit(500).all()
+        return {"items":[{"business_id":r.business_id,
+            "invoice_id":r.id,"month":r.period,
+            "paid_eur":r.gross_paid_cents/100,
+            "status":"refunded" if r.refunded else "confirmed",
+            "verified_at":r.created_at} for r in rows]}
 
     @router.post("/admin/bind")
     def bind(req:MerchantLinkInput,actor=Depends(admin),db:Session=Depends(session)):
