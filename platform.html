@@ -360,7 +360,7 @@
       <div id="adminActivity" aria-live="polite" style="font-size:13px;line-height:1.7"></div>
     </div>
     <div class="card">
-      <h2>1. Firme înscrise & Abonamente Stripe (67 EUR/lună, fără TVA adăugat)</h2>
+      <h2>1. Firme înscrise & planuri LOIAL (67 EUR/lună, fără TVA adăugat)</h2><p style="font-size:13px;color:var(--text-muted)">Accesul ProBusiness acordat manual este gratuit până la retragere și nu generează comisioane. Abonamentele Stripe sunt independente.</p>
       <table>
         <thead>
           <tr><th>Firmă</th><th>Email</th><th>Adusă de</th><th>Clienți</th><th>Plan</th><th>Acțiune</th></tr>
@@ -371,6 +371,14 @@
 
     <div class="card">
       <h2>2. Ambasadori & Plăți Lunare Wise Business</h2>
+      <div style="margin:12px 0">
+        <label for="adminAmbEmail">Desemnează un membru LOIAL ca ambasador (email existent)</label>
+        <input id="adminAmbEmail" type="email" placeholder="Email membru">
+        <button class="btn-secondary" type="button" onclick="inviteExistingAmbassador()">Creează invitația de activare</button>
+        <p id="adminInviteStatus" role="status" style="font-size:13px"></p>
+        <input id="adminInviteLink" type="text" readonly hidden>
+        <button id="adminCopyInvite" class="btn-secondary" type="button" hidden onclick="navigator.clipboard.writeText(document.getElementById('adminInviteLink').value)">Copiază linkul privat</button>
+      </div>
       <button type="button" class="btn-secondary" onclick="downloadCommissionXlsx()">Descarcă raportul Excel al lunii (comisioane / Wise)</button>
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px;">
         Luna 1: <strong>20 EUR</strong> direct + <strong>10 EUR</strong> recrutorului direct, o singură dată • Luna 2+: <strong>5 EUR</strong> (1–25 firme), <strong>10 EUR</strong> Manager (26–50), <strong>15 EUR</strong> Senior (51+).
@@ -887,11 +895,10 @@
         <td>${escapeHtml(b.email)}</td>
         <td>${escapeHtml(b.ambassador_name)}</td>
         <td>${Number(b.customers_count)||0}</td>
-        <td><strong>${escapeHtml((b.plan||'').toUpperCase())}</strong></td>
+        <td><strong>${escapeHtml((b.plan||'').toUpperCase())}</strong>${b.manual_grant?'<br><small>Acces manual gratuit</small>':''}</td>
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" disabled title="Plata si accesul se gestioneaza automat prin Stripe">
-            ${b.plan === 'probusiness' ? 'Abonament ProBusiness' : 'Așteaptă plata Stripe'}
-          </button>
+          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" data-admin-action="manualPlan" data-id="${Number(b.id)}" data-name="${escapeHtml(b.name)}" data-granted="${b.manual_grant?'1':'0'}">${b.manual_grant?'Retrage ProBusiness manual':'Acordă ProBusiness manual'}</button>
+          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" data-admin-action="inviteAmb" data-email="${escapeHtml(b.email)}">Desemnează ambasador</button>
           <button type="button" class="btn-danger" data-admin-action="deleteBiz" data-id="${Number(b.id)}" data-name="${escapeHtml(b.name)}">🗑️ Șterge</button>
         </td>
       </tr>
@@ -928,6 +935,7 @@
           <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" data-admin-action="sendBonus" data-wallet="${escapeHtml(c.wallet_uuid)}" data-name="${escapeHtml(c.name)}">
             🎁 Trimite Bonus
           </button>
+          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" data-admin-action="inviteAmb" data-email="${escapeHtml(c.email||'')}" data-wallet="${escapeHtml(c.wallet_uuid)}">Desemnează ambasador</button>
           <button type="button" class="btn-danger" data-admin-action="deleteCust" data-wallet="${escapeHtml(c.wallet_uuid)}" data-name="${escapeHtml(c.name)}">🗑️</button>
         </td>
       </tr>
@@ -941,12 +949,45 @@
     const id=Number(button.dataset.id);
     const wallet=button.dataset.wallet||'';
     const name=button.dataset.name||'';
-    if(action==='deleteBiz'&&Number.isInteger(id))deleteBiz(id,name);
+    if(action==='manualPlan'&&Number.isInteger(id))setManualPlan(id,name,button.dataset.granted!=='1');
+    else if(action==='inviteAmb')inviteExistingAmbassador(button.dataset.email||'',wallet);
+    else if(action==='deleteBiz'&&Number.isInteger(id))deleteBiz(id,name);
     else if(action==='deleteAmb'&&Number.isInteger(id))deleteAmb(id,name);
     else if(action==='sendBonus'&&wallet)sendManualBonus(wallet,name);
     else if(action==='deleteCust'&&wallet)deleteCust(wallet,name);
   });
 
+  async function setManualPlan(id,name,active){
+    if(!confirm((active?'Acordă acces ProBusiness gratuit firmei ':'Retrage accesul manual pentru ')+name+'? Nicio plată sau comision nu va fi înregistrat.'))return;
+    try{
+      const res=await authorizedFetch('/api/admin/business/'+id+'/manual-plan',{
+        method:'PUT',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({active,reason:active?'Acces gratuit acordat de administrator':'Acces manual retras de administrator'})});
+      const result=await res.json();
+      if(!res.ok)throw Error(result.detail||'Nu s-a putut modifica planul.');
+      await loadSuperAdmin();
+    }catch(e){alert(e.message);}
+  }
+  async function inviteExistingAmbassador(prefill='',wallet=''){
+    const field=document.getElementById('adminAmbEmail');
+    const status=document.getElementById('adminInviteStatus');
+    const link=document.getElementById('adminInviteLink');
+    const copy=document.getElementById('adminCopyInvite');
+    let email=String(prefill||field.value||'').trim();
+    if(wallet&&!prefill){email=prompt('Introdu emailul titularului verificat al acestui card LOIAL:','')||'';}
+    if(!email){status.textContent='Introdu emailul membrului.';return;}
+    if(!confirm('Desemnezi '+email+' ca ambasador? Trimite linkul privat numai titularului verificat.'))return;
+    field.value=email;link.value='';link.hidden=true;copy.hidden=true;
+    try{
+      const res=await authorizedFetch('/api/admin/ambassador/invite',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email,wallet_uuid:wallet||null})});
+      const result=await res.json();
+      if(!res.ok)throw Error(result.detail||'Invitația nu a putut fi creată.');
+      link.value=result.activation_url;link.hidden=false;copy.hidden=false;
+      status.textContent='Invitație valabilă 24 ore. Trimite linkul privat titularului; membrul își stabilește parola.';
+    }catch(e){status.textContent=e.message;}
+  }
   async function downloadCommissionXlsx() {
     const month=document.getElementById('adminMonthBadge').textContent.replace('Luna: ','').trim();
     if(!/^\d{4}-\d{2}$/.test(month)){alert('Lună invalidă');return;}
