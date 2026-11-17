@@ -243,7 +243,7 @@ def recompute_recurring(db,Agent,period,agent_id):
             # path can credit the exact ProBusiness subscription amount.
             from loial_plans import renewal_rate
             plan_code = ("probusiness" if inv.gross_paid_cents == 27000
-                         and inv.subscription_id != "wise_manually_reconciled"
+                         and inv.review_reason == "stripe_verified_probusiness"
                          and inv.net_revenue_cents == 27000
                          else "business")
             entry.amount_cents=renewal_rate(plan_code,distinct)
