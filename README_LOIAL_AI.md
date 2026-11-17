@@ -2,7 +2,7 @@
 
 ## Obiectiv comercial
 Loial este un consultant managerial conversațional prin chat exclusiv text și documente atașate.
-Pachetul Business este gândit pentru 65 EUR/lună, fără TVA adăugat în prezent, cu AI inclus. Activarea facturării și costul real pe firmă necesită validare comercială.
+Pachetul Business este gândit pentru 67 EUR/lună, fără TVA adăugat în prezent, cu AI inclus. Activarea facturării și costul real pe firmă necesită validare comercială.
 Nu trimite SMS/WhatsApp: eventualii furnizori sunt contractați separat de firma client.
 Sistemul este multi-industrie; nu presupune că orice antreprenor vinde produse în magazin.
 
