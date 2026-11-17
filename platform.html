@@ -425,7 +425,9 @@
       button.style.display=active?'none':'inline-block';
       button.disabled=!data.checkout_configured;
       portal.style.display=data.status==='not_started'?'none':'inline-block';
-      hint.textContent=active
+      hint.textContent=data.free_pilot_only
+        ?'LOIAL este disponibil în pilot gratuit. Abonamentele de 67 EUR/lună vor fi activate după configurarea Stripe.'
+        :active
         ?'Abonament activ'+(data.paid_until?' până la '+data.paid_until.slice(0,10):'')+
           (data.subscription.status==='grace_period'?' • perioada de remediere a plății':'')
         :data.checkout_configured
