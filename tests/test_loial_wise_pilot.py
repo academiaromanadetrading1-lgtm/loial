@@ -38,7 +38,7 @@ def env():
     yield db
     db.close()
 
-def credit(db,biz,reference,month="2026-11",amount=6500):
+def credit(db,biz,reference,month="2026-11",amount=6700):
     result=apply_verified_wise_receipt(
         db,db.get(Business,biz),Agent,reference,month,amount,
         "Verified personally in Wise account statement")
@@ -90,7 +90,7 @@ def test_invalid_month_and_amount_rejected(env):
         credit(env,12,"WISE-INV-00000012","2026-13")
     env.rollback()
     with pytest.raises(ValueError):
-        credit(env,12,"WISE-INV-00000012",amount=6499)
+        credit(env,12,"WISE-INV-00000012",amount=6699)
     env.rollback()
 
 def test_tier_boundaries():
