@@ -439,6 +439,44 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                 "idempotency_key":"capped-out-merchant-scan"})
             assert capped_scan.status_code==403,capped_scan.text
             assert capped_scan.json()["detail"]=="LIMIT_REACHED"
+            # Admin-granted ProBusiness has no financial side effects.
+            admin_headers={"Authorization":"Bearer "+admin_token}
+            recruited_id=firm_b.json()["business_id"]
+            manual_url=f"/api/admin/business/{recruited_id}/manual-plan"
+            from loial_revenue_commissions import PaidMerchantInvoice, AmbassadorCommission
+            with main.SessionLocal() as db:
+                before=(db.query(PaidMerchantInvoice).count(),db.query(AmbassadorCommission).count())
+            assert client.put(manual_url,json={"active":True},headers=second_auth).status_code==403
+            grant=client.put(manual_url,json={"active":True},headers=admin_headers)
+            assert grant.status_code==200,grant.text
+            assert grant.json()["access_status"]=="manual_grant"
+            assert client.get("/api/loial-stripe/me",headers=second_auth).json()["subscription"]["active"] is True
+            with main.SessionLocal() as db:
+                assert main.business_can_enroll_new_customers(db,recruited_id)
+                assert db.get(main.BusinessAccount,recruited_id).max_customers==999999
+            assert client.put(manual_url,json={"active":False},headers=admin_headers).status_code==200
+            assert client.get("/api/loial-stripe/me",headers=second_auth).json()["subscription"]["active"] is False
+            with main.SessionLocal() as db:
+                assert not main.business_can_enroll_new_customers(db,recruited_id)
+            invite_url="/api/admin/ambassador/invite"
+            member_email="firm-recruited-by-b@example.invalid"
+            assert client.post(invite_url,json={"email":member_email},headers=second_auth).status_code==403
+            assert client.post(invite_url,json={"email":"no-member@example.invalid"},headers=admin_headers).status_code==404
+            invite=client.post(invite_url,json={"email":member_email},headers=admin_headers)
+            assert invite.status_code==200,invite.text
+            token=invite.json()["activation_url"].split("#activate=")[1]
+            claim=client.post("/api/ambassador/activate-invite",
+                json={"activation_token":token,"password":"new-ambassador-test-password"})
+            assert claim.status_code==200,claim.text
+            assert client.post("/api/ambassador/activate-invite",
+                json={"activation_token":token,"password":"new-ambassador-test-password"}).status_code==400
+            invited_headers={"Authorization":"Bearer "+claim.json()["access_token"]}
+            assert client.get("/api/loial-revenue/ambassador/me",headers=invited_headers).status_code==200
+            assert client.get("/api/my-business",headers=second_auth).status_code==200
+            with main.SessionLocal() as db:
+                assert db.query(PaidMerchantInvoice).count()==before[0]
+                assert db.query(AmbassadorCommission).count()==before[1]
+                assert db.get(main.BusinessAccount,recruited_id).agent_id==ambassador_b["id"]
             # No external provider or recipient data is needed for this scenario.
     finally:
         main.engine.dispose()
