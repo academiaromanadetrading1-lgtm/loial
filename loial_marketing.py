@@ -46,6 +46,16 @@ TEMPLATES = {
     },
 }
 
+def campaign_message(text, product):
+    """Include the selected product without inventing an offer or changing its name."""
+    message = text.strip()
+    product = product.strip()
+    if not product or product.lower() in message.lower():
+        return message
+    suffix = "\n\n" + product if message else product
+    return message[:2000-len(suffix)].rstrip() + suffix if message else suffix
+
+
 class SafeFormat(dict):
     def __missing__(self, key):
         return "{" + key + "}"
