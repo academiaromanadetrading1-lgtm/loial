@@ -1,7 +1,7 @@
 # LOIAL — gates de lansare (17 noiembrie 2026)
 
 ## Decizii comerciale ferme
-- Business: 65 EUR/lună, fără TVA adăugat în prezent.
+- Business: 67 EUR/lună, fără TVA adăugat în prezent.
 - Wise Business: link de plată, fără API pentru pilot; creditarea numai după verificare manuală de către admin.
 - Prima plată reală: 20 EUR ambasadorului care a adus firma + 10 EUR recrutorului direct al acelui ambasador, o singură dată per firmă.
 - Reînnoiri: 5 EUR (1–25), 10 EUR (26–50), 15 EUR (51+) numai pentru ambasadorul care a adus firma și numai în lunile achitate.
@@ -15,7 +15,7 @@
 - Calcul direct + recrutor, recomputare tier la reînnoiri, istoric privat ambasador, feed activitate admin.
 - Export lunar .xlsx pentru comisioane și încasări reconciliate.
 - Link Wise configurabil prin LOIAL_WISE_PAYMENT_URL; butonul rămâne ascuns până la configurare.
-- Prețul public și interfața ajustate la 65 EUR fără TVA adăugat.
+- Prețul public și interfața ajustate la 67 EUR fără TVA adăugat.
 - Endpoint public nesecurizat /setup-admin dezactivat prin PR separat, deja integrat în main.
 
 ## Verificări executate
@@ -25,7 +25,7 @@
 
 ## Blocaje de lansare publică
 1. Linkul de plată Wise Business real, administrat de proprietar; fără el butonul rămâne indisponibil.
-2. Testarea cap-coadă pe un cont Business și două conturi de ambasador, cu tranzacție Wise reală de 65 EUR.
+2. Testarea cap-coadă pe un cont Business și două conturi de ambasador, cu tranzacție Wise reală de 67 EUR.
 3. Valabilitatea abonamentelor, neplata/reînnoirea, anularea și reactivarea trebuie stabilite și testate, nu doar marcați în DB «probusiness» pentru totdeauna.
 4. Verificarea securității pe întregul sistem, inclusiv rotația cheilor istorice, backup/restore DB, rate-limit înscriere și GDPR.
 5. Test PWA pe Android și iPhone: instalare, păstrare token privat, recuperare portofel, scanări, recompense, caching offline.
