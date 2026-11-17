@@ -163,8 +163,8 @@ button.black{background:#111318;color:#ddc48b}
       const list=$('inboxList');list.replaceChildren();
       for(const message of (data.messages||[]).slice(0,12)){
         const item=newEl('article',null,'merchant');item.style.marginTop='8px';
-        item.appendChild(newEl('strong',message.title||'Mesaj Loial'));
-        item.appendChild(newEl('p',message.body||''));
+        item.appendChild(newEl('strong',message.subject||message.title||'Mesaj Loial'));
+        item.appendChild(newEl('p',message.text||message.body||''));
         list.appendChild(item);
       }
       if(!(data.messages||[]).length)list.textContent='Nu ai încă mesaje.';
