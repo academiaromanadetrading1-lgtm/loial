@@ -2932,6 +2932,7 @@ def admin_super_overview(credentials: HTTPAuthorizationCredentials = Depends(sec
 
 @app.post("/api/admin/business/{biz_id}/toggle-pro")
 def admin_toggle_business_pro(biz_id: int, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410, detail="Activarea fara incasare verificata a fost retrasa; foloseste confirmarea Wise.")
     require_platform_admin(credentials, db)
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == biz_id).first()
     if not biz:
