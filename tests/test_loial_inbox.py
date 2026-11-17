@@ -167,14 +167,16 @@ def test_read_is_limited_to_wallet_owner(env):
 
 def test_specific_product_audience_does_not_leak_to_other_merchants(env):
     client, _, _, _, _, tokens, boss, wallet = env
+    from loial_marketing import campaign_message
+    message=campaign_message("Reducere la revizie","Revizie")
     sent=client.post("/api/loial-inbox/send", headers=boss("boss1@example.test"),
-                     json={"subject":"Revizie","text":"Reducere la revizie",
+                     json={"subject":"Revizie","text":message,
                            "audience":"product_buyers","product":"Revizie"})
     assert sent.json()["sent"] == 1
     other=client.get("/api/loial-inbox/me",headers=wallet(tokens[1])).json()
     assert other["messages"] == []
     assert client.post("/api/loial-inbox/send", headers=boss("boss2@example.test"),
-                       json={"subject":"Bolt","text":"Salut","audience":"product_buyers",
+                       json={"subject":"Bolt","text":campaign_message("Salut","Revizie"),"audience":"product_buyers",
                              "product":"Revizie"}).json()["sent"] == 0
 
 def test_service_messages_are_idempotent(env):
@@ -265,3 +267,26 @@ def test_same_device_secret_recovers_after_network_retry(env):
     owner = client.get("/api/loial-inbox/me",
                        headers={"X-Loial-Wallet-Token":device_secret})
     assert owner.status_code==200
+
+
+def test_promotion_exact_preview_and_deadline(env):
+    from loial_marketing import campaign_message
+    client, _, _, _, _, tokens, boss, wallet = env
+    headers=boss("boss1@example.test")
+    payload={"subject":"Oferta","text":"Vino la noi","product":"Revizie","audience":"all","deadline":"2099-12-31"}
+    assert client.post("/api/loial-inbox/send",headers=headers,json=payload).status_code==422
+    payload["text"]=campaign_message(payload["text"],"Revizie","ro",payload["deadline"])
+    assert "În promoție: Revizie." in payload["text"]
+    assert "Valabilă până la 2099-12-31." in payload["text"]
+    assert "Profită de ofertă acum!" in payload["text"]
+    sent=client.post("/api/loial-inbox/send",headers=headers,json=payload)
+    assert sent.status_code==200
+    messages=client.get("/api/loial-inbox/me",headers=wallet(tokens[0])).json()["messages"]
+    assert messages[0]["text"]==payload["text"]
+    assert messages[0]["subject"]==payload["subject"]
+    payload["deadline"]="2000-01-01"
+    assert client.post("/api/loial-inbox/send",headers=headers,json=payload).status_code==422
+    for lang in ("ro","en","de","fr","it","es","nl","pl","hu"):
+        message=campaign_message("x"*2000,"Revizie",lang)
+        assert len(message)<=2000
+        assert campaign_message(message,"Revizie",lang)==message
