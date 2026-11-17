@@ -319,13 +319,20 @@ async def _ask_model_once(system, question, usage, db, picture=None, advanced=Fa
                                      json=payload, headers={"Authorization": "Bearer " + key})
         resp.raise_for_status()
         data = resp.json()
-        response = data["choices"][0]["message"]["content"]
-        spent = data.get("usage") or {}
-        inp, out = int(spent.get("prompt_tokens") or 0), int(spent.get("completion_tokens") or 0)
+        # Account for billed tokens even if the response has no usable text.
+        # Missing/invalid usage is charged conservatively at the admission
+        # estimate, not silently treated as a free request.
+        spent = data.get("usage") if isinstance(data,dict) else None
+        inp, out = estimated_in, max_out
+        if isinstance(spent,dict):
+            reported_in, reported_out = spent.get("prompt_tokens"), spent.get("completion_tokens")
+            if type(reported_in) is int and type(reported_out) is int and reported_in>=0 and reported_out>=0:
+                inp, out = reported_in, reported_out
         usage.input_tokens += inp
         usage.output_tokens += out
         usage.cost_eur += (inp * rates[0] + out * rates[1]) * rates[2] / 1000000
         db.commit()
+        response = data["choices"][0]["message"]["content"]
         result=response.strip() if isinstance(response,str) and response.strip() else None
         if return_finish_reason and result:
             return result,data["choices"][0].get("finish_reason")
