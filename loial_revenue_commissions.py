@@ -121,6 +121,20 @@ class SettlementInput(BaseModel):
     bank_reference:str=Field(min_length=6,max_length=110)
     document_confirmed:bool=False
 
+def payable_commissions(db, period, status, agent_id=None):
+    """Only ledger entries backed by an eligible, non-refunded invoice."""
+    query=db.query(AmbassadorCommission).join(
+        PaidMerchantInvoice,PaidMerchantInvoice.id==AmbassadorCommission.invoice_id
+    ).filter(AmbassadorCommission.period==period,
+             AmbassadorCommission.status==status,
+             PaidMerchantInvoice.eligible==1,
+             PaidMerchantInvoice.refunded==0,
+             PaidMerchantInvoice.period==period)
+    if agent_id is not None:
+        query=query.filter(AmbassadorCommission.agent_id==agent_id)
+    return query
+
+
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
@@ -839,9 +853,7 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm,pass
         if datetime.now(timezone.utc)<first_next+timedelta(days=REWARD_RELEASE_DAYS):
             raise HTTPException(status_code=409,
                 detail="Perioada de verificare a platilor si retururilor nu a expirat")
-        pending=db.query(AmbassadorCommission).filter(
-            AmbassadorCommission.period==period,
-            AmbassadorCommission.status=="pending").all()
+        pending=payable_commissions(db,period,"pending").all()
         for entry in pending:entry.status="approved"
         db.commit()
         return {"approved":len(pending),"period":period,
@@ -857,10 +869,7 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm,pass
         if db.query(AmbassadorSettlement).filter(
             AmbassadorSettlement.paid_reference==ref).first():
             raise HTTPException(status_code=409,detail="Transfer deja inregistrat")
-        entries=db.query(AmbassadorCommission).filter(
-            AmbassadorCommission.agent_id==req.agent_id,
-            AmbassadorCommission.period==req.period,
-            AmbassadorCommission.status=="approved").all()
+        entries=payable_commissions(db,req.period,"approved",req.agent_id).all()
         if not entries:raise HTTPException(status_code=404,detail="Nu exista comisioane aprobate")
         cents=sum(x.amount_cents for x in entries)
         db.add(AmbassadorSettlement(agent_id=req.agent_id,period=req.period,
