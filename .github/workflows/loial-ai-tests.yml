@@ -60,6 +60,19 @@ jobs:
           assert(!all.some(n=>n.tag==='img'||n.tag==='script'));
           assert(all.some(n=>n.tag==='#text'&&n.textContent.includes('<img')));
           assert(all.some(n=>n.className==='chart-fill negative'));
+          const legacy=new Node('div');
+          const oldRows=['Creșterea bonului mediu  +2.028 lei  ██████████','Reducerea risipei           +935 lei  █████','Ajustarea prețului        +1.123 lei  ██████','Ținta de +30%             +3.498 lei  █████████████████'];
+          ctx.renderRich(legacy,fence+'text\n'+oldRows.join('\n')+'\n'+fence);
+          const oldNodes=walk(legacy);
+          assert.equal(oldNodes.filter(n=>n.className==='chart-track').length,4);
+          assert.equal(oldNodes.find(n=>n.className==='chart-fill target').style.width,'100%');
+          assert(oldNodes.some(n=>n.tag==='strong'&&n.textContent===new Intl.NumberFormat('ro').format(2028)+' RON'));
+          assert(!oldNodes.some(n=>n.tag==='pre'));
+          const plain=new Node('div');ctx.renderRich(plain,oldRows.join('\n'));assert(walk(plain).some(n=>n.tag==='figure'));
+          const ambiguous=new Node('div');assert.equal(ctx.legacyChart(ambiguous,'Cost 100 RON ███\nSales 25 EUR █'),false);
+          const roles=new Node('div');
+          assert(ctx.richChart(roles,JSON.stringify({title:'Profit',unit:'RON',points:[{label:'Base',value:100,kind:'baseline'},{label:'Scenario',value:120,kind:'scenario'},{label:'Target',value:130,kind:'target'}]})));
+          assert(walk(roles).some(n=>n.className==='chart-fill baseline'));assert(walk(roles).some(n=>n.className==='chart-fill target'));
           const bad=new Node('div');assert.equal(ctx.richChart(bad,JSON.stringify({title:'bad',unit:'RON',points:[{label:'x',value:'<bad>'},{label:'y',value:10}]})),false);
           NODE
       - name: Validate PWA helper, service worker and manifest
