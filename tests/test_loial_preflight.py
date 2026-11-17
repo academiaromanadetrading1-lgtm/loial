@@ -62,3 +62,17 @@ def test_preflight_does_not_return_private_keys():
     output=json.dumps(preflight(env,"production"))
     assert private not in output
     assert "FAKE" not in output
+
+def test_free_only_public_pilot_can_prepare_without_stripe_but_not_with_partial_keys():
+    env=sample_env()
+    for key in ("LOIAL_STRIPE_SECRET_KEY","LOIAL_STRIPE_WEBHOOK_SECRET",
+                "LOIAL_STRIPE_PRICE_ID"):
+        env.pop(key)
+    env["LOIAL_PUBLIC_FREE_PILOT"]="1"
+    free=preflight(env,"production")
+    assert free["automatic_checks_passed"]
+    assert "loial_stripe_live_key" not in free["blockers"]
+    assert free["safe_to_deploy_automatically"] is False
+    env["LOIAL_STRIPE_PRICE_ID"]="price_accidental_partial"
+    partial=preflight(env,"production")
+    assert "free_pilot_stripe_disabled" in partial["blockers"]
