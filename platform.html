@@ -432,8 +432,10 @@
       const active=!!data.subscription.active;
       button.style.display=active?'none':'inline-block';
       button.disabled=!data.checkout_configured;
-      portal.style.display=data.status==='not_started'?'none':'inline-block';
-      hint.textContent=data.free_pilot_only
+      portal.style.display=(!data.checkout_configured||data.status==='not_started')?'none':'inline-block';
+      hint.textContent=data.subscription.status==='manual_grant'
+        ?'Acces ProBusiness gratuit acordat de administrator, până la retragere.'
+        :data.free_pilot_only&&!active
         ?'LOIAL este disponibil în pilot gratuit. Abonamentele de 67 EUR/lună vor fi activate după configurarea Stripe.'
         :active
         ?'Abonament activ'+(data.paid_until?' până la '+data.paid_until.slice(0,10):'')+
@@ -441,7 +443,7 @@
         :data.checkout_configured
         ?'Abonamentul este inactiv. Confirmarea plății se face automat prin Stripe.'
         :'Stripe LOIAL nu este configurat încă; plata nu poate fi inițiată.';
-      document.getElementById('wiseReference').textContent='Status: '+data.status;
+      document.getElementById('wiseReference').textContent='Status: '+data.subscription.status;
     }catch(error){hint.textContent=error.message;}
   }
   async function stripeLink(path){
