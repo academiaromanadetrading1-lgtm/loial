@@ -250,6 +250,10 @@ def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent
 
     @route.post("/send")
     def send_direct(req: DirectMessage, biz=Depends(owner), db: Session = Depends(db_session)):
+        from loial_marketing import campaign_message
+        # Product inclusion must be approved in the exact text shown in the UI.
+        if campaign_message(req.text, req.product) != req.text.strip():
+            raise HTTPException(status_code=422, detail="Include produsul sau serviciul in mesaj si verifica previzualizarea inainte de trimitere.")
         event = "direct:" + req.idempotency_key if req.idempotency_key else None
         if event:
             previous = db.query(InboxEntry).filter(
