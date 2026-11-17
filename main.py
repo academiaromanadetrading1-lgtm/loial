@@ -2890,6 +2890,10 @@ def enroll_ambassador(request: Request, req: AmbassadorEnrollRequest, db: Sessio
         raise HTTPException(status_code=400, detail="Email obligatoriu pentru contul de Ambasador")
     if len(req.password) < 10:
         raise HTTPException(status_code=422, detail="Parola necesita minimum 10 caractere")
+    from loial_manual_admin import AmbassadorInvite
+    invite=db.get(AmbassadorInvite,email)
+    if invite and not invite.used_at:
+        raise HTTPException(409,"Pentru acest cont exista o invitatie individuala. Solicita administratorului linkul de activare.")
     agent = db.query(SalesAgent).filter(SalesAgent.email == email).first()
     if agent:
         raise HTTPException(status_code=409, detail="Acest email are deja un cont de ambasador. Foloseste autentificarea contului.")
@@ -3127,7 +3131,9 @@ def admin_invite_ambassador(req:ManualAmbassadorRequest,
         if not customer:raise HTTPException(404,"Card negasit")
         if customer.email and customer.email.strip().lower()!=email:
             raise HTTPException(422,"Emailul nu coincide cu cel al titularului")
-    if biz:
+    if req.wallet_uuid and customer:
+        name,source=customer.name,"customer:"+str(customer.id)
+    elif biz:
         name,source=biz.name,"business:"+str(biz.id)
     elif user:
         name,source=user.name,"user:"+str(user.id)
