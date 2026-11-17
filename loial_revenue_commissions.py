@@ -581,6 +581,7 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm):
     @router.post("/admin/wise/confirm")
     def confirm_wise_payment(req:WiseReceiptInput,
                              actor=Depends(admin),db:Session=Depends(session)):
+        raise HTTPException(status_code=410,detail="Abonamentele se incaseaza exclusiv prin Stripe.")
         if not req.confirmed_in_wise:
             raise HTTPException(status_code=422,
                 detail="Verifica incasarea reala din extrasul Wise Business")
