@@ -49,3 +49,6 @@ Nu substitui o copie locală din același volum unei copii externe. Păstrează 
 
 ## Stare
 CI PASS. Backup de producție, restore, rotație, verificare dispozitive și publicare încă neconfirmate. Nicio lansare sau execuție plătită inițiată prin acest document.
+
+## Dovada operațională — 17.11.2026
+Backup SQLite creat din consola Railway pe volumul activ: /data/backups/loial-20261117-103627.db, 851968 bytes, permisiuni 0600. Operatorul a furnizat captură cu mesajul Verified backup. Restaurarea într-un director temporar a returnat RESTORE TEST: PASS și integrity ok; baza activă nu a fost suprascrisă. Aceasta verifică integritatea copiei, nu recuperarea integrală a serviciului. Copia externă criptată, rotația cheilor și validarea dispozitivelor rămân neconfirmate. Railway read-only confirmă serviciul online și nicio modificare staged. Commitul de deploy rămâne eadbfb2d11f14686d803fef9e87184ef87754c74. Nu activa Stripe și nu publica fără aprobarea specifică și verificarea condițiilor de mai sus.
