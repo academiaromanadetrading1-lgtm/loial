@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 BillingBase=declarative_base()
 GRACE_DAYS=3
 PRICE_CENTS=6700
+from loial_plans import PLANS, plan_for_amount, renewal_rate, public_catalog
 
 class LoialSubscription(BillingBase):
     __tablename__="loial_stripe_subscriptions"
@@ -84,15 +85,16 @@ def invoice_period(invoice):
             return start.strftime("%Y-%m"),end
     return None,None
 
-def invoice_is_eligible(invoice,price_id):
+def invoice_is_eligible(invoice,price_id,expected_cents=PRICE_CENTS):
     if not price_id or invoice.get("status")!="paid" or invoice.get("paid") is not True:
         return False
     if invoice.get("paid_out_of_band") or invoice.get("currency")!="eur":
         return False
-    if invoice.get("amount_paid")!=PRICE_CENTS:
+    if invoice.get("amount_paid")!=expected_cents:
         return False
     items=((invoice.get("lines") or {}).get("data") or [])
     if len(items)!=1:return False
+    if items[0].get("quantity",1)!=1:return False
     price=items[0].get("price") or {}
     pricing=items[0].get("pricing") or {}
     return (price.get("id")==price_id or
@@ -100,10 +102,11 @@ def invoice_is_eligible(invoice,price_id):
 
 def process_paid_invoice(db, invoice, state, business, Agent, price_id,
                          PaidMerchantInvoice, AmbassadorCommission,
-                         SponsorRelationship, tier, recompute_recurring):
-    if not invoice_is_eligible(invoice,price_id):
+                         SponsorRelationship, tier, recompute_recurring, expected_cents=PRICE_CENTS):
+    if not invoice_is_eligible(invoice,price_id,expected_cents):
         return {"review":"invoice_not_eligible"}
-    if not state or state.business_id!=business.id:
+    plan=plan_for_amount(expected_cents)
+    if not state or not business or state.business_id!=business.id:
         return {"review":"subscription_not_bound"}
     invoice_id=invoice.get("id")
     if not isinstance(invoice_id,str) or not invoice_id.startswith("in_"):
@@ -136,15 +139,15 @@ def process_paid_invoice(db, invoice, state, business, Agent, price_id,
         agent_id=agent.id if agent else None,
         payment_intent_id=None,subscription_id=state.subscription_id,
         provider_customer_id=state.customer_id or "",
-        currency="eur",gross_paid_cents=PRICE_CENTS,
-        net_revenue_cents=PRICE_CENTS,eligible=1,
+        currency="eur",gross_paid_cents=expected_cents,
+        net_revenue_cents=expected_cents,eligible=1,
         review_reason="",refunded=0,
         paid_at=stamp,period=period,created_at=stamp)
     db.add(row);db.flush()
     first=prior==0
     if agent:
         kind="activation" if first else "recurring"
-        cents=2000 if first else tier(1)["rate_cents"]
+        cents=plan.activation_cents if first else renewal_rate(plan.code,1)
         db.add(AmbassadorCommission(invoice_id=row.id,agent_id=agent.id,
             kind=kind,amount_cents=cents,period=period,status="pending",
             created_at=stamp))
@@ -157,7 +160,7 @@ def process_paid_invoice(db, invoice, state, business, Agent, price_id,
                 if sponsor:
                     db.add(AmbassadorCommission(invoice_id=row.id,
                         agent_id=sponsor.id,kind="sponsor",
-                        amount_cents=1000,period=period,status="pending",
+                        amount_cents=plan.sponsor_cents,period=period,status="pending",
                         created_at=stamp))
         recompute_recurring(db,Agent,period,agent.id)
     existing_paid=parse_utc(state.paid_until)
@@ -222,26 +225,35 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
             ("sk_test_","sk_live_")) and
             os.getenv("LOIAL_STRIPE_PRICE_ID","").startswith("price_") and
             bool(os.getenv("LOIAL_STRIPE_WEBHOOK_SECRET","")))
-        return {"plan_price_eur":67,"free_pilot_only":free_pilot,
+        return {"plan_price_eur":67,"plans":public_catalog(),"free_pilot_only":free_pilot,
                 "subscription":effective_entitlements(db,biz.id,state),
                 "status":state.status if state else "not_started",
                 "paid_until":state.paid_until if state else None,
                 "checkout_configured":configured}
 
     @api.post("/checkout")
-    def checkout(biz=Depends(own_business),db=Depends(session)):
+    def checkout(plan: str="business",biz=Depends(own_business),db=Depends(session)):
         if os.getenv("LOIAL_PUBLIC_FREE_PILOT","0")=="1":
             raise HTTPException(status_code=503,
                 detail="Programul LOIAL este momentan in pilot gratuit; abonamentele vor fi disponibile ulterior")
         key=os.getenv("LOIAL_STRIPE_SECRET_KEY","")
-        price=os.getenv("LOIAL_STRIPE_PRICE_ID","")
+        if plan not in ("business","probusiness"):
+            raise HTTPException(422,"Plan invalid")
+        # Expansion is explicitly gated until multi-location integration is validated.
+        if plan=="probusiness" and os.getenv("LOIAL_MULTILOCATION_READY","0")!="1":
+            raise HTTPException(503,"ProBusiness este in pregatire")
+        price=os.getenv("LOIAL_STRIPE_PROBUSINESS_PRICE_ID" if plan=="probusiness" else "LOIAL_STRIPE_PRICE_ID","")
+        expected_cents=PLANS[plan].price_cents
+        other=os.getenv("LOIAL_STRIPE_PRICE_ID" if plan=="probusiness" else "LOIAL_STRIPE_PROBUSINESS_PRICE_ID","")
+        if price and price==other:
+            raise HTTPException(503,"Configuratie Stripe ambigua")
         origin=os.getenv("LOIAL_PUBLIC_ORIGIN","https://loial.space").rstrip("/")
         if not key.startswith(("sk_test_","sk_live_")) or not price.startswith("price_"):
             raise HTTPException(status_code=503,detail="Stripe LOIAL neconfigurat")
         stripe.api_key=key
         try:
             stripe_price=stripe.Price.retrieve(price)
-            if stripe_price.get("unit_amount")!=PRICE_CENTS or \
+            if stripe_price.get("unit_amount")!=expected_cents or \
                stripe_price.get("currency")!="eur" or \
                (stripe_price.get("recurring") or {}).get("interval")!="month":
                 raise HTTPException(status_code=503,detail="Pret Stripe incorect pentru LOIAL")
@@ -384,9 +396,17 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
                 db.commit()
                 return {"status":"recorded",**outcome}
             business=db.query(Business).filter(Business.id==state.business_id).first()
+            business_price=os.getenv("LOIAL_STRIPE_PRICE_ID","")
+            pro_price=os.getenv("LOIAL_STRIPE_PROBUSINESS_PRICE_ID","")
+            if business_price and business_price==pro_price:
+                raise HTTPException(503,"Configuratie Stripe ambigua")
+            if invoice_is_eligible(obj,pro_price,27000) and os.getenv("LOIAL_MULTILOCATION_READY","0")=="1":
+                price,amount=pro_price,27000
+            else:
+                price,amount=business_price,6700
             outcome=process_paid_invoice(db,obj,state,business,Agent,
-                os.getenv("LOIAL_STRIPE_PRICE_ID",""),PaidMerchantInvoice,
-                AmbassadorCommission,SponsorRelationship,tier,recompute_recurring)
+                price,PaidMerchantInvoice,
+                AmbassadorCommission,SponsorRelationship,tier,recompute_recurring,amount)
         elif typ in ("credit_note.created","charge.dispute.created"):
             # Never continue payout on disputed/credited invoices. Partial
             # credits require manual review; no automatic money clawbacks.
