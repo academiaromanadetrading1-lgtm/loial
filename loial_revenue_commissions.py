@@ -239,7 +239,14 @@ def recompute_recurring(db,Agent,period,agent_id):
             AmbassadorCommission.agent_id==agent_id,
             AmbassadorCommission.kind=="recurring",
             AmbassadorCommission.status=="pending").all():
-            entry.amount_cents=rate
+            # Legacy invoices remain Business; only the verified Stripe billing
+            # path can credit the exact ProBusiness subscription amount.
+            from loial_plans import renewal_rate
+            plan_code = ("probusiness" if inv.gross_paid_cents == 27000
+                         and inv.subscription_id != "wise_manually_reconciled"
+                         and inv.net_revenue_cents == 27000
+                         else "business")
+            entry.amount_cents=renewal_rate(plan_code,distinct)
     return {"active_firms":distinct,"tier":tier(distinct)["rank"],
             "recurring_rate_cents":rate}
 
