@@ -568,6 +568,11 @@
     document.getElementById('businessOwnerSection').style.display = 'none';
     document.getElementById('superAdminSection').style.display = 'block';
     loadSuperAdmin();
+    // New registrations, recruited ambassadors and Stripe-verified payments
+    // appear without a manual reload while the administrator is online.
+    setInterval(()=>{
+      if(!document.hidden)loadSuperAdmin();
+    },60000);
   } else {
     if (!bizId) {
       logout();
