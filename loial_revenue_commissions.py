@@ -435,6 +435,7 @@ def summary(db,Agent,period=None):
             "verified_gross_eur":round(sum(
                 x.gross_paid_cents for x in db.query(PaidMerchantInvoice).filter(
                     PaidMerchantInvoice.currency=="eur",
+                    PaidMerchantInvoice.eligible==1,
                     PaidMerchantInvoice.refunded==0,
                     *([PaidMerchantInvoice.period==period] if period else [])).all())/100,2),
             "note":"Fara retineri, comisioane de procesare, TVA sau plati simulate; payout doar dupa verificare."}
@@ -740,7 +741,7 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm,pass
     @router.get("/admin/summary")
     def admin_summary(period:Optional[str]=None,actor=Depends(admin),
                       db:Session=Depends(session)):
-        if period and not re.fullmatch(r"\d{4}-\d{2}",period):
+        if period and not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])",period):
             raise HTTPException(status_code=422,detail="Luna trebuie sa fie YYYY-MM")
         return summary(db,Agent,period)
 
@@ -807,7 +808,7 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm,pass
     @router.post("/admin/approve/{period}")
     def approve_period(period:str,actor=Depends(admin),
                        db:Session=Depends(session)):
-        if not re.fullmatch(r"\d{4}-\d{2}",period):
+        if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])",period):
             raise HTTPException(status_code=422,detail="Perioada invalida")
         try:
             year,month=map(int,period.split("-"))
