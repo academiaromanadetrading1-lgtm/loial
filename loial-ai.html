@@ -43,7 +43,7 @@ header{padding:14px max(24px,calc((100% - 1392px)/2));flex-wrap:wrap}
 .chat-card .bubble{max-width:92%}.chat-card .compose{padding-top:8px;border-top:1px solid var(--line);align-items:end}.compose textarea{min-width:0}
 .profile-details>summary{font-weight:800;font-size:16px;cursor:pointer;margin-bottom:10px}.profile-content #details{min-height:112px}
 .tool-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}.tool-grid.single{grid-template-columns:minmax(0,1fr);max-width:980px;margin:0 auto}
-.tool-grid .panel{margin:0;padding:24px}.tool-grid .report{max-height:480px}.tool-grid .file-list{max-height:340px}.file-row{overflow-wrap:anywhere}.file-row span{min-width:0;flex:1}.tool-grid input[type=file]{max-width:100%}
+.tool-grid .panel{margin:0;padding:24px}.tool-grid .report{max-height:480px}.tool-grid .file-list{max-height:340px}.file-row{overflow-wrap:anywhere}.file-row{flex-wrap:wrap}.file-row span{min-width:0;flex:1 1 160px}.tool-grid input[type=file]{max-width:100%}
 #documentPreview{overflow-wrap:anywhere;background:#f3f7f4;padding:14px;border:1px solid var(--line);border-radius:10px}
 @media(max-width:1050px){.workspace-nav{grid-template-columns:repeat(3,minmax(0,1fr))}.chat-card{height:calc(100dvh - 230px);min-height:500px}.conversation-layout{grid-template-columns:240px minmax(0,1fr)}}
 @media(max-width:760px){.layout.workspace{padding:0 10px;margin:10px auto 20px}.workspace-nav{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:5px}.workspace-tab{flex-direction:column;gap:2px;font-size:11px;line-height:1.25;min-height:56px;padding:5px}.conversation-layout,.tool-grid{display:flex;flex-direction:column}.profile-card,.chat-card,.tool-grid .panel{width:100%;min-width:0}.profile-card{padding:12px 14px}.profile-details>summary{margin:0}.profile-content{padding-top:12px}.chat-card{height:calc(100dvh - 265px);min-height:400px;padding:14px}.tool-grid .panel{padding:16px}header{padding:12px 10px;gap:8px}.brand{font-size:14px}.back{font-size:12px}.chat-card textarea{font-size:16px}.compose button{min-width:42px;padding:10px}.chat-card .bubble{font-size:14px;max-width:95%}}
@@ -55,6 +55,7 @@ header{padding:14px max(24px,calc((100% - 1392px)/2));flex-wrap:wrap}
 <header><a class="brand" href="/platform.html">◉ LOIAL • AI BUSINESS</a><a class="back" href="/platform.html">← Panou firmă</a></header>
 <main class="layout workspace">
 <nav class="workspace-nav" aria-label="Instrumente LOIAL"><button class="workspace-tab active" type="button" data-workspace="chat" aria-pressed="true"><span aria-hidden="true">◉</span><span>Conversație</span></button><button class="workspace-tab" type="button" data-workspace="documents" aria-pressed="false"><span aria-hidden="true">▤</span><span>Documente și facturi</span></button><button class="workspace-tab" type="button" data-workspace="sales" aria-pressed="false"><span aria-hidden="true">▧</span><span>Bonuri și vânzări</span></button><button class="workspace-tab" type="button" data-workspace="reports" aria-pressed="false"><span aria-hidden="true">▥</span><span>Rapoarte și indicatori</span></button><button class="workspace-tab" type="button" data-workspace="customers" aria-pressed="false"><span aria-hidden="true">◎</span><span>Clienți și exporturi</span></button><button class="workspace-tab" type="button" data-workspace="messages" aria-pressed="false"><span aria-hidden="true">✉</span><span>Campanii și mesaje</span></button></nav>
+<div id="workspaceNotice" class="status" role="status" aria-live="polite" hidden></div>
 <section class="workspace-view active" id="view-chat" data-view="chat" ><div class="conversation-layout"><aside class="card profile-card" id="profileCard">
 <details class="profile-details" id="profileDetails" open><summary>Consultantul afacerii tale</summary><div class="profile-content">
 <p>Loial îți explică vânzările, costurile, clienții și oportunitățile, adaptat activității tale.</p>
@@ -232,6 +233,7 @@ function showWorkspace(key,updateHash=true){
   if(!['chat','documents','sales','reports','customers','messages'].includes(key))key='chat';
   for(const panel of document.querySelectorAll('[data-view]')){panel.hidden=panel.dataset.view!==key;panel.classList.toggle('active',!panel.hidden);}
   for(const tab of document.querySelectorAll('[data-workspace]')){const active=tab.dataset.workspace===key;tab.classList.toggle('active',active);tab.setAttribute('aria-pressed',String(active));}
+  const notice=$('workspaceNotice');if(notice)notice.hidden=true;
   if(updateHash)history.replaceState(null,'',location.pathname+location.search+(key==='chat'?'':'#'+key));
   if(key==='chat')$('chat').scrollTop=$('chat').scrollHeight;
 }
@@ -268,7 +270,7 @@ function renderMetricChoices(){
     const o=document.createElement('option');o.value=key;o.textContent=name;$('metricName').appendChild(o);
   });
 }
-function status(message,error=false){$('connection').textContent=message;$('connection').classList.toggle('error',error);}
+function status(message,error=false){$('connection').textContent=message;$('connection').classList.toggle('error',error);const n=$('workspaceNotice');if(n){n.hidden=!error&&!document.querySelector('.workspace-view:not([hidden]):not(#view-chat)');n.textContent=message;n.classList.toggle('error',error);}}
 function setAIStatus(value){aiStatus=value;const mode=$('aiMode');mode.textContent=tr(value==='configured'?'AI configurat':value==='budget_exhausted'?'Buget AI epuizat':value==='provider_unavailable'?'AI temporar indisponibil':'AI neconectat');mode.classList.toggle('online',value==='configured');}
 function chatFeedback(message,error=false){const b=$('chatFeedback');b.textContent=message;b.hidden=!message;b.classList.toggle('error',error);}
 function chooseDocument(id,name){selectedDocument=id;$('selectedDocumentName').textContent=tr('Document selectat')+': '+name;$('selectedDocument').hidden=false;showWorkspace('chat');$('message').focus();}
@@ -286,7 +288,7 @@ function bubble(role,text){
 }
 function setTopic(key,label){currentTopic=key;
   document.querySelectorAll('.topic').forEach(x=>x.classList.toggle('active',x.dataset.topic===key));
-  $('message').value=''; $('message').placeholder=tr('Scrie întrebarea ta...');
+  if(!sending&&!$('message').value.trim())$('message').value=tr(label); $('message').placeholder=tr('Scrie întrebarea ta...');
   $('message').focus();
 }
 async function init(){
