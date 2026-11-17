@@ -62,6 +62,17 @@ def entitlements(state,clock=None):
         return {"active":True,"status":"grace_period","grace_until":state.grace_until}
     return {"active":False,"status":"expired_or_unpaid"}
 
+def effective_entitlements(db,business_id,state=None):
+    from loial_manual_admin import manual_grant
+    if state is None:
+        state=db.get(LoialSubscription,business_id)
+    paid=entitlements(state)
+    if paid["active"]:
+        return paid
+    if manual_grant(db,business_id):
+        return {"active":True,"status":"manual_grant"}
+    return paid
+
 def invoice_period(invoice):
     """Use billed service period, not webhook delivery date, for deduplication."""
     lines=((invoice.get("lines") or {}).get("data") or [])
@@ -210,7 +221,7 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
             os.getenv("LOIAL_STRIPE_PRICE_ID","").startswith("price_") and
             bool(os.getenv("LOIAL_STRIPE_WEBHOOK_SECRET","")))
         return {"plan_price_eur":67,"free_pilot_only":free_pilot,
-                "subscription":entitlements(state),
+                "subscription":effective_entitlements(db,biz.id,state),
                 "status":state.status if state else "not_started",
                 "paid_until":state.paid_until if state else None,
                 "checkout_configured":configured}
@@ -442,10 +453,12 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
                             if biz:
                                 state=db.query(LoialSubscription).filter(
                                     LoialSubscription.business_id==biz.id).first()
-                                access=entitlements(state)
-                                if not access["active"] and biz.plan=="probusiness":
-                                    biz.plan="free"
-                                    biz.max_customers=50
+                                access=effective_entitlements(db,biz.id,state)
+                                desired="probusiness" if access["active"] else "free"
+                                cap=999999 if access["active"] else 50
+                                if biz.plan!=desired or biz.max_customers!=cap:
+                                    biz.plan=desired
+                                    biz.max_customers=cap
                                     db.commit()
                                 if premium and not access["active"]:
                                     return JSONResponse(status_code=402,content={
