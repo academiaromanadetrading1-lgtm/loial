@@ -351,6 +351,16 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                 "subject":"spam","body":"spam"},headers=user_headers).status_code==410
             assert client.put("/pricing/pro",params={"base_price":1},
                 headers=user_headers).status_code==410
+            # Obsolete global CRM routes may not disclose or modify cross-firm
+            # customer records, fabricate stamp awards or send arbitrary messages.
+            for legacy in ("/customers","/stats","/locations"):
+                assert client.get(legacy,headers=user_headers).status_code==410
+            assert client.post("/customers",json={"name":"Forged"},
+                headers=user_headers).status_code in (410,422)
+            assert client.post("/stamp",json={"customer_id":target},
+                headers=user_headers).status_code in (410,422)
+            assert client.post("/notify",json={"customer_id":target,"message":"spam"},
+                headers=user_headers).status_code in (410,422)
             # Legacy analytics routes must not leak merchant data or permit
             # unauthenticated fabricated purchases and cancellations.
             assert client.get("/analytics/business/"+str(business_id)).status_code==410
