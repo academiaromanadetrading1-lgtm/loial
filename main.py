@@ -2914,19 +2914,18 @@ def admin_super_overview(credentials: HTTPAuthorizationCredentials = Depends(sec
             "message":ambassador_names.get(link.sponsor_id,"Ambasador")+
                       " a recrutat "+ambassador_names.get(link.ambassador_id,"un ambasador")})
     verified=db.query(PaidMerchantInvoice).filter(
-        PaidMerchantInvoice.provider_customer_id=="wise_business",
         PaidMerchantInvoice.eligible==1).order_by(
         PaidMerchantInvoice.id.desc()).limit(200).all()
     by_id={b.id:b.name for b in businesses}
     for payment in verified:
-        activity.append({"type":"wise_payment_confirmed",
+        activity.append({"type":"subscription_payment_confirmed",
             "date":payment.created_at or "",
             "business_id":payment.business_id,
             "business":by_id.get(payment.business_id,"Firma"),
             "agent_id":payment.agent_id,
             "amount_eur":payment.gross_paid_cents/100,
             "month":payment.period,
-            "message":"Plata abonamentului a fost verificata in Wise"})
+            "message":"Plata abonamentului a fost confirmata"})
     activity.sort(key=lambda item:item["date"],reverse=True)
     activity=activity[:35]
 
