@@ -145,7 +145,7 @@
         <p id="rolesStatus" class="role-caption">Se verifică identitățile disponibile...</p>
         <div class="profile-actions">
           <button id="rolesAppleWallet" class="btn-secondary" onclick="saveAmbassadorWallet('apple')" disabled style="display:none">Apple Wallet</button>
-          <button id="rolesGoogleWallet" class="btn-secondary" onclick="saveAmbassadorWallet('google')" disabled>Google Wallet</button>
+          <button id="rolesGoogleWallet" class="btn-secondary" onclick="saveAmbassadorWallet('google')" disabled style="display:none">Google Wallet</button>
         </div>
       </div>
       <div>
@@ -480,7 +480,7 @@
       document.getElementById('rolesGoogleWallet').disabled=
         !(verifiedAmbassador&&premiumWalletReady.google_ambassador_ready);
       if(!premiumWalletReady.apple_ready&&!premiumWalletReady.google_ambassador_ready)
-        document.getElementById('rolesStatus').textContent+=' Google Wallet va fi disponibil după configurarea emitentului Loial.';
+        document.getElementById('rolesStatus').textContent+=' Cardul LOIAL se poate salva direct pe ecranul telefonului.';
     }catch(e){document.getElementById('rolesStatus').textContent=e.message;}
   }
 
@@ -834,8 +834,8 @@
       const ready=google.issuer_credentials_present &&
         google.loyalty_class_id_configured;
       notice.textContent=ready
-        ?'Emitentul și clasa Google sunt configurate tehnic. Verifică aprobarea pentru publicare în Google Wallet Console.'
-        :'Emiterea Google Wallet nu este încă pregătită: configurează emitentul și clasa de fidelitate. Codul funcționează fără cost suplimentar de dezvoltare.';
+        ?'Cardul PWA LOIAL este disponibil fără aprobare Google Wallet.'
+         :'Cardul PWA LOIAL funcționează independent de Google Wallet.';
     }catch(error){notice.textContent=error.message;}
   }
 
