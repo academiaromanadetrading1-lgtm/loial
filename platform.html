@@ -327,7 +327,7 @@
 
     <div class="card" id="googlePilotPanel">
       <span class="step-tag">PILOT PRIMELE 100 DE FIRME</span>
-      <h2>Google Wallet · Lansare fără Apple Developer</h2>
+      <h2>Card LOIAL pe ecranul telefonului · Fără Google/Apple Wallet</h2>
       <p style="font-size:13px;color:var(--text-muted)">
         Firmele active sunt cele cu cel puțin o ștampilă acordată în Loial. Înscrierile singure nu sunt considerate activitate.
       </p>
@@ -339,13 +339,13 @@
       <div style="height:9px;border-radius:999px;background:#e4e9e5;overflow:hidden">
         <div id="pilotProgress" style="height:100%;width:0;background:#2d6a4f;border-radius:999px"></div>
       </div>
-      <p id="pilotIssuerStatus" style="font-size:12px;color:#536b5b;margin:12px 0">Verificare emitent Google...</p>
+      <p id="pilotIssuerStatus" style="font-size:12px;color:#536b5b;margin:12px 0">Cardul PWA LOIAL nu necesită Google Wallet.</p>
       <button class="btn-secondary" type="button" onclick="loadGooglePilot()">Actualizează stadiul pilotului</button>
-      <p style="font-size:11px;color:#607467">Apple Wallet rămâne amânat. Prezența credențialelor Google nu confirmă aprobarea publicării.</p>
+      <p style="font-size:11px;color:#607467">Google Wallet și Apple Wallet nu sunt necesare pentru lansarea PWA.</p>
     </div>
 
     <div class="card">
-      <h2>1. Firme înscrise & Activare ProBusiness (65 EUR + TVA)</h2>
+      <h2>1. Firme înscrise & Confirmare Wise (65 EUR/lună, fără TVA adăugat)</h2>
       <table>
         <thead>
           <tr><th>Firmă</th><th>Email</th><th>Adusă de</th><th>Clienți</th><th>Plan</th><th>Acțiune</th></tr>
@@ -357,7 +357,7 @@
     <div class="card">
       <h2>2. Ambasadori & Plăți Lunare Wise Business</h2>
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px;">
-        Luna 1: <strong>20 EUR</strong>/firmă nouă • Luna 2+: <strong>5 EUR</strong> (1–25 firme), <strong>10 EUR</strong> Manager (26–50), <strong>15 EUR</strong> Senior (51+).
+        Luna 1: <strong>20 EUR</strong> direct + <strong>10 EUR</strong> recrutorului direct, o singură dată • Luna 2+: <strong>5 EUR</strong> (1–25 firme), <strong>10 EUR</strong> Manager (26–50), <strong>15 EUR</strong> Senior (51+).
       </p>
       <table>
         <thead>
@@ -819,8 +819,8 @@
         <td>${Number(b.customers_count)||0}</td>
         <td><strong>${escapeHtml((b.plan||'').toUpperCase())}</strong></td>
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" onclick="toggleProPlan(${b.id})">
-            ${b.plan === 'probusiness' ? 'Treci pe Start' : 'Activează ProBusiness (65€)'}
+          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" onclick="confirmWisePlan(${b.id})" ${b.plan === 'probusiness' ? 'disabled' : ''}>
+            ${b.plan === 'probusiness' ? 'Plată înregistrată' : 'Confirmă Wise (65€)'}
           </button>
           <button type="button" class="btn-danger" data-admin-action="deleteBiz" data-id="${Number(b.id)}" data-name="${escapeHtml(b.name)}">🗑️ Șterge</button>
         </td>
@@ -832,7 +832,7 @@
         <td><strong>${escapeHtml(a.agent_name)}</strong><br><span style="font-size:12px;color:#475d52;">${escapeHtml(a.email)}</span></td>
         <td>${escapeHtml(a.rank)}</td>
         <td>${Number(a.total_active_businesses)||0} firme</td>
-        <td>${Number(a.new_this_month)||0} noi (20€) + ${Number(a.recurring_businesses)||0} rec. (${Number(a.recurring_rate)||0}€)</td>
+        <td>${Number(a.new_this_month)||0} noi (20€) + ${Number(a.recurring_businesses)||0} rec. (${Number(a.recurring_rate)||0}€) + ${Number(a.sponsor_commission)||0}€ recrutări</td>
         <td><strong style="color:#2d6a4f;font-size:15px;">${Number(a.total)||0} EUR</strong></td>
         <td>
           <code>${escapeHtml(a.payout_method)}: ${escapeHtml(a.payout_details || 'nesetat')}</code>
@@ -877,8 +877,23 @@
     else if(action==='deleteCust'&&wallet)deleteCust(wallet,name);
   });
 
-  async function toggleProPlan(id) {
-    await authorizedFetch(`/api/admin/business/${id}/toggle-pro`, { method: 'POST' });
+  async function confirmWisePlan(id) {
+    const reference=prompt('Referința exactă a plății verificate în Wise Business:');
+    if(!reference)return;
+    const paymentMonth=prompt('Luna plătită (YYYY-MM):',new Date().toISOString().slice(0,7));
+    if(!paymentMonth)return;
+    const evidenceNote=prompt('Dovada: dată Wise, plătitor, extras sau tranzacție:');
+    if(!evidenceNote)return;
+    if(!confirm('Ai verificat personal în Wise Business plata de 65 EUR?'))return;
+    const res=await authorizedFetch('/api/loial-revenue/admin/wise/confirm',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({business_id:id,wise_reference:reference,
+        payment_month:paymentMonth,paid_amount_eur_cents:6500,
+        evidence_note:evidenceNote,confirmed_in_wise:true})
+    });
+    const result=await res.json().catch(()=>({}));
+    if(!res.ok){alert(result.detail||'Nu am putut confirma încasarea.');return;}
+    alert('Încasare reconciliată. Comisioanele au fost înregistrate.');
     loadSuperAdmin();
   }
 
