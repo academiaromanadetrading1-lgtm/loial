@@ -116,10 +116,10 @@
 
   <div class="card" id="wiseBillingCard">
     <span class="step-tag">ABONAMENT LOIAL PROBUSINESS</span>
-    <h2>65 EUR / lună, fără TVA adăugat</h2>
+    <h2>67 EUR / lună, fără TVA adăugat</h2>
     <p style="font-size:13px;color:var(--text-muted)">Plata se efectuează în Wise Business. Abonamentul va fi activat numai după verificarea efectivă a încasării.</p>
     <p id="wiseReference" style="font-weight:700;margin-top:10px"></p>
-    <a id="wisePayButton" class="btn-primary" href="#" target="_blank" rel="noopener noreferrer" style="display:none;width:max-content">Plătește abonamentul 65 EUR</a>
+    <a id="wisePayButton" class="btn-primary" href="#" target="_blank" rel="noopener noreferrer" style="display:none;width:max-content">Plătește abonamentul 67 EUR</a>
     <p id="wisePayHint" style="font-size:12px;color:var(--text-muted)">Linkul de plată Wise este în curs de configurare.</p>
   </div>
   <div id="loialAiEntry" style="background:#fff;border:1px solid #dfeae2;border-radius:15px;padding:16px 20px;margin:0 0 18px;display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;">
@@ -359,7 +359,7 @@
       <div id="adminActivity" aria-live="polite" style="font-size:13px;line-height:1.7"></div>
     </div>
     <div class="card">
-      <h2>1. Firme înscrise & Confirmare Wise (65 EUR/lună, fără TVA adăugat)</h2>
+      <h2>1. Firme înscrise & Confirmare Wise (67 EUR/lună, fără TVA adăugat)</h2>
       <table>
         <thead>
           <tr><th>Firmă</th><th>Email</th><th>Adusă de</th><th>Clienți</th><th>Plan</th><th>Acțiune</th></tr>
@@ -871,7 +871,7 @@
         <td><strong>${escapeHtml((b.plan||'').toUpperCase())}</strong></td>
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
           <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" onclick="confirmWisePlan(${b.id})" ${b.plan === 'probusiness' ? 'disabled' : ''}>
-            ${b.plan === 'probusiness' ? 'Plată înregistrată' : 'Confirmă Wise (65€)'}
+            ${b.plan === 'probusiness' ? 'Plată înregistrată' : 'Confirmă Wise (67€)'}
           </button>
           <button type="button" class="btn-danger" data-admin-action="deleteBiz" data-id="${Number(b.id)}" data-name="${escapeHtml(b.name)}">🗑️ Șterge</button>
         </td>
@@ -947,11 +947,11 @@
     if(!paymentMonth)return;
     const evidenceNote=prompt('Dovada: dată Wise, plătitor, extras sau tranzacție:');
     if(!evidenceNote)return;
-    if(!confirm('Ai verificat personal în Wise Business plata de 65 EUR?'))return;
+    if(!confirm('Ai verificat personal în Wise Business plata de 67 EUR?'))return;
     const res=await authorizedFetch('/api/loial-revenue/admin/wise/confirm',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({business_id:id,wise_reference:reference,
-        payment_month:paymentMonth,paid_amount_eur_cents:6500,
+        payment_month:paymentMonth,paid_amount_eur_cents:6700,
         evidence_note:evidenceNote,confirmed_in_wise:true})
     });
     const result=await res.json().catch(()=>({}));
