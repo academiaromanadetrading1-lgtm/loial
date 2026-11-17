@@ -58,6 +58,10 @@ def setup_receipts():
     ScanBase.metadata.create_all(engine)
     ReferralBase.metadata.create_all(engine)
     BaseAI.metadata.create_all(engine)
+    from loial_stripe_billing import BillingBase
+    from loial_manual_admin import GrantBase, ManualBusinessGrant
+    BillingBase.metadata.create_all(engine)
+    GrantBase.metadata.create_all(engine)
     factory=sessionmaker(bind=engine)
     app=FastAPI()
     from loial_business_ai import AIDocument, AISale
@@ -66,6 +70,9 @@ def setup_receipts():
     install_loial_ai(app,engine,factory,Business,Customer,Consent,
                      "secure-only-for-tests","HS256")
     with factory() as db:
+        db.add_all([ManualBusinessGrant(business_id=i,active=1,actor_id=1,
+                    reason="isolated test grant",updated_at="2026-11-17T00:00:00Z")
+                    for i in (1,2)])
         db.add_all([
             Business(id=1,name="Atelier",
                      email="owner1@test.invalid",business_type="atelier auto",
