@@ -59,7 +59,15 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert public.status_code == 200
             assert public.json()["name"] == "Service Auto Test"
 
-            identity = client.get("/api/loial-identity/me", headers=bearer)
+            # Stripe remains unconfigured in this test: free firm has no
+            # premium entitlement, and a fake plan flag cannot grant access.
+            stripe_state=client.get("/api/loial-stripe/me",headers=bearer)
+            assert stripe_state.status_code==200,stripe_state.text
+            assert stripe_state.json()["plan_price_eur"]==67
+            assert stripe_state.json()["subscription"]["active"] is False
+            assert client.get("/api/loial-stripe/me").status_code==401
+            assert client.get("/api/loial-ai/context",headers=bearer).status_code==402
+                        identity = client.get("/api/loial-identity/me", headers=bearer)
             assert identity.status_code == 200, identity.text
             assert identity.json()["roles"] == ["business"]
 
@@ -202,7 +210,17 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                     name="Administrator Test",role="admin",plan="pro"))
                 db.commit()
             admin_token=main.create_access_token({"sub":"supervisor@loial.test","role":"admin"})
-            pilot=client.get("/api/admin/google-wallet-pilot",
+            # Administrator-only receipts and monthly export are read-only.
+            assert client.get("/api/loial-revenue/admin/summary",headers=bearer).status_code in (401,403)
+            from io import BytesIO
+            from openpyxl import load_workbook
+            revenue_export=client.get("/api/loial-revenue/admin/export/2026-11.xlsx",
+                headers={"Authorization":"Bearer "+admin_token})
+            assert revenue_export.status_code==200,revenue_export.text[:80] if revenue_export.status_code!=200 else ""
+            workbook=load_workbook(BytesIO(revenue_export.content),read_only=True)
+            assert "De platit" in workbook.sheetnames
+            assert "Registru comisioane" in workbook.sheetnames
+                        pilot=client.get("/api/admin/google-wallet-pilot",
                 headers={"Authorization":"Bearer "+admin_token})
             assert pilot.status_code==200,pilot.text
             state=pilot.json()
