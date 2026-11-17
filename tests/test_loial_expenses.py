@@ -38,11 +38,18 @@ def env():
     DB.metadata.create_all(engine)
     BaseAI.metadata.create_all(engine)
     ExpenseBase.metadata.create_all(engine)
+    from loial_stripe_billing import BillingBase
+    from loial_manual_admin import GrantBase, ManualBusinessGrant
+    BillingBase.metadata.create_all(engine)
+    GrantBase.metadata.create_all(engine)
     factory=sessionmaker(bind=engine)
     app=FastAPI()
     install_expenses(app,engine,factory,Biz,AIDocument,"expense-test-key","HS256")
     install_loial_ai(app,engine,factory,Biz,Customer,Consent,"expense-test-key","HS256")
     with factory() as db:
+        db.add_all([ManualBusinessGrant(business_id=i,active=1,actor_id=1,
+                    reason="isolated test grant",updated_at="2026-11-17T00:00:00Z")
+                    for i in (1,2)])
         db.add_all([Biz(id=1,email="owner1@example.invalid",name="Atelier",
                         plan="probusiness",business_type="atelier auto"),
                     Biz(id=2,email="owner2@example.invalid",name="Selfwash",
