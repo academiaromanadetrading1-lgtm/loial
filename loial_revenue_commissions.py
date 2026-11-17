@@ -514,12 +514,36 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm):
             AmbassadorCommission.id.desc()).limit(150).all()
         recruits=db.query(SponsorRelationship).filter(
             SponsorRelationship.sponsor_id==agent.id).count()
+        invoices=db.query(PaidMerchantInvoice).filter(
+            PaidMerchantInvoice.eligible==1,
+            PaidMerchantInvoice.refunded==0).order_by(
+            PaidMerchantInvoice.id.desc()).limit(500).all()
+        personal=[x for x in invoices if x.agent_id==agent.id]
+        receipt_index={x.id:x for x in invoices}
+        team_links=db.query(SponsorRelationship).filter(
+            SponsorRelationship.sponsor_id==agent.id).all()
+        recruited_ids={x.ambassador_id for x in team_links}
+        recruits_people=db.query(Agent).filter(Agent.id.in_(recruited_ids)).all() if recruited_ids else []
         return {"agent_id":agent.id,"sponsored_ambassadors":recruits,
                 "pending_eur":sum(x.amount_cents for x in rows if x.status=="pending")/100,
                 "approved_eur":sum(x.amount_cents for x in rows if x.status=="approved")/100,
                 "paid_eur":sum(x.amount_cents for x in rows if x.status=="paid")/100,
+                "direct_paid_businesses":len({x.business_id for x in personal}),
+                "month":datetime.now(timezone.utc).strftime("%Y-%m"),
+                "recruits":[{"name":x.name,"joined_at":next(
+                    (r.referred_at for r in team_links if r.ambassador_id==x.id),"")}
+                    for x in recruits_people],
                 "entries":[{"kind":x.kind,"eur":x.amount_cents/100,
-                            "status":x.status,"month":x.period} for x in rows],
+                            "status":x.status,"month":x.period,
+                            "created_at":x.created_at,
+                            "business_id":receipt_index[x.invoice_id].business_id
+                                if x.invoice_id in receipt_index else None,
+                            "source":"my_business" if x.kind!="sponsor" else "direct_recruit",
+                            "description":"Firmă adusă de un ambasador recrutat direct"
+                                if x.kind=="sponsor" else
+                                ("Primul abonament achitat" if x.kind=="activation"
+                                 else "Reînnoire abonament achitat")}
+                            for x in rows],
                 "money_withdrawal_auto_enabled":False}
 
     @router.get("/simulate")
