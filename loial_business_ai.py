@@ -110,6 +110,7 @@ class ProfileRequest(BaseModel):
 class ChatRequest(BaseModel):
     text: str = Field(min_length=1, max_length=3000)
     topic: str = Field(default="general", max_length=60)
+    language: str = Field(default="ro", max_length=2)
 
 class BreakEvenRequest(BaseModel):
     period: str = Field(min_length=7,max_length=7)
@@ -341,7 +342,9 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         p = account_profile(db, biz)
         p.sector, p.description, p.currency = canonical(req.sector), req.description.strip(), req.currency.upper()
         db.commit()
-        return {"status": "saved", "industry": profile(p.sector)}
+        db.refresh(p)
+        return {"status":"saved","business":biz.name,"industry":profile(p.sector),
+                "description":p.description,"currency":p.currency}
     @r.get("/history")
     def history(biz=Depends(owner), db: Session = Depends(db_session)):
         items = db.query(AIMessage).filter(AIMessage.business_id == biz.id).order_by(AIMessage.id.desc()).limit(80).all()
@@ -528,7 +531,9 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
             }
         recent_messages = db.query(AIMessage).filter(AIMessage.business_id == biz.id).order_by(AIMessage.id.desc()).limit(12).all()
         conversation = "\n".join(x.role + ": " + x.content[:1000] for x in reversed(recent_messages))
-        system = ("Esti Loial, consultantul managerial al acestei afaceri. Vorbesti romaneste natural, "
+        languages={"ro":"Romanian","en":"English","de":"German","fr":"French","it":"Italian","es":"Spanish","nl":"Dutch","pl":"Polish","hu":"Hungarian"}
+        language=languages.get(req.language,"Romanian")
+        system = ("Respond naturally in "+language+". Esti Loial, consultantul managerial al acestei afaceri. Vorbesti natural, "
                   "pe intelesul unui antreprenor fara pregatire contabila. "
                   "Te adaptezi activitatii. Explica decizii in termeni practici fara afisarea formulelor "
                   "sau a metodologiei interne. Nu inventa date, nu echivala cifra de afaceri "
