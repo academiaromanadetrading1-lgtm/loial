@@ -75,12 +75,20 @@ def install_loial_identity(app, engine, session_factory, BusinessAccount,
         return account
 
     def public_ambassador(agent, db):
-        completed = db.query(Sale).filter(
-            Sale.agent_id == agent.id, Sale.status == "completed").count()
-        tier=tier_func(completed)
+        # Legacy Sale rows are not proof that a subscription was paid.
+        # Keep tier and counts consistent with the verified commission ledger.
+        from loial_revenue_commissions import PaidMerchantInvoice, tier
+        period=datetime.now(timezone.utc).strftime("%Y-%m")
+        verified=db.query(PaidMerchantInvoice.business_id).filter(
+            PaidMerchantInvoice.agent_id==agent.id,
+            PaidMerchantInvoice.period==period,
+            PaidMerchantInvoice.eligible==1,
+            PaidMerchantInvoice.refunded==0).distinct().all()
+        count=len(verified)
+        band=tier(count)
         return {"name":agent.name,"id":agent.id,"ref_code":agent.qr_code,
-                "rank":tier["rank"],"active_businesses":completed,
-                "monthly_rate":tier["monthly_rate"],
+                "rank":band["rank"],"active_businesses":count,
+                "monthly_rate":band["rate_cents"]/100,
                 "referral_url":"https://loial.space/register.html?ref="+agent.qr_code}
 
     @router.get("/me")
