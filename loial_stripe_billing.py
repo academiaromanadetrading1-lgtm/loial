@@ -141,7 +141,7 @@ def process_paid_invoice(db, invoice, state, business, Agent, price_id,
         provider_customer_id=state.customer_id or "",
         currency="eur",gross_paid_cents=expected_cents,
         net_revenue_cents=expected_cents,eligible=1,
-        review_reason="",refunded=0,
+        review_reason="stripe_verified_probusiness" if plan.code=="probusiness" else "",refunded=0,
         paid_at=stamp,period=period,created_at=stamp)
     db.add(row);db.flush()
     first=prior==0
