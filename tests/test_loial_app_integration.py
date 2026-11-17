@@ -67,7 +67,7 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert stripe_state.json()["subscription"]["active"] is False
             assert client.get("/api/loial-stripe/me").status_code==401
             assert client.get("/api/loial-ai/context",headers=bearer).status_code==402
-                        identity = client.get("/api/loial-identity/me", headers=bearer)
+            identity = client.get("/api/loial-identity/me", headers=bearer)
             assert identity.status_code == 200, identity.text
             assert identity.json()["roles"] == ["business"]
 
@@ -220,7 +220,7 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             workbook=load_workbook(BytesIO(revenue_export.content),read_only=True)
             assert "De platit" in workbook.sheetnames
             assert "Registru comisioane" in workbook.sheetnames
-                        pilot=client.get("/api/admin/google-wallet-pilot",
+            pilot=client.get("/api/admin/google-wallet-pilot",
                 headers={"Authorization":"Bearer "+admin_token})
             assert pilot.status_code==200,pilot.text
             state=pilot.json()
