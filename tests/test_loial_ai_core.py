@@ -246,3 +246,42 @@ def test_export_counts_respect_tenant_and_consent(app_client):
     assert first.json()=={"customers":1,"sales":0,"ads_consented":1}
     assert second.json()=={"customers":1,"sales":0,"ads_consented":0}
     assert client.get("/api/loial-ai/exports/customers.xlsx",headers=auth("owner1@test.invalid")).content.startswith(b"PK")
+
+
+def test_modern_gpt_payload_and_cost_accounting(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+    import loial_business_ai as ai
+    config={"LOIAL_AI_OPENAI_API_KEY":"test-key",
+            "LOIAL_AI_ECONOMY_MODEL":"gpt-6-luna",
+            "LOIAL_AI_ADVANCED_MODEL":"gpt-6.1-terra",
+            "LOIAL_AI_INPUT_USD_PER_M":"0.10",
+            "LOIAL_AI_OUTPUT_USD_PER_M":"0.50",
+            "LOIAL_AI_ADVANCED_INPUT_USD_PER_M":"1.00",
+            "LOIAL_AI_ADVANCED_OUTPUT_USD_PER_M":"5.00",
+            "LOIAL_AI_USD_TO_EUR":"1",
+            "LOIAL_AI_MONTHLY_BUDGET_EUR":"1"}
+    for k,v in config.items():
+        monkeypatch.setenv(k,v)
+    calls=[]
+    class MockClient:
+        def __init__(self,**kwargs):pass
+        async def __aenter__(self):return self
+        async def __aexit__(self,*args):pass
+        async def post(self,url,**kwargs):
+            calls.append(kwargs["json"])
+            return SimpleNamespace(raise_for_status=lambda:None,json=lambda:{
+                "choices":[{"message":{"content":"Test response"}}],
+                "usage":{"prompt_tokens":1000,"completion_tokens":200}})
+    monkeypatch.setattr(ai.httpx,"AsyncClient",MockClient)
+    usage=SimpleNamespace(input_tokens=0,output_tokens=0,cost_eur=0.0)
+    db=SimpleNamespace(commit=lambda:None)
+    assert asyncio.run(ai.ask_model("system","question",usage,db))=="Test response"
+    assert asyncio.run(ai.ask_model("system","question",usage,db,picture=("image/png",b"fake")) )=="Test response"
+    assert [p["model"] for p in calls]==["gpt-6-luna","gpt-6.1-terra"]
+    assert [p["max_completion_tokens"] for p in calls]==[1100,1800]
+    assert all(p["store"] is False and p["reasoning_effort"]=="none" and "max_tokens" not in p for p in calls)
+    assert abs(usage.cost_eur-0.0022)<1e-9
+    usage.cost_eur=1
+    assert asyncio.run(ai.ask_model("system","question",usage,db)) is None
+    assert len(calls)==2
