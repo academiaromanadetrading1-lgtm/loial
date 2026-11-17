@@ -56,7 +56,10 @@ def number(value, nonnegative=False):
 def label(value, limit):
     if not isinstance(value,str) or not value.strip():
         raise ValueError("missing text")
-    return re.sub(r"[\r\n|\x00-\x1f]", " ", value).strip()[:limit]
+    cleaned = re.sub(r"[\r\n|\x00-\x1f]", " ", value).strip()[:limit]
+    if not cleaned:
+        raise ValueError("missing text")
+    return cleaned
 
 def rounded(d):
     return d.quantize(Decimal(".01"),rounding=ROUND_HALF_UP)
@@ -70,7 +73,10 @@ def calculate(spec, currency):
             raise ValueError("ambiguous revenue")
         revenue=number(spec["revenue"],True)
     else:
-        revenue=number(spec["transactions"],True)*number(spec["average_ticket"],True)
+        transactions=number(spec["transactions"],True)
+        if transactions != transactions.to_integral_value():
+            raise ValueError("transaction count must be an integer")
+        revenue=transactions*number(spec["average_ticket"],True)
         if revenue>Decimal("1000000000000"):
             raise ValueError("out of range revenue")
     variable=number(spec["variable_cost"],True)
@@ -141,6 +147,14 @@ def render(spec,currency,language):
 BLOCK=re.compile(r"(?ms)^```loial-simulation[ \t]*\r?\n(.*?)(?:^```[ \t]*$|\Z)")
 RAW_CHART=re.compile(r"(?ms)^```loial-chart[ \t]*\r?\n.*?(?:^```[ \t]*$|\Z)")
 
+def _unique_json_object(pairs):
+    obj = {}
+    for key, value in pairs:
+        if key in obj:
+            raise ValueError("duplicate JSON key")
+        obj[key] = value
+    return obj
+
 def enrich_answer(answer,currency,language,truncated=False):
     # Only the server generates the chart contract.
     answer=RAW_CHART.sub("",answer)
@@ -149,7 +163,7 @@ def enrich_answer(answer,currency,language,truncated=False):
     body=BLOCK.sub("",answer).strip()
     try:
         if len(blocks)!=1 or len(blocks[0].group(1))>10000:raise ValueError("invalid block")
-        output=render(json.loads(blocks[0].group(1)),currency,language)
+        output=render(json.loads(blocks[0].group(1), object_pairs_hook=_unique_json_object),currency,language)
         if truncated:
             return output+"\n\n"+EXTRA_LABELS.get(language,EXTRA_LABELS["en"])[2]
         return (output+"\n\n"+body).strip()
