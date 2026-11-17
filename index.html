@@ -202,7 +202,7 @@
 <section class="hero">
   <div>
     <span class="badge">✨ Fără aplicații de descărcat. Direct prin cod QR & Wallet.</span>
-    <h1>Transformă clienții<br><span class="gradient-text">ocazionali în fideli.</span></h1>
+    <h1><span class="hero-title-line">Transformă clienții</span><br><span class="gradient-text">ocazionali în fideli.</span></h1>
     <p class="subtitle">Creează carduri digitale cu ștampile, puncte sau cashback în 3 minute. Clienții le salvează în telefon printr-o simplă scanare QR, iar tu îi aduci înapoi și crești recenziile pe Google.</p>
     <button class="btn-primary cta-big" onclick="goRegister()">Creează-ți primul card gratuit →</button>
     <p class="micro">Gratuit până la primii 50 de clienți • Fără card bancar • Gata în 3 minute</p>
@@ -332,7 +332,7 @@
         <div class="plan-name">ProBusiness</div>
         <div class="plan-desc">Toată puterea de fidelizare, control pe echipă și creștere fără limite.</div>
         <div class="plan-price">67 EUR <span>/ lună</span></div>
-        <div class="vat-note">+ TVA aplicabil conform țării (taxare inversă pentru firme UE plătitoare de TVA)</div>
+        <div class="vat-note">Fără TVA adăugat în prezent</div>
         <ul class="feature-list">
           <li><span class="check-icon">✓</span> <strong>Clienți activi nelimitați</strong></li>
           <li><span class="check-icon">✓</span> <strong>Angajați nelimitați</strong> cu PIN individual de 4 cifre</li>
@@ -409,6 +409,7 @@
   toggleBtn.addEventListener('click', () => {
     const isExpanded = grid.classList.toggle('expanded');
     toggleBtn.textContent = isExpanded ? 'Restrânge lista de industrii ↑' : 'Vezi toate cele 10 industrii la care ne adresăm ↓';
+    if(window.LoialLang)LoialLang.apply();
   });
 
   let stamps = 5;
