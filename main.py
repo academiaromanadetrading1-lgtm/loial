@@ -683,6 +683,7 @@ def nearby(lat: float, lng: float, current_user: User = Depends(get_current_user
 
 @app.post("/payment")
 def create_payment(req: PaymentRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410, detail="Abonamentele platite se confirma numai din Wise Business, dupa reconciliere.")
     prices = {"starter": 0, "pro": 49, "network": 199}
     if req.plan not in prices:
         raise HTTPException(status_code=400, detail="Invalid plan")
@@ -716,6 +717,7 @@ def legacy_apple_wallet_endpoint(customer_id:int):
 
 @app.post("/payment/stripe")
 def create_stripe_payment(req: PaymentRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410, detail="LOIAL foloseste exclusiv Wise Business. Checkout Stripe retras.")
     prices = {"starter": 0, "pro": 4900, "network": 19900}
     if req.plan not in prices:
         raise HTTPException(status_code=400, detail="Invalid plan")
@@ -1371,8 +1373,8 @@ def set_payout_method(agent_id: int, method: str, details: str, current_user: Us
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-    if method not in ["bank", "revolut", "wise", "paypal"]:
-        raise HTTPException(status_code=400, detail="Method must be: bank, revolut, wise, paypal")
+    if method != "wise":
+        raise HTTPException(status_code=400, detail="Comisioanele LOIAL se platesc exclusiv din Wise Business")
     agent.payout_method = method
     agent.payout_details = details
     db.commit()
@@ -3115,8 +3117,9 @@ def loial_install_script():
 from loial_friend_referrals import install_friend_referrals
 install_friend_referrals(app,engine,SessionLocal)
 
-# Contabilizarea incasarilor Stripe verificate si comisioanelor a doi beneficiari:
-# 20 EUR pentru ambasadorul vanzator, 10 EUR unic pentru sponsorul direct.
+# Registrul de comisioane LOIAL: Wise Business este sursa financiara aprobata.
+# Stripe legacy se retrage; 20 EUR vanzator + 10 EUR sponsor direct doar la prima incasare.
+# Urmeaza reconcilierea dedicata Wise inainte de activarea platilor in productie.
 from loial_revenue_commissions import install_revenue
 install_revenue(app,engine,SessionLocal,SalesAgent,BusinessAccount,User,SECRET_KEY,ALGORITHM)
 
