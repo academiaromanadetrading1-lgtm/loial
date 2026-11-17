@@ -3453,3 +3453,6 @@ def loial_ai_page():
 
 from loial_growth import install_growth
 install_growth(app, INDUSTRIES)
+
+from loial_multilocation import install_multilocation
+install_multilocation(app,engine,SessionLocal,BusinessAccount,Customer,SECRET_KEY,ALGORITHM)
