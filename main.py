@@ -3242,6 +3242,31 @@ def admin_delete_business(biz_id: int, credentials: HTTPAuthorizationCredentials
     from loial_revenue_commissions import PaidMerchantInvoice
     if db.query(PaidMerchantInvoice).filter(PaidMerchantInvoice.business_id==biz_id).first():
         raise HTTPException(status_code=409,detail="Firma are incasari sau comisioane istorice; arhiveaza, nu sterge.")
+    # Refuse hard deletion of accounts with operational history until all dependent
+    # records can be archived safely. Prevent cross-tenant exposure on SQLite ID reuse.
+    from loial_multilocation import GroupMember, GroupInvitation
+    from loial_acquisition import Acquisition
+    from loial_manual_admin import ManualBusinessGrant
+    from sqlalchemy import inspect as sa_inspect, text as sa_text
+    schema=sa_inspect(db.connection())
+    known_removable={"loial_business_acquisition","loial_location_invites",
+                     "loial_location_members"}
+    # Inspect actual schema, not a partial list of modules. SQL identifiers are
+    # quoted by the dialect; business IDs are always bound parameters.
+    quote=db.bind.dialect.identifier_preparer.quote
+    for table in schema.get_table_names():
+        if table in known_removable or table==BusinessAccount.__tablename__:
+            continue
+        if "business_id" not in {c["name"] for c in schema.get_columns(table)}:
+            continue
+        if table in {ManualBusinessGrant.__tablename__}:
+            continue
+        found=db.execute(sa_text("SELECT 1 FROM "+quote(table)+" WHERE business_id = :bid LIMIT 1"),{"bid":biz_id}).first()
+        if found:
+            raise HTTPException(status_code=409,detail="Firma are date operationale; arhiveaza, nu sterge.")
+    db.query(GroupInvitation).filter((GroupInvitation.parent_id==biz_id)|(GroupInvitation.target_id==biz_id)).delete(synchronize_session=False)
+    db.query(GroupMember).filter((GroupMember.parent_id==biz_id)|(GroupMember.business_id==biz_id)).delete(synchronize_session=False)
+    db.query(Acquisition).filter(Acquisition.business_id==biz_id).delete(synchronize_session=False)
     # A reused SQLite integer ID must never inherit a deleted firm's grant.
     from loial_manual_admin import ManualBusinessGrant
     db.query(ManualBusinessGrant).filter(ManualBusinessGrant.business_id==biz_id).delete()
