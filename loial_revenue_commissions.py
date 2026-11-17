@@ -26,7 +26,7 @@ from sqlalchemy.exc import IntegrityError
 RevenueBase=declarative_base()
 ACTIVATION_EUR_CENTS=2000
 SPONSOR_EUR_CENTS=1000
-SUBSCRIPTION_PRICE_EUR_CENTS=6500
+SUBSCRIPTION_PRICE_EUR_CENTS=6700
 REWARD_RELEASE_DAYS=14
 
 class SponsorRelationship(RevenueBase):
@@ -205,7 +205,7 @@ def _eligible_invoice(invoice):
     net=invoice.get("total_excluding_tax")
     if (not isinstance(cents,int) or not isinstance(net,int) or
         cents<=0 or net<SUBSCRIPTION_PRICE_EUR_CENTS):
-        return "not_full_price_65_eur_excluding_vat"
+        return "not_full_price_67_eur"
     if not _payment_id(invoice.get("payment_intent")):
         # Some newer Stripe versions omit payment_intent from invoice; must
         # reconcile invoice.payments before declaring this payable.
