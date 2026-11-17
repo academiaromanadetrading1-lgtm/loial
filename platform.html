@@ -121,7 +121,7 @@
     <p id="wiseReference" style="font-weight:700;margin-top:10px"></p>
     <button id="stripePayButton" class="btn-primary" type="button" onclick="startStripeCheckout()" style="width:max-content">Activează ProBusiness – 67 EUR/lună</button>
     <button id="stripePortalButton" class="btn-secondary" type="button" onclick="manageStripeBilling()" style="display:none;width:max-content">Gestionează abonamentul Stripe</button>
-    <p id="wisePayHint" style="font-size:12px;color:var(--text-muted)">Linkul de plată Wise este în curs de configurare.</p>
+    <p id="wisePayHint" style="font-size:12px;color:var(--text-muted)">Stripe LOIAL se configurează în contul dedicat. Plata activează automat abonamentul.</p>
   </div>
   <div id="loialAiEntry" style="background:#fff;border:1px solid #dfeae2;border-radius:15px;padding:16px 20px;margin:0 0 18px;display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;">
     <div><strong style="font-size:17px;color:#2d6a4f;">🤖 Loial AI • Consultantul afacerii</strong><div style="color:#61766a;font-size:13px;margin-top:3px;">Analizează documente, vânzări, marje, clienți și campanii pentru domeniul tău.</div></div>
@@ -880,8 +880,8 @@
         <td>${Number(b.customers_count)||0}</td>
         <td><strong>${escapeHtml((b.plan||'').toUpperCase())}</strong></td>
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" onclick="confirmWisePlan(${b.id})" ${b.plan === 'probusiness' ? 'disabled' : ''}>
-            ${b.plan === 'probusiness' ? 'Plată înregistrată' : 'Verifică încasarea Stripe'}
+          <button type="button" class="btn-secondary" style="margin:0;padding:6px 10px;font-size:12px;" disabled title="Plata si accesul se gestioneaza automat prin Stripe">
+            ${b.plan === 'probusiness' ? 'Abonament ProBusiness' : 'Așteaptă plata Stripe'}
           </button>
           <button type="button" class="btn-danger" data-admin-action="deleteBiz" data-id="${Number(b.id)}" data-name="${escapeHtml(b.name)}">🗑️ Șterge</button>
         </td>
@@ -950,27 +950,7 @@
     document.body.appendChild(link);link.click();link.remove();
     URL.revokeObjectURL(url);
   }
-    async function confirmWisePlan(id) {
-    const reference=prompt('Referința exactă a plății verificate în Wise Business:');
-    if(!reference)return;
-    const paymentMonth=prompt('Luna plătită (YYYY-MM):',new Date().toISOString().slice(0,7));
-    if(!paymentMonth)return;
-    const evidenceNote=prompt('Dovada: dată Wise, plătitor, extras sau tranzacție:');
-    if(!evidenceNote)return;
-    if(!confirm('Ai verificat personal în Wise Business plata de 67 EUR?'))return;
-    const res=await authorizedFetch('/api/loial-revenue/admin/wise/confirm',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({business_id:id,wise_reference:reference,
-        payment_month:paymentMonth,paid_amount_eur_cents:6700,
-        evidence_note:evidenceNote,confirmed_in_wise:true})
-    });
-    const result=await res.json().catch(()=>({}));
-    if(!res.ok){alert(result.detail||'Nu am putut confirma încasarea.');return;}
-    alert('Încasare reconciliată. Comisioanele au fost înregistrate.');
-    loadSuperAdmin();
-  }
-
-  async function saveNetworkRule() {
+    async function saveNetworkRule() {
     const btn = document.getElementById('saveRuleBtn');
     btn.textContent = 'Se salvează...';
     await authorizedFetch('/api/admin/network-rule', {
