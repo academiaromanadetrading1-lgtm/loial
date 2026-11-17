@@ -13,7 +13,7 @@ sumele sunt comparabile; daca se declara preturi cu TVA, nu le trata ca venit ne
 Nu transforma lipsa datelor in zero si nu dubla cheltuielile. Nu confunda achizitiile
 cu consumul. O simulare nu modifica registrul firmei. Nu promite cresterea profitului.
 Cand exista suficiente valori sau ipoteze explicite pentru o simulare lunara de
-profitabilitate, include EXACT un bloc fenced JSON la final. Exemplul de sintaxa de mai jos contine numere fictive; NU le folosi ca date sau ipoteze implicite pentru firma analizata. Inlocuieste toate valorile cu cele relevante cazului:
+profitabilitate, incepe raspunsul cu EXACT un bloc fenced JSON complet, INAINTEA oricarui text explicativ. Aceasta este prioritatea absoluta a formatului. Exemplul de sintaxa de mai jos contine numere fictive; NU le folosi ca date sau ipoteze implicite pentru firma analizata. Inlocuieste toate valorile cu cele relevante cazului:
 ```loial-simulation
 {"currency":"RON","basis":"explain period, VAT, provenance and assumptions in reply language","revenue":100000,"variable_cost":40000,"fixed_cost":30000,"target_pct":20,"scenarios":[{"name":"short label","assumption":"specific action and numeric assumptions","revenue_delta":0,"variable_cost_delta":-1000,"fixed_cost_delta":0}]}
 ```
@@ -25,10 +25,9 @@ veniturilor, costurilor variabile si fixe; zero inseamna neschimbat, nu necunosc
 La volum suplimentar include cost variabil incremental; la schimbari de pret explica
 ipoteza privind cererea; la campanii include costul/recompensa. Pentru o tinta de
 profit, arata actiuni plauzibile si ce trebuie masurat; nu pretinde ca tinta e atinsa.
-Daca datele chiar nu permit un model de baza, explica ce poate fi calculat, ofera o
+Daca suma cheltuielilor este cunoscuta dar clasificarea este incompleta, construieste o ipoteza explicita si reversibila: materiile prime si ambalajele variabile, salariile si chiria fixe, utilitatile si alte costuri tratate ca fixe numai pentru intervalul/volumul simularii, cu limitarea mentionata. Verifica suma costurilor clasificate. Daca exista date contradictorii, prezinta ipoteza alternativa sau cere clarificarea esentiala. Daca datele chiar nu permit un model de baza, explica ce poate fi calculat, ofera o
 sensibilitate/interval justificat si cere doar datele cu adevarat decisive.
-Blocul este calculat de server; nu repeta rezultatele numerice derivate in text.
-Scrie clar cu titluri Markdown, bold si liste scurte. Tabele Markdown sunt permise.
+Blocul este calculat de server; nu genera tabele paralele, grafice ASCII (inclusiv caractere █) ori rezultate derivate duplicate. Dupa bloc, scrie cel mult 350 de cuvinte: plan de actiune concret, KPI, termen, risc si intrebare esentiala numai daca este necesara. Daca se cere plan de 30 zile, include toate cele 4 saptamani. Pentru scenarii financiare, tabelul si graficul sunt generate de server.
 Nu emite HTML sau cod executabil. Nu emite blocuri loial-chart direct.
 """
 
@@ -43,6 +42,8 @@ LABELS = {
 "pl": ["Warunkowa symulacja miesięczna","Założenia","Wskaźnik","Wartość","Przychody","Koszty zmienne","Koszty stałe","Szacowany zysk operacyjny","Marża operacyjna","Próg rentowności","Docelowy zysk","Wymagany wzrost","Scenariusz alternatywny","Szacowany zysk","Zmiana względem bazy","Baza","Nieokreślony","Scenariusze są niezależne, nie sumują się.","Nieprawidłowa symulacja; liczby niezweryfikowane.","Przychody scenariusza","Koszty zmienne scenariusza","Koszty stałe scenariusza"],
 "hu": ["Feltételes havi szimuláció","Feltételezések","Mutató","Érték","Bevétel","Változó költségek","Fix költségek","Becsült üzemi eredmény","Üzemi eredményhányad","Fedezeti pont","Célzott eredmény","Szükséges növekedés","Alternatív forgatókönyv","Becsült eredmény","Eltérés az alaptól","Alap","Nem meghatározható","A forgatókönyvek függetlenek, nem összeadandók.","Érvénytelen szimuláció; a számok nem ellenőrzöttek.","Forgatókönyv bevétele","Forgatókönyv változó költségei","Forgatókönyv fix költségei"],
 }
+
+EXTRA_LABELS = {"ro":["Vânzări suplimentare necesare (același mix și costuri fixe)","Diferență rămasă până la țintă","Răspunsul explicativ a atins limita de lungime; simularea completă este afișată."],"en":["Additional sales needed (same mix and fixed costs)","Remaining target gap","The explanation reached its length limit; the complete simulation is displayed."],"es":["Ventas adicionales necesarias (misma mezcla y costes fijos)","Diferencia pendiente hasta el objetivo","La explicación alcanzó su límite; se muestra la simulación completa."],"de":["Zusätzlicher Umsatz (gleicher Mix und Fixkosten)","Verbleibende Ziellücke","Die Erklärung erreichte das Längenlimit; die vollständige Simulation wird angezeigt."],"fr":["Ventes supplémentaires (même mix et coûts fixes)","Écart restant à l’objectif","L’explication a atteint sa limite ; la simulation complète est affichée."],"it":["Vendite aggiuntive (stesso mix e costi fissi)","Scostamento residuo dall’obiettivo","La spiegazione ha raggiunto il limite; la simulazione completa è visualizzata."],"nl":["Extra omzet (zelfde mix en vaste kosten)","Resterend verschil tot doel","De uitleg bereikte de lengtelimiet; de volledige simulatie wordt getoond."],"pl":["Dodatkowa sprzedaż (ten sam miks i koszty stałe)","Pozostała różnica do celu","Wyjaśnienie osiągnęło limit długości; pokazano pełną symulację."],"hu":["További értékesítés (azonos mix és fix költségek)","A célhoz hiányzó összeg","A magyarázat elérte a hosszkorlátot; a teljes szimuláció látható."]}
 
 def number(value, nonnegative=False):
     if isinstance(value,bool) or not isinstance(value,(int,float,Decimal)):
@@ -97,12 +98,14 @@ def calculate(spec, currency):
         p=r-v-f
         rows.append({"name":label(s["name"],75),"assumption":label(s["assumption"],300),
                      "revenue":r,"variable":v,"fixed":f,"profit":p,"delta":p-profit})
+    target_sales = (target-profit)*revenue/contribution if target is not None and contribution>0 else None
     return dict(basis=basis,revenue=revenue,variable=variable,fixed=fixed,profit=profit,
-                margin=margin,breakeven=breakeven,target=target,scenarios=rows)
+                margin=margin,breakeven=breakeven,target=target,target_sales=target_sales,scenarios=rows)
 
 def render(spec,currency,language):
     r=calculate(spec,currency)
     l=LABELS.get(language,LABELS["en"])
+    extra=EXTRA_LABELS.get(language,EXTRA_LABELS["en"])
     def fmt(d,unit=currency):
         if d is None:return l[16]
         n=f"{rounded(d):,.2f}"
@@ -115,12 +118,18 @@ def render(spec,currency,language):
         lines.append("| "+title+" | "+fmt(r[key],unit)+" |")
     if r["target"] is not None:
         lines.extend(["| "+l[10]+" | "+fmt(r["target"])+" |","| "+l[11]+" | "+fmt(r["target"]-r["profit"])+" |"])
+    if r["target_sales"] is not None:
+        lines.append("| "+extra[0]+" | "+fmt(r["target_sales"])+" |")
     points=[{"label":l[15],"value":float(rounded(r["profit"]))}]
     if r["target"] is not None:points.append({"label":l[10],"value":float(rounded(r["target"]))})
     if r["scenarios"]:
-        lines.extend(["",l[17],"","| "+ " | ".join([l[12],l[19],l[20],l[21],l[13],l[14]])+" |","| --- | ---: | ---: | ---: | ---: | ---: |"])
+        headings=[l[12],l[19],l[20],l[21],l[13],l[14]]
+        if r["target"] is not None:headings.append(extra[1])
+        lines.extend(["",l[17],"","| "+" | ".join(headings)+" |","| --- | "+" | ".join(["---:"]*(len(headings)-1))+" |"])
         for s in r["scenarios"]:
-            lines.append("| "+s["name"]+" | "+" | ".join(fmt(s[k]) for k in ("revenue","variable","fixed","profit","delta"))+" |")
+            values=[fmt(s[k]) for k in ("revenue","variable","fixed","profit","delta")]
+            if r["target"] is not None:values.append(fmt(max(Decimal(0),r["target"]-s["profit"])))
+            lines.append("| "+s["name"]+" | "+" | ".join(values)+" |")
             points.append({"label":s["name"],"value":float(rounded(s["profit"]))})
         lines.append("")
         lines.extend("- **"+s["name"]+":** "+s["assumption"] for s in r["scenarios"])
@@ -132,15 +141,17 @@ def render(spec,currency,language):
 BLOCK=re.compile(r"(?ms)^```loial-simulation[ \t]*\r?\n(.*?)(?:^```[ \t]*$|\Z)")
 RAW_CHART=re.compile(r"(?ms)^```loial-chart[ \t]*\r?\n.*?(?:^```[ \t]*$|\Z)")
 
-def enrich_answer(answer,currency,language):
+def enrich_answer(answer,currency,language,truncated=False):
     # Only the server generates the chart contract.
     answer=RAW_CHART.sub("",answer)
     blocks=list(BLOCK.finditer(answer))
-    if not blocks:return answer
+    if not blocks:return "" if truncated else answer
     body=BLOCK.sub("",answer).strip()
     try:
         if len(blocks)!=1 or len(blocks[0].group(1))>10000:raise ValueError("invalid block")
         output=render(json.loads(blocks[0].group(1)),currency,language)
-        return (body+"\n\n"+output).strip()
+        if truncated:
+            return output+"\n\n"+EXTRA_LABELS.get(language,EXTRA_LABELS["en"])[2]
+        return (output+"\n\n"+body).strip()
     except (ValueError,TypeError,KeyError,InvalidOperation,OverflowError):
-        return (body+"\n\n"+LABELS.get(language,LABELS["en"])[18]).strip()
+        return "" if truncated else (body+"\n\n"+LABELS.get(language,LABELS["en"])[18]).strip()
