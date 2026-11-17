@@ -864,7 +864,7 @@
       item.style.padding='9px 0';
       item.style.borderBottom='1px solid #e3e8e4';
       const date=(row.date||'').slice(0,16).replace('T',' ');
-      const detail=row.type==='wise_payment_confirmed'
+      const detail=row.type==='subscription_payment_confirmed'
         ? (row.business||'')+' • '+Number(row.amount_eur||0).toFixed(2)+' EUR • '+(row.month||'')
         : row.type==='business_registered'
         ? (row.business||'') : '';
