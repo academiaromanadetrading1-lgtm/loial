@@ -59,6 +59,8 @@ class DirectMessage(BaseModel):
     text: str = Field(min_length=2, max_length=2000)
     audience: str = Field(default="all", max_length=40)
     product: str = Field(default="", max_length=200)
+    language: str = Field(default="ro", max_length=2)
+    deadline: str = Field(default="", max_length=10)
     customer_ids: Optional[List[int]] = None
     idempotency_key: Optional[str] = Field(default=None, min_length=8, max_length=120)
 
@@ -250,10 +252,14 @@ def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent
 
     @route.post("/send")
     def send_direct(req: DirectMessage, biz=Depends(owner), db: Session = Depends(db_session)):
-        from loial_marketing import campaign_message
+        from loial_marketing import campaign_message, validate_promotion_deadline
         # Product inclusion must be approved in the exact text shown in the UI.
-        if campaign_message(req.text, req.product) != req.text.strip():
-            raise HTTPException(status_code=422, detail="Include produsul sau serviciul in mesaj si verifica previzualizarea inainte de trimitere.")
+        try:
+            deadline = validate_promotion_deadline(req.deadline) if req.product.strip() else ""
+        except ValueError as exc:
+            raise HTTPException(422, str(exc))
+        if campaign_message(req.text, req.product, req.language, deadline) != req.text.strip():
+            raise HTTPException(status_code=422, detail="Verifica promotia, indemnul la actiune si previzualizarea inainte de trimitere.")
         event = "direct:" + req.idempotency_key if req.idempotency_key else None
         if event:
             previous = db.query(InboxEntry).filter(
