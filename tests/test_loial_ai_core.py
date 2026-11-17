@@ -285,3 +285,79 @@ def test_modern_gpt_payload_and_cost_accounting(monkeypatch):
     usage.cost_eur=1
     assert asyncio.run(ai.ask_model("system","question",usage,db)) is None
     assert len(calls)==2
+
+
+def financial_spec():
+    return {"currency":"RON","basis":"Estimare lunara; toate valorile fara TVA; costuri fixe constante.",
+            "transactions":3120,"average_ticket":18,"variable_cost":18700,"fixed_cost":25800,
+            "target_pct":30,"scenarios":[
+                {"name":"Reducere risipa","assumption":"Economii de 1750 lei fara pierdere de vanzari.",
+                 "revenue_delta":0,"variable_cost_delta":-1750,"fixed_cost_delta":0},
+                {"name":"Bon mediu","assumption":"Venituri +3900; costuri incrementale 402.",
+                 "revenue_delta":3900,"variable_cost_delta":402,"fixed_cost_delta":0},
+                {"name":"Optimizare","assumption":"Reducere de cost fix de 1000 si variabil de 2498.",
+                 "revenue_delta":0,"variable_cost_delta":-2498,"fixed_cost_delta":-1000}]}
+
+
+def test_simulation_deterministic_math_and_independent_scenarios():
+    from decimal import Decimal
+    from loial_financial_simulation import calculate,rounded
+    r=calculate(financial_spec(),"RON")
+    assert r["revenue"]==56160
+    assert r["profit"]==11660
+    assert rounded(r["margin"])==Decimal("20.76")
+    assert rounded(r["breakeven"])==Decimal("38678.91")
+    assert r["target"]==15158
+    assert [s["profit"] for s in r["scenarios"]]==[13410,15158,15158]
+    assert [s["delta"] for s in r["scenarios"]]==[1750,3498,3498]
+
+
+def test_simulation_missing_or_invalid_values_are_not_zero():
+    from loial_financial_simulation import calculate
+    import pytest
+    for key,bad in [("variable_cost",None),("fixed_cost",-1),("average_ticket",True),
+                    ("average_ticket",float("nan")),("currency","EUR")]:
+        spec=financial_spec();spec[key]=bad
+        with pytest.raises(ValueError):calculate(spec,"RON")
+    spec=financial_spec();del spec["fixed_cost"]
+    with pytest.raises(KeyError):calculate(spec,"RON")
+    spec=financial_spec();spec["scenarios"][0]["variable_cost_delta"]=-20000
+    with pytest.raises(ValueError):calculate(spec,"RON")
+
+
+def test_negative_profit_and_zero_contribution_do_not_claim_growth_target():
+    from loial_financial_simulation import calculate
+    spec={"currency":"RON","basis":"Conditional; comparable amounts.","revenue":100,
+          "variable_cost":100,"fixed_cost":50,"target_pct":30}
+    r=calculate(spec,"RON")
+    assert r["profit"]==-50
+    assert r["breakeven"] is None and r["target"] is None
+    spec["revenue"]=0
+    assert calculate(spec,"RON")["margin"] is None
+
+
+def test_simulation_rendered_in_chat_and_history_without_extra_model_call(app_client,monkeypatch):
+    import json
+    import loial_business_ai as ai
+    client,auth=app_client
+    h=auth("owner1@test.invalid")
+    monkeypatch.setattr(ai,"provider_status",lambda usage:"configured")
+    calls=[]
+    async def mocked_model(system,question,usage,db,**kwargs):
+        calls.append(system)
+        return "**Propuneri**\n\n```loial-simulation\n"+json.dumps(financial_spec())+"\n```"
+    monkeypatch.setattr(ai,"ask_model",mocked_model)
+    result=client.post("/api/loial-ai/chat",headers=h,json={"text":"Simuleaza profitul"})
+    assert result.status_code==200,result.text
+    answer=result.json()["answer"]
+    assert len(calls)==1 and "estimari conditionale" in calls[0]
+    assert "11.660,00 RON" in answer and "15.158,00 RON" in answer
+    assert "```loial-chart" in answer and "```loial-simulation" not in answer
+    assert client.get("/api/loial-ai/history",headers=h).json()[-1]["text"]==answer
+
+
+def test_malformed_simulation_is_removed_not_rendered_as_valid():
+    from loial_financial_simulation import enrich_answer
+    r=enrich_answer("Text\n```loial-simulation\n{\"revenue\":100}\n```","RON","ro")
+    assert "Simulare invalidă" in r and "loial-simulation" not in r
+    assert "loial-chart" not in r
