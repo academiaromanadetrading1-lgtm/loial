@@ -120,8 +120,7 @@ def render(spec,currency,language):
         lines.extend(["| "+l[10]+" | "+fmt(r["target"])+" |","| "+l[11]+" | "+fmt(r["target"]-r["profit"])+" |"])
     if r["target_sales"] is not None:
         lines.append("| "+extra[0]+" | "+fmt(r["target_sales"])+" |")
-    points=[{"label":l[15],"value":float(rounded(r["profit"]))}]
-    if r["target"] is not None:points.append({"label":l[10],"value":float(rounded(r["target"]))})
+    points=[{"label":l[15],"value":float(rounded(r["profit"])),"kind":"baseline"}]
     if r["scenarios"]:
         headings=[l[12],l[19],l[20],l[21],l[13],l[14]]
         if r["target"] is not None:headings.append(extra[1])
@@ -130,9 +129,10 @@ def render(spec,currency,language):
             values=[fmt(s[k]) for k in ("revenue","variable","fixed","profit","delta")]
             if r["target"] is not None:values.append(fmt(max(Decimal(0),r["target"]-s["profit"])))
             lines.append("| "+s["name"]+" | "+" | ".join(values)+" |")
-            points.append({"label":s["name"],"value":float(rounded(s["profit"]))})
+            points.append({"label":s["name"],"value":float(rounded(s["profit"])),"kind":"scenario"})
         lines.append("")
         lines.extend("- **"+s["name"]+":** "+s["assumption"] for s in r["scenarios"])
+    if r["target"] is not None:points.append({"label":l[10],"value":float(rounded(r["target"])),"kind":"target"})
     if len(points)>1:
         chart=json.dumps({"title":l[7],"unit":currency,"points":points},ensure_ascii=False,separators=(",",":"))
         lines.extend(["","```loial-chart",chart,"```"])
