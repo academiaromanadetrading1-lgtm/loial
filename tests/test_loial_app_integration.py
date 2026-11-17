@@ -16,6 +16,7 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
     monkeypatch.delenv("LOIAL_ADMIN_BOOTSTRAP_EMAIL", raising=False)
     monkeypatch.delenv("LOIAL_DEV_SEED_DATA", raising=False)
     monkeypatch.setenv("LOIAL_WEEKLY_JOBS_ENABLED","0")
+    monkeypatch.setenv("LOIAL_PUBLIC_FREE_PILOT","1")
     sys.modules.pop("main", None)
     main = importlib.import_module("main")
     try:
@@ -83,6 +84,11 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             stripe_state=client.get("/api/loial-stripe/me",headers=bearer)
             assert stripe_state.status_code==200,stripe_state.text
             assert stripe_state.json()["plan_price_eur"]==67
+            assert stripe_state.json()["free_pilot_only"] is True
+            assert stripe_state.json()["checkout_configured"] is False
+            checkout_disabled=client.post("/api/loial-stripe/checkout",headers=bearer)
+            assert checkout_disabled.status_code==503
+
             assert stripe_state.json()["subscription"]["active"] is False
             assert client.get("/api/loial-stripe/me").status_code==401
             assert client.get("/api/loial-ai/context",headers=bearer).status_code==402
