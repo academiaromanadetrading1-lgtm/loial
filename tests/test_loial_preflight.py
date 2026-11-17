@@ -22,15 +22,15 @@ def test_preflight_remains_manual_even_when_config_seems_ready():
     assert report["automatic_checks_passed"] is True
     assert report["safe_to_deploy_automatically"] is False
     assert "credential_rotation_manual" in report["manual_approvals_required"]
-    assert "google_publishing_manual" in report["manual_approvals_required"]
+    assert "backup_restore_manual" in report["manual_approvals_required"]
 
-def test_missing_google_does_not_block_staging_but_blocks_launch():
+def test_missing_google_does_not_block_pwa_launch():
     env=sample_env()
     env.pop("LOIAL_GOOGLE_WALLET_SERVICE_ACCOUNT_JSON")
     env["LOIAL_GOOGLE_LOYALTY_CLASS_ID"]=""
     assert "google_issuer" not in preflight(env,"staging")["blockers"]
-    assert "google_issuer" in preflight(env,"production")["blockers"]
-    assert "google_class_id" in preflight(env,"production")["blockers"]
+    assert "google_issuer" not in preflight(env,"production")["blockers"]
+    assert "google_class_id" not in preflight(env,"production")["blockers"]
 
 def test_apple_and_weak_secrets_cannot_pass_launch_checks():
     env=sample_env()
