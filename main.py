@@ -998,7 +998,7 @@ def check_affiliate_status(db, agent):
 
 @app.post("/notifications/{notif_id}/read")
 def mark_read(notif_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    notif = db.query(PlatformNotification).filter(PlatformNotification.id == notif_id).first()
+    notif = db.query(PlatformNotification).filter(PlatformNotification.id == notif_id,PlatformNotification.user_email == current_user.email).first()
     if notif:
         notif.read = 1
         db.commit()
@@ -1067,11 +1067,13 @@ def onboard_business(qr_code: str, business_name: str, business_email: str, busi
 
 @app.get("/sales/live")
 def live_sales(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Legacy sales feed is replaced by verified administrator activity.")
     recent = db.query(Sale).order_by(Sale.id.desc()).limit(20).all()
     return [{"id": s.id, "business": s.business_name, "agent_id": s.agent_id, "type": s.business_type, "date": s.completed_at} for s in recent]
 
 @app.get("/sales/agent/{agent_id}/stats")
 def agent_stats(agent_id: int, month: str = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Legacy sales statistics are replaced by the private ambassador ledger.")
     if not month:
         month = datetime.now().strftime("%Y-%m")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
@@ -1233,6 +1235,7 @@ def admin_analytics(period: str = "month", current_user: User = Depends(get_curr
 
 @app.get("/analytics/agent/{agent_id}")
 def agent_analytics(agent_id: int, period: str = "month", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Other agents must not access private ambassador analytics.")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
@@ -1264,6 +1267,7 @@ def agent_analytics(agent_id: int, period: str = "month", current_user: User = D
 
 @app.get("/analytics/manager/{agent_id}")
 def manager_analytics(agent_id: int, period: str = "month", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Legacy team commission analytics are deprecated.")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent or not agent.is_manager:
         raise HTTPException(status_code=403, detail="Not a manager")
@@ -1310,6 +1314,7 @@ def manager_analytics(agent_id: int, period: str = "month", current_user: User =
 
 @app.get("/analytics/business/{business_id}")
 def business_analytics(business_id: int, period: str = "month", db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Business analytics is available only through the private business dashboard.")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Business not found")
@@ -1354,6 +1359,7 @@ def business_analytics(business_id: int, period: str = "month", db: Session = De
 
 @app.post("/analytics/purchase")
 def record_purchase(customer_id: int, business_id: int, product: str, amount: float, db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Unauthenticated purchase recording is disabled.")
     purchase = CustomerPurchase(customer_id=customer_id, business_id=business_id, product=product, amount=amount, date=datetime.now().strftime("%Y-%m-%d"))
     db.add(purchase)
     db.commit()
@@ -1361,6 +1367,7 @@ def record_purchase(customer_id: int, business_id: int, product: str, amount: fl
 
 @app.post("/analytics/cancel")
 def record_cancellation(business_id: int, reason: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Legacy cancellation endpoint does not verify merchant ownership.")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Business not found")
