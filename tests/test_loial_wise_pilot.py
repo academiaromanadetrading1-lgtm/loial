@@ -96,3 +96,11 @@ def test_invalid_month_and_amount_rejected(env):
 def test_tier_boundaries():
     assert [tier(n)["rate_cents"] for n in (1,25,26,50,51)]==[
         500,500,1000,1000,1500]
+
+
+def test_spreadsheet_export_formula_injection_is_neutralized():
+    from loial_revenue_commissions import excel_literal
+    for malicious in ("=1+1","+SUM(A1:A4)","-NOW()","@cmd","  =HYPERLINK('evil')"):
+        assert excel_literal(malicious).startswith("'")
+    assert excel_literal("Ambasador LOIAL")=="Ambasador LOIAL"
+    assert excel_literal(67.0)==67.0
