@@ -43,7 +43,7 @@ def db_fixture():
 
 def invoice(invoice_id,month=11):
     start=datetime(2026,month,1,tzinfo=timezone.utc)
-    finish=datetime(2026,month+1,1,tzinfo=timezone.utc)
+    finish=datetime(2027,1,1,tzinfo=timezone.utc) if month==12 else datetime(2026,month+1,1,tzinfo=timezone.utc)
     return {"id":invoice_id,"customer":"cus_loial","subscription":"sub_loial",
         "status":"paid","paid":True,"currency":"eur",
         "amount_paid":PRICE_CENTS,"billing_reason":"subscription_cycle",
