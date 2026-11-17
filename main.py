@@ -2718,6 +2718,10 @@ def scan_universal_card(request: Request, req: UniversalScanRequest, db: Session
         ).first()
         if not existing_profile:
             raise HTTPException(status_code=404, detail="Cardul nu a fost găsit")
+        # Scanning a universal wallet can create a NEW card at this merchant.
+        # It must respect the same customer cap as direct QR enrollment.
+        if not business_can_enroll_new_customers(db,biz.id):
+            raise HTTPException(status_code=403,detail="LIMIT_REACHED")
 
         wallet_id = existing_profile.wallet_uuid or existing_profile.uuid
         customer = Customer(
