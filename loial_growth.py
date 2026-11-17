@@ -4,6 +4,7 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 from fastapi import HTTPException
 from fastapi.responses import HTMLResponse, Response
 from loial_plans import public_catalog
+from loial_seo_locales import COPY, landing, path_for
 
 ORIGIN = "https://loial.space"
 LANGUAGES = ("ro","en","de","fr","it","es","nl","pl","hu")
@@ -33,7 +34,7 @@ def install_growth(app, industries):
     @app.get("/sitemap.xml")
     def sitemap():
         # Only actual, published canonical pages; never advertise speculative translations.
-        return Response(sitemap_xml(["/","/ambasadori","/demo"]+
+        return Response(sitemap_xml(["/ambasadori","/demo"]+[path_for(lang) for lang in COPY]+
             ["/solutii/"+x for x in industries]),media_type="application/xml")
 
     @app.get("/ambasadori")
@@ -45,3 +46,11 @@ def install_growth(app, industries):
     def demo():
         return page("Personalizează un card demonstrativ",
             """<p>Demonstrație locală. Nu creează conturi, carduri sau ștampile reale.</p><label>Numele firmei <input id="n" maxlength="80" value="Afacerea ta"></label><p><label>Recompensă <input id="r" maxlength="120" value="La 6 vizite primești o recompensă"></label></p><label>Culoare <input id="c" type="color" value="#153c2b"></label><div class="card" id="card"><strong>DEMO · LOIAL</strong><h2 id="pn">Afacerea ta</h2><p id="pr">La 6 vizite primești o recompensă</p><p id="count">0 / 6</p></div><p><button id="stamp">Simulează o ștampilă</button> <button id="reset">Resetează</button></p><a href="/register.html?utm_source=demo">Încearcă gratuit</a><script>const el=id=>document.getElementById(id);let count=0;el('n').oninput=()=>el('pn').textContent=el('n').value;el('r').oninput=()=>el('pr').textContent=el('r').value;el('c').oninput=()=>el('card').style.backgroundColor=el('c').value;function show(){el('count').textContent=count+' / 6'}el('stamp').onclick=()=>{count=Math.min(6,count+1);show()};el('reset').onclick=()=>{count=0;show()};</script>""","/demo")
+
+    for lang in COPY:
+        if lang=="ro":continue
+        def make_page(locale):
+            def localized_page():
+                return HTMLResponse(landing(locale))
+            return localized_page
+        app.add_api_route(path_for(lang),make_page(lang),methods=["GET"],name="loial_landing_"+lang)
