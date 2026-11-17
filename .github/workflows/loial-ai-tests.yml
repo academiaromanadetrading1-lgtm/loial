@@ -44,6 +44,28 @@ jobs:
           NODE
       - name: Validate PWA helper, service worker and manifest
         run: |
+          node --check loial-i18n.js
+          node - <<'NODE'
+          const fs=require('fs'),vm=require('vm'),assert=require('assert');
+          const code=fs.readFileSync('loial-i18n.js','utf8');
+          const prefs=new Map();
+          const node={children:[],textContent:'Salvează profilul',closest:()=>null};
+          const document={readyState:'loading',documentElement:{},addEventListener(){},dispatchEvent(){},
+            querySelectorAll(q){return q.startsWith('h1')?[node]:[];},getElementById(){return null;}};
+          const context={document,localStorage:{getItem:k=>prefs.get(k),setItem:(k,v)=>prefs.set(k,v)},
+            window:{addEventListener(){}},CustomEvent:function(){}};
+          vm.runInNewContext(code,context);
+          const l=context.window.LoialLang;
+          for(const lang of ['en','de','fr','it','es','nl','pl','hu']){
+            l.set(lang);
+            assert.equal(document.documentElement.lang,lang);
+            assert.notEqual(node.textContent,'Salvează profilul');
+            assert.equal(node.textContent,l.t('Salvează profilul'));
+            assert.equal(l.t('customer-private text'),'customer-private text');
+            assert.equal(prefs.get('loial_language'),lang);
+          }
+          l.set('ro');assert.equal(node.textContent,'Salvează profilul');
+          NODE
           node --check loial-pwa-install.js
           node --check sw.js
           node -e "const x=require('./manifest.json');if(x.start_url.slice(0,7)!='/wallet'||x.display!=='standalone'||x.icons.length<2)process.exit(1);"
