@@ -372,12 +372,17 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
             return {"status":"duplicate"}
         return {"status":"recorded",**outcome}
 
-    # Only premium APIs are gated; free CRM/loyalty remains accessible.
+    # Keep free loyalty accessible, but deny premium features after grace.
+    # A paid plan flag in the legacy Business table is not an entitlement.
     @app.middleware("http")
     async def enforce_premium_access(request,call_next):
-        protected=("/api/loial-ai/chat","/api/loial-ai/documents",
-                   "/api/loial-ai/report","/api/loial-ai/exports")
-        if request.url.path.startswith(protected):
+        path=request.url.path
+        premium=(path.startswith("/api/loial-ai/") or
+                 path in ("/api/loial-inbox/send", "/api/loial-inbox/audience",
+                          "/api/loial-inbox/sent"))
+        # Update stale subscription flags for business requests even if they
+        # use a legacy route that checks only Business.plan.
+        if path.startswith("/api/") and not path.startswith("/api/loial-stripe/"):
             header=request.headers.get("Authorization","")
             if header.startswith("Bearer "):
                 try:
@@ -385,15 +390,30 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
                     if claims.get("role")=="business":
                         db=factory()
                         try:
-                            row=db.query(LoialSubscription).filter(
-                                LoialSubscription.business_id==claims.get("business_id")).first()
-                            if not entitlements(row)["active"]:
-                                return JSONResponse(status_code=402,content={
-                                    "detail":"Abonament ProBusiness inactiv",
-                                    "billing_status":entitlements(row)["status"]})
+                            biz=db.query(Business).filter(
+                                Business.id==claims.get("business_id"),
+                                Business.email==claims.get("sub")).first()
+                            if biz:
+                                state=db.query(LoialSubscription).filter(
+                                    LoialSubscription.business_id==biz.id).first()
+                                access=entitlements(state)
+                                if not access["active"] and biz.plan=="probusiness":
+                                    biz.plan="free"
+                                    biz.max_customers=50
+                                    db.commit()
+                                if premium and not access["active"]:
+                                    return JSONResponse(status_code=402,content={
+                                        "detail":"Abonament ProBusiness inactiv",
+                                        "billing_status":access["status"]})
                         finally:db.close()
                 except JWTError:
-                    return JSONResponse(status_code=401,content={"detail":"Sesiune invalida"})
+                    return JSONResponse(status_code=401,content={
+                        "detail":"Sesiune invalida"})
+            elif premium and request.method!="OPTIONS":
+                # Authentication will still be enforced by the endpoint,
+                # but premium functions must never be granted anonymously.
+                return JSONResponse(status_code=401,content={
+                    "detail":"Autentificare necesara"})
         return await call_next(request)
 
     app.include_router(api)
