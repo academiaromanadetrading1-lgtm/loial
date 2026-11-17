@@ -55,6 +55,18 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert sign_up.status_code == 200, sign_up.text
             business_id = sign_up.json()["business_id"]
             bearer = {"Authorization": "Bearer " + sign_up.json()["token"]}
+            # Legacy web login must issue the same scoped JWT needed by billing.
+            login=client.post("/auth/login",json={
+                "email":"owner.smoke@example.invalid",
+                "password":"strong-test-password-only"})
+            assert login.status_code==200,login.text
+            login_headers={"Authorization":"Bearer "+login.json()["access_token"]}
+            assert client.get("/api/loial-stripe/me",headers=login_headers).status_code==200
+            from jose import jwt as jose_jwt
+            payload=jose_jwt.decode(login.json()["access_token"],
+                main.SECRET_KEY,algorithms=[main.ALGORITHM])
+            assert payload["role"]=="business"
+            assert payload["business_id"]==business_id
             public = client.get("/api/business-public/" + str(business_id))
             assert public.status_code == 200
             assert public.json()["name"] == "Service Auto Test"
