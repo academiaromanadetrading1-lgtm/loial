@@ -2979,7 +2979,7 @@ def admin_super_overview(credentials: HTTPAuthorizationCredentials = Depends(sec
             "id": b.id,
             "name": b.name,
             "email": b.email,
-            "plan": "probusiness" if access["active"] else "free",
+            "plan": access.get("plan","start"),
             "manual_grant":manual_grant(db,b.id),
             "access_status":access["status"],
             "customers_count": c_count,
