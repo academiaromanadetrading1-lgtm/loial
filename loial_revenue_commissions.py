@@ -29,6 +29,14 @@ SPONSOR_EUR_CENTS=1000
 SUBSCRIPTION_PRICE_EUR_CENTS=6700
 REWARD_RELEASE_DAYS=14
 
+def excel_literal(value):
+    """Prevent user-controlled cells from executing formulas in Excel."""
+    if isinstance(value,str) and value.lstrip().startswith(
+            ("=","+","-","@","\\t","\\r")):
+        return "'"+value
+    return value
+
+
 class SponsorRelationship(RevenueBase):
     __tablename__="loial_ambassador_sponsorships"
     ambassador_id=Column(Integer,primary_key=True)
@@ -755,13 +763,6 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm,pass
         from openpyxl.styles import Font, PatternFill
         from io import BytesIO
         from fastapi import Response
-        def excel_literal(value):
-            # Prevent spreadsheet formula injection from ambassador names and
-            # manual Wise payment reference fields in admin-only exports.
-            if isinstance(value,str) and value.lstrip().startswith(
-                    ("=","+","-","@","\\t","\\r")):
-                return "'"+value
-            return value
         book=Workbook()
         overview=book.active
         overview.title="De platit"
