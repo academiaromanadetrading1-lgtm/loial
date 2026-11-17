@@ -82,4 +82,13 @@ def install_pwa(app):
                         headers={"Cache-Control":"public, max-age=86400",
                                  "X-Content-Type-Options":"nosniff"})
 
+    @router.get("/favicon.ico", include_in_schema=False)
+    def favicon():
+        output = BytesIO()
+        with Image.open(BytesIO(metal_icon(192))) as image:
+            image.save(output, format="ICO", sizes=[(16, 16), (32, 32), (48, 48)])
+        return Response(output.getvalue(), media_type="image/x-icon",
+                        headers={"Cache-Control":"public, max-age=86400",
+                                 "X-Content-Type-Options":"nosniff"})
+
     app.include_router(router)
