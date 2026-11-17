@@ -59,6 +59,24 @@ def preflight(env=None,stage="production"):
     add("no_plaintext_admin",not env.get("LOIAL_ADMIN_BOOTSTRAP_EMAIL") or
         len(env.get("LOIAL_ADMIN_BOOTSTRAP_PASSWORD",""))>=12,
         "Admin bootstrap credentials must be explicit and strong")
+    # Stripe credentials belong to LOIAL, not to another connected project.
+    stripe_key=env.get("LOIAL_STRIPE_SECRET_KEY","")
+    webhook_key=env.get("LOIAL_STRIPE_WEBHOOK_SECRET","")
+    price_id=env.get("LOIAL_STRIPE_PRICE_ID","")
+    origin=env.get("LOIAL_PUBLIC_ORIGIN","https://loial.space").rstrip("/")
+    stripe_severity="blocker" if strict else "warning"
+    add("loial_stripe_live_key",stripe_key.startswith("sk_live_") and
+        len(stripe_key)>=25,"Use the LOIAL live Stripe secret key only in production",
+        severity=stripe_severity)
+    add("loial_stripe_webhook",webhook_key.startswith("whsec_") and
+        len(webhook_key)>=20,"Configure dedicated LOIAL signed webhook secret",
+        severity=stripe_severity)
+    add("loial_stripe_price",bool(re.fullmatch(r"price_[A-Za-z0-9]{8,}",price_id)),
+        "Dedicated LOIAL recurring EUR 67 price ID required",
+        severity=stripe_severity)
+    add("loial_stripe_return_origin",origin=="https://loial.space",
+        "Checkout return URLs restricted to https://loial.space",
+        severity=stripe_severity)
     # This cannot prove that a previously exposed secret was rotated.
     add("credential_rotation_manual",False,
         "Manually verify historical exposed secrets were rotated before deployment",
