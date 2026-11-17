@@ -209,7 +209,8 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
             ("sk_test_","sk_live_")) and
             os.getenv("LOIAL_STRIPE_PRICE_ID","").startswith("price_") and
             bool(os.getenv("LOIAL_STRIPE_WEBHOOK_SECRET","")))
-        return {"plan_price_eur":67,"subscription":entitlements(state),
+        return {"plan_price_eur":67,"free_pilot_only":free_pilot,
+                "subscription":entitlements(state),
                 "status":state.status if state else "not_started",
                 "paid_until":state.paid_until if state else None,
                 "checkout_configured":configured}
