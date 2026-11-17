@@ -293,6 +293,25 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert status_a["pending_eur"]==0
             assert status_a["sponsored_ambassadors"]==1
             # Paid state must never be inferred solely from registration.
+            # The public wallet route cannot bypass the free-tier 50-card limit.
+            with main.SessionLocal() as db:
+                for i in range(50):
+                    db.add(main.Customer(
+                        uuid=f"SMOKE-LIMIT-{i:03d}",
+                        wallet_uuid=f"SMOKE-LIMIT-{i:03d}",
+                        name=f"Customer {i}",stamps=0,
+                        business_id=firm_b.json()["business_id"]))
+                db.commit()
+            denied=client.post("/api/enroll-sync",json={
+                "business_id":firm_b.json()["business_id"],
+                "uuid":"SMOKE-LIMIT-NEW-CUSTOMER",
+                "name":"Client 51",
+                "wallet_claim_token":"S"*48})
+            assert denied.status_code==403,denied.text
+            assert denied.json()["detail"]=="LIMIT_REACHED"
+            also_denied=client.post("/api/enroll",json={
+                "business_id":firm_b.json()["business_id"],"name":"Client 51"})
+            assert also_denied.status_code==403,also_denied.text
             # No external provider or recipient data is needed for this scenario.
     finally:
         main.engine.dispose()
