@@ -204,7 +204,8 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
     def status(biz=Depends(own_business),db=Depends(session)):
         state=db.query(LoialSubscription).filter(
             LoialSubscription.business_id==biz.id).first()
-        configured=(os.getenv("LOIAL_STRIPE_SECRET_KEY","").startswith(
+        free_pilot=os.getenv("LOIAL_PUBLIC_FREE_PILOT","0")=="1"
+        configured=not free_pilot and (os.getenv("LOIAL_STRIPE_SECRET_KEY","").startswith(
             ("sk_test_","sk_live_")) and
             os.getenv("LOIAL_STRIPE_PRICE_ID","").startswith("price_") and
             bool(os.getenv("LOIAL_STRIPE_WEBHOOK_SECRET","")))
@@ -215,6 +216,9 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
 
     @api.post("/checkout")
     def checkout(biz=Depends(own_business),db=Depends(session)):
+        if os.getenv("LOIAL_PUBLIC_FREE_PILOT","0")=="1":
+            raise HTTPException(status_code=503,
+                detail="Programul LOIAL este momentan in pilot gratuit; abonamentele vor fi disponibile ulterior")
         key=os.getenv("LOIAL_STRIPE_SECRET_KEY","")
         price=os.getenv("LOIAL_STRIPE_PRICE_ID","")
         origin=os.getenv("LOIAL_PUBLIC_ORIGIN","https://loial.space").rstrip("/")
@@ -258,6 +262,8 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
 
     @api.post("/portal")
     def portal(biz=Depends(own_business),db=Depends(session)):
+        if os.getenv("LOIAL_PUBLIC_FREE_PILOT","0")=="1":
+            raise HTTPException(status_code=503,detail="Stripe nu este activ in pilotul gratuit")
         state=db.query(LoialSubscription).filter(
             LoialSubscription.business_id==biz.id).first()
         if not state or not state.customer_id:
@@ -275,6 +281,8 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
 
     @api.post("/webhook")
     async def webhook(request:Request,db=Depends(session)):
+        if os.getenv("LOIAL_PUBLIC_FREE_PILOT","0")=="1":
+            raise HTTPException(status_code=503,detail="Stripe dezactivat in pilotul gratuit")
         webhook_key=os.getenv("LOIAL_STRIPE_WEBHOOK_SECRET","")
         if not webhook_key:raise HTTPException(status_code=503,detail="Webhook neconfigurat")
         body=await request.body()
