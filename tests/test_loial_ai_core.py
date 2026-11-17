@@ -308,6 +308,7 @@ def test_simulation_deterministic_math_and_independent_scenarios():
     assert rounded(r["margin"])==Decimal("20.76")
     assert rounded(r["breakeven"])==Decimal("38679.34")
     assert r["target"]==15158
+    assert rounded(r["target_sales"])==Decimal("5244.20")
     assert [s["profit"] for s in r["scenarios"]]==[13410,15158,15158]
     assert [s["delta"] for s in r["scenarios"]]==[1750,3498,3498]
 
@@ -361,3 +362,32 @@ def test_malformed_simulation_is_removed_not_rendered_as_valid():
     r=enrich_answer("Text\n```loial-simulation\n{\"revenue\":100}\n```","RON","ro")
     assert "Simulare invalidă" in r and "loial-simulation" not in r
     assert "loial-chart" not in r
+
+
+def test_simulation_first_survives_provider_length_limit(app_client,monkeypatch):
+    import json
+    import loial_business_ai as ai
+    client,auth=app_client
+    h=auth("owner1@test.invalid")
+    monkeypatch.setattr(ai,"provider_status",lambda usage:"configured")
+    calls=[]
+    async def model(system,question,usage,db,**kwargs):
+        calls.append(kwargs)
+        return ("```loial-simulation\n"+json.dumps(financial_spec())+"\n```\nPlan netermin", "length")
+    monkeypatch.setattr(ai,"ask_model",model)
+    result=client.post("/api/loial-ai/chat",headers=h,json={"text":"Simuleaza profitul si pragul"})
+    assert result.status_code==200,result.text
+    answer=result.json()["answer"]
+    assert "38.679,34 RON" in answer and "15.158,00 RON" in answer
+    assert "Diferență rămasă până la țintă" in answer
+    assert "```loial-chart" in answer and "Plan netermin" not in answer
+    assert "limita de lungime" in answer
+    assert calls==[{"advanced":False,"completion_limit":2600,"return_finish_reason":True}]
+    assert client.get("/api/loial-ai/history",headers=h).json()[-1]["text"]==answer
+
+    async def incomplete(*args,**kwargs):
+        return "O propozitie neterminata","length"
+    monkeypatch.setattr(ai,"ask_model",incomplete)
+    result=client.post("/api/loial-ai/chat",headers=h,json={"text":"Reia analiza"})
+    assert result.status_code==503
+    assert len(client.get("/api/loial-ai/history",headers=h).json())==2
