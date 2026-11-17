@@ -313,8 +313,8 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         if email is None:
             raise HTTPException(status_code=401, detail="Invalid token")
         user = db.query(User).filter(User.email == email).first()
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
+        if not user or payload.get("role") != user.role:
+            raise HTTPException(status_code=401,detail="Sesiune de utilizator invalida")
         return user
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
