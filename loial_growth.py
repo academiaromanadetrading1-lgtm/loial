@@ -28,6 +28,15 @@ def install_growth(app, industries):
     def plans():
         return public_catalog()
 
+    @app.get("/api/loial-plans/simulate")
+    def simulate(new_business:int=0,renewed_business:int=0,new_pro:int=0,
+                 renewed_pro:int=0,recruited_business:int=0,recruited_pro:int=0):
+        from loial_plans import simulate_portfolio
+        try:
+            return simulate_portfolio(new_business,renewed_business,new_pro,renewed_pro,recruited_business,recruited_pro)
+        except ValueError:
+            raise HTTPException(422,"Portofoliu invalid")
+
     @app.get("/robots.txt")
     def robots():
         return Response("User-agent: *\nDisallow: /api/\nDisallow: /platform.html\nDisallow: /join/\nDisallow: /scan/\nDisallow: /review/\nSitemap: https://loial.space/sitemap.xml\n",media_type="text/plain")
