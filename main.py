@@ -1730,6 +1730,7 @@ def health(db: Session = Depends(get_db)):
 
 @app.get("/setup-admin")
 def setup_admin(email: str = "ciprianpop@academiadetrading.llc", db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410, detail="Configurarea administratorului prin URL public este dezactivata.")
     user = db.query(User).filter(User.email == email).first()
     if not user:
         user = User(email=email, password=pwd_context.hash("Admin123!"), name="Ciprian Pop", plan="network", role="admin")
@@ -1801,6 +1802,11 @@ def quick_register(req: QuickRegisterRequest, db: Session = Depends(get_db)):
 
     clean_ref = sanitize_input(req.ref_code or "", 60)
     agent = db.query(SalesAgent).filter(SalesAgent.qr_code == clean_ref).first() if clean_ref else None
+
+    if len(req.password)<10:
+        raise HTTPException(status_code=422,detail="Parola trebuie sa aiba minimum 10 caractere")
+    if not req.business_name.strip() or len(req.business_name)>150:
+        raise HTTPException(status_code=422,detail="Denumire firma invalida")
 
     business = BusinessAccount(
         name=req.business_name,
@@ -3042,6 +3048,9 @@ def admin_delete_business(biz_id: int, credentials: HTTPAuthorizationCredentials
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == biz_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
+    from loial_revenue_commissions import PaidMerchantInvoice
+    if db.query(PaidMerchantInvoice).filter(PaidMerchantInvoice.business_id==biz_id).first():
+        raise HTTPException(status_code=409,detail="Firma are incasari sau comisioane istorice; arhiveaza, nu sterge.")
     db.query(StaffMember).filter(StaffMember.business_id == biz_id).delete()
     db.query(Customer).filter(Customer.business_id == biz_id).delete()
     db.query(Sale).filter(Sale.business_id == biz_id).delete()
@@ -3056,6 +3065,11 @@ def admin_delete_ambassador(agent_id: int, credentials: HTTPAuthorizationCredent
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Ambasador negăsit")
+    from loial_revenue_commissions import AmbassadorCommission, SponsorRelationship
+    if db.query(AmbassadorCommission).filter(AmbassadorCommission.agent_id==agent_id).first():
+        raise HTTPException(status_code=409,detail="Ambasador cu comisioane istorice: suspenda contul, nu sterge.")
+    if db.query(SponsorRelationship).filter((SponsorRelationship.ambassador_id==agent_id)|(SponsorRelationship.sponsor_id==agent_id)).first():
+        raise HTTPException(status_code=409,detail="Ambasador cu legaturi de recrutare: nu sterge istoricul.")
     db.query(BusinessAccount).filter(BusinessAccount.agent_id == agent_id).update({"agent_id": None, "ref_code": ""})
     db.query(Sale).filter(Sale.agent_id == agent_id).delete()
     db.query(Commission).filter(Commission.agent_id == agent_id).delete()
