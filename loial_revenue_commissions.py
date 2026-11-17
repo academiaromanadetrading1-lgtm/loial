@@ -476,6 +476,7 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm):
 
     @router.post("/stripe/webhook")
     async def webhook(request:Request,db:Session=Depends(session)):
+        raise HTTPException(status_code=410,detail="Stripe retras: incasari numai Wise Business.")
         secret_key=os.getenv("LOIAL_STRIPE_WEBHOOK_SECRET","")
         if not secret_key:
             raise HTTPException(status_code=503,detail="Stripe webhook not configured")
