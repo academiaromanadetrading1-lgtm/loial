@@ -34,3 +34,22 @@ def public_catalog():
     return [{"code": p.code,"name":p.label,"price_eur":p.price_cents//100,
              "customer_cap":p.customer_cap,"location_cap":p.location_cap,
              "custom_quote_above_cap":p.code=="probusiness"} for p in PLANS.values()]
+
+
+def simulate_portfolio(new_business=0, renewed_business=0, new_pro=0,
+                       renewed_pro=0, recruited_business=0, recruited_pro=0):
+    """Illustrative monthly scenario in integer cents, not actual earned commission."""
+    counts=(new_business,renewed_business,new_pro,renewed_pro,recruited_business,recruited_pro)
+    if any(type(n) is not int or not 0<=n<=100000 for n in counts) or sum(counts)>100000:
+        raise ValueError("Invalid portfolio size")
+    active=new_business+renewed_business+new_pro+renewed_pro
+    b,p=PLANS["business"],PLANS["probusiness"]
+    activation=new_business*b.activation_cents+new_pro*p.activation_cents
+    recurring=renewed_business*renewal_rate("business",active)+renewed_pro*renewal_rate("probusiness",active)
+    sponsor=recruited_business*b.sponsor_cents+recruited_pro*p.sponsor_cents
+    revenue=(new_business+renewed_business+recruited_business)*b.price_cents+(new_pro+renewed_pro+recruited_pro)*p.price_cents
+    return {"active_direct_firms":active,"activation_cents":activation,
+            "recurring_cents":recurring,"sponsor_cents":sponsor,
+            "total_commission_cents":activation+recurring+sponsor,
+            "illustrative_subscription_revenue_cents":revenue,
+            "scenario_only":True,"requires_verified_payment":True}
