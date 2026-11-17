@@ -292,6 +292,30 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                 headers=session_a).json()
             assert status_a["pending_eur"]==0
             assert status_a["sponsored_ambassadors"]==1
+            # Legacy payout destination may not be edited by an unrelated
+            # authenticated account. The new endpoint re-verifies password.
+            attacker=client.put(
+                f"/sales/agent/{ambassador_b['id']}/payout",
+                params={"method":"wise","details":"attacker@invalid.test"},
+                headers=other_bearer)
+            assert attacker.status_code==410,attacker.text
+            bad_update=client.put(
+                "/api/loial-revenue/ambassador/wise-details",
+                json={"password":"wrong password","account_details":"merchant@wise.test"},
+                headers=session_a)
+            assert bad_update.status_code==403,bad_update.text
+            updated=client.put(
+                "/api/loial-revenue/ambassador/wise-details",
+                json={"password":"test-ambassador-password-2026",
+                    "account_details":"ambassador-a@wise.test"},
+                headers=session_a)
+            assert updated.status_code==200,updated.text
+            assert "ambassador-a@wise.test" not in updated.text
+            refreshed=client.get("/api/loial-revenue/ambassador/me",
+                headers=session_a)
+            assert refreshed.status_code==200
+            assert refreshed.json()["wise_details_saved"] is True
+            assert "ambassador-a@wise.test" not in refreshed.text
             # Paid state must never be inferred solely from registration.
             # The public wallet route cannot bypass the free-tier 50-card limit.
             with main.SessionLocal() as db:
