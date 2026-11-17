@@ -4,10 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - chatgpt/loial-ai-business-foundation-20261116
-  pull_request:
-    branches:
-      - main
+      - chatgpt/loial-pilot-hardening-20261117
+    paths:
+      - '.github/workflows/loial-ai-tests.yml'
 
 permissions:
   contents: read
