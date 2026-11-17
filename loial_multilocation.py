@@ -65,6 +65,8 @@ def direct_plan(db,business_id,state=None):
 
 def inherited_access(db,business_id):
     from loial_stripe_billing import LoialSubscription, entitlements
+    import os
+    if os.getenv("LOIAL_MULTILOCATION_READY","0")!="1":return None
     link=db.get(GroupMember,business_id)
     if not link or not 2<=link.slot<=5:
         return None
@@ -115,6 +117,9 @@ def install_multilocation(app,engine,factory,Business,Customer,secret,algorithm)
         return biz
 
     def parent_only(db,biz):
+        import os
+        if os.getenv("LOIAL_MULTILOCATION_READY","0")!="1":
+            raise HTTPException(503,"ProBusiness este in pregatire")
         if db.get(GroupMember,biz.id) or direct_plan(db,biz.id)!="probusiness":
             raise HTTPException(403,"Abonament ProBusiness direct necesar")
 
@@ -122,7 +127,8 @@ def install_multilocation(app,engine,factory,Business,Customer,secret,algorithm)
     def me(biz=Depends(owner),db=Depends(session)):
         access=effective_entitlements(db,biz.id)
         link=db.get(GroupMember,biz.id)
-        can_manage=direct_plan(db,biz.id)=="probusiness" and not link
+        import os
+        can_manage=os.getenv("LOIAL_MULTILOCATION_READY","0")=="1" and direct_plan(db,biz.id)=="probusiness" and not link
         return {"business_id":biz.id,"plan":access.get("plan","start"),
                 "can_manage":can_manage,"member_of":link.parent_id if link else None,
                 "locations":[{"business_id":x.business_id,"slot":x.slot}
