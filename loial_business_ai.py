@@ -239,7 +239,7 @@ def monthly_budget():
         return 0.0
 
 def provider_status(usage):
-    if not model_settings():
+    if not model_settings() or not os.getenv("LOIAL_AI_ECONOMY_MODEL","").strip():
         return "not_configured"
     if usage.cost_eur >= monthly_budget():
         return "budget_exhausted"
@@ -251,7 +251,9 @@ async def ask_model(system, question, usage, db, picture=None, advanced=False, c
     if not settings or usage.cost_eur >= budget:
         return None
     key, rates = settings
-    selected_model = os.getenv("LOIAL_AI_ECONOMY_MODEL", "gpt-6-luna")
+    selected_model = os.getenv("LOIAL_AI_ECONOMY_MODEL", "").strip()
+    if not selected_model:
+        return None
     if advanced or picture:
         strong = os.getenv("LOIAL_AI_ADVANCED_MODEL", "").strip()
         advanced_in = os.getenv("LOIAL_AI_ADVANCED_INPUT_USD_PER_M", "").strip()
@@ -269,8 +271,17 @@ async def ask_model(system, question, usage, db, picture=None, advanced=False, c
         mime, raw = picture
         parts.append({"type": "image_url", "image_url": {"url":
                       "data:" + mime + ";base64," + base64.b64encode(raw).decode()}})
+    # Conservative admission estimate (not a provider tokenizer or hard spend guarantee).
+    # UTF-8 bytes overestimate typical text token counts; images need a separate reserve.
+    max_out = min(2600,max(256,int(completion_limit))) if completion_limit is not None else (1800 if (advanced or picture) else 1100)
+    estimated_in = len(system.encode("utf-8")) + len(question[:32000].encode("utf-8")) + 512
+    if picture:
+        estimated_in += 16384
+    estimated_cost = (estimated_in*rates[0] + max_out*rates[1])*rates[2]/1000000
+    if not math.isfinite(estimated_cost) or estimated_cost > max(0,budget-usage.cost_eur):
+        return None
     payload = {"model": selected_model, "store": False,
-               "max_completion_tokens": min(2600,max(256,int(completion_limit))) if completion_limit is not None else (1800 if (advanced or picture) else 1100),
+               "max_completion_tokens": max_out,
                "reasoning_effort": "none", "messages": [
                   {"role": "system", "content": system},
                   {"role": "user", "content": parts}]}
