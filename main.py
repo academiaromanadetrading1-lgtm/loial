@@ -1967,6 +1967,10 @@ class PublicFeedbackRequest(BaseModel):
 
 @app.post("/api/private-feedback")
 def save_public_review_feedback(req: PublicFeedbackRequest, db: Session = Depends(get_db)):
+    if not 1 <= req.rating <= 5 or len(req.message) > 2000:
+        raise HTTPException(422, "Feedback invalid")
+    if not db.get(BusinessAccount, req.business_id):
+        raise HTTPException(404, "Firma negasita")
     fb = PublicReviewFeedback(
         business_id=req.business_id,
         rating=req.rating,
@@ -1998,7 +2002,8 @@ def industry_seo_page(industrie: str):
     html = f'''<!DOCTYPE html>
 <html lang="ro"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{data["title"]} - Loial.space</title>
-<meta name="description" content="{data["title"]}. Creează carduri digitale de fidelitate cu cod QR gratuit în 3 minute.">
+<meta name="description" content="{data["title"]}. Creează carduri digitale de fidelitate cu cod QR.">
+<link rel="canonical" href="https://loial.space/solutii/{industrie}">
 <link href="https://googleapis.com" rel="stylesheet">
 <style>
   body {{ font-family: 'Inter', system-ui, sans-serif; background: #f6f9f7; color: #111f18; margin: 0; line-height: 1.6; }}
@@ -3444,3 +3449,7 @@ def loial_receipt_page():
 @app.get("/loial-ai")
 def loial_ai_page():
     return FileResponse("loial-ai.html")
+
+
+from loial_growth import install_growth
+install_growth(app, INDUSTRIES)
