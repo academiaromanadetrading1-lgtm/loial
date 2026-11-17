@@ -7,6 +7,8 @@ import hashlib
 import io
 import json
 import os
+import math
+import logging
 from datetime import date, datetime, timezone
 from typing import Optional
 
@@ -111,6 +113,7 @@ class ChatRequest(BaseModel):
     text: str = Field(min_length=1, max_length=3000)
     topic: str = Field(default="general", max_length=60)
     language: str = Field(default="ro", max_length=2)
+    document_id: Optional[int] = Field(default=None, gt=0)
 
 class BreakEvenRequest(BaseModel):
     period: str = Field(min_length=7,max_length=7)
@@ -221,15 +224,29 @@ def model_settings():
         return None
     try:
         rates = [float(v) for v in values[1:]]
-        if min(rates) <= 0:
+        if any(not math.isfinite(r) or r <= 0 for r in rates):
             return None
         return values[0], rates
     except ValueError:
         return None
 
+def monthly_budget():
+    try:
+        value=float(os.getenv("LOIAL_AI_MONTHLY_BUDGET_EUR","5"))
+        return min(15.0,max(0.0,value)) if math.isfinite(value) else 0.0
+    except ValueError:
+        return 0.0
+
+def provider_status(usage):
+    if not model_settings():
+        return "not_configured"
+    if usage.cost_eur >= monthly_budget():
+        return "budget_exhausted"
+    return "configured"
+
 async def ask_model(system, question, usage, db, picture=None, advanced=False):
     settings = model_settings()
-    budget = min(15.0, max(0.0, float(os.getenv("LOIAL_AI_MONTHLY_BUDGET_EUR", "5"))))
+    budget = monthly_budget()
     if not settings or usage.cost_eur >= budget:
         return None
     key, rates = settings
@@ -241,18 +258,18 @@ async def ask_model(system, question, usage, db, picture=None, advanced=False):
         if strong and advanced_in and advanced_out:
             try:
                 strong_rates = [float(advanced_in), float(advanced_out)]
-                if min(strong_rates) > 0:
+                if all(math.isfinite(r) and r > 0 for r in strong_rates):
                     selected_model = strong
                     rates = [strong_rates[0], strong_rates[1], rates[2]]
             except ValueError:
                 pass
-    parts = [{"type": "text", "text": question[:12000]}]
+    parts = [{"type": "text", "text": question[:32000]}]
     if picture:
         mime, raw = picture
         parts.append({"type": "image_url", "image_url": {"url":
                       "data:" + mime + ";base64," + base64.b64encode(raw).decode()}})
     payload = {"model": selected_model,
-               "max_tokens": 750, "messages": [
+               "max_tokens": 1100 if advanced else 850, "messages": [
                   {"role": "system", "content": system},
                   {"role": "user", "content": parts}]}
     try:
@@ -268,8 +285,12 @@ async def ask_model(system, question, usage, db, picture=None, advanced=False):
         usage.output_tokens += out
         usage.cost_eur += (inp * rates[0] + out * rates[1]) * rates[2] / 1000000
         db.commit()
-        return response
-    except (httpx.HTTPError, KeyError, IndexError, ValueError, TypeError):
+        return response.strip() if isinstance(response,str) and response.strip() else None
+    except httpx.HTTPStatusError as exc:
+        logging.getLogger("loial.ai").warning("AI provider HTTP status=%s",exc.response.status_code)
+        return None
+    except (httpx.HTTPError, KeyError, IndexError, ValueError, TypeError) as exc:
+        logging.getLogger("loial.ai").warning("AI provider failure type=%s",type(exc).__name__)
         return None
 
 def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
@@ -335,8 +356,9 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                 "description": p.description, "currency": p.currency,
                 "sectors": [{"key": k, "label": v["label"]} for k, v in PROFILES.items()],
                 "topics": [{"key": k, "label": v} for k, v in TOPICS],
-                "ai_connected": bool(model_settings()), "in_app_messaging": True, "cost_eur": round(u.cost_eur, 4),
-                "budget_eur": min(15, max(0, float(os.getenv("LOIAL_AI_MONTHLY_BUDGET_EUR", "5"))))}
+                "ai_connected": provider_status(u)=="configured", "ai_status":provider_status(u),
+                "in_app_messaging": True, "cost_eur": round(u.cost_eur, 4),
+                "budget_eur": monthly_budget()}
     @r.put("/profile")
     def update_profile(req: ProfileRequest, biz=Depends(owner), db: Session = Depends(db_session)):
         p = account_profile(db, biz)
@@ -478,6 +500,16 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         data = db.query(AIDocument).filter(AIDocument.business_id == biz.id).order_by(AIDocument.id.desc()).limit(100).all()
         return [{"id": x.id, "name": x.filename, "type": x.kind,
                  "confirmed": bool(x.confirmed), "at": x.created_at} for x in data]
+    @r.get("/documents/{doc_id}/preview")
+    def document_preview(doc_id:int,biz=Depends(owner),db:Session=Depends(db_session)):
+        doc=db.query(AIDocument).filter(AIDocument.business_id==biz.id,AIDocument.id==doc_id).first()
+        if not doc:raise HTTPException(404,"Document negasit")
+        data=json.loads(doc.data_json or "{}")
+        return {"id":doc.id,"name":doc.filename,"kind":doc.kind,"confirmed":bool(doc.confirmed),
+                "text":str(data.get("preview") or "")[:12000],
+                "rows":data.get("rows",[])[:100],"notes":data.get("notes",[]),
+                "uncertain_fields":data.get("uncertain_fields",[]),
+                "truncated":len(data.get("rows",[]))>100 or (doc.kind=="pdf_text" and len(str(data.get("preview") or ""))>=12000)}
     @r.post("/documents/{doc_id}/confirm")
     def confirm(doc_id: int, biz=Depends(owner), db: Session = Depends(db_session)):
         doc = db.query(AIDocument).filter(AIDocument.business_id == biz.id, AIDocument.id == doc_id).first()
@@ -507,9 +539,13 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         if day_count >= 100:
             raise HTTPException(status_code=429, detail="Limita de 100 de mesaje zilnice")
         p = account_profile(db, biz)
-        db.add(AIMessage(business_id=biz.id, role="user", topic=req.topic,
-                         content=req.text.strip(), created_at=now()))
-        db.commit()
+        usage=usage_now(db,biz)
+        availability=provider_status(usage)
+        if availability!="configured":
+            raise HTTPException(503 if availability=="not_configured" else 429,
+                detail={"code":availability,"message":"Conversatia generativa nu este disponibila momentan."})
+        if not req.text.strip():
+            raise HTTPException(422,"Mesajul este gol")
         sales = sector_summary(p.sector, rows(db, biz))
         clients = db.query(Customer).filter(Customer.business_id == biz.id).all()
         from loial_expenses import VerifiedExpense, expense_totals
@@ -521,14 +557,15 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                     "warning":"Sume cu TVA/fara TVA si valute diferite nu se aduna; cheltuielile pot fi incomplete."},
                 "summary": {k: sales[k] for k in ("total_revenue", "total_contribution", "missing", "sector_metrics")},
                 "products": sales["products"][:15], "customers": customer_segments(clients)}
-        recent_document = db.query(AIDocument).filter(AIDocument.business_id == biz.id).order_by(AIDocument.id.desc()).first()
-        if recent_document:
-            extracted = json.loads(recent_document.data_json or "{}")
-            data["latest_document"] = {
-                "kind": recent_document.kind,
-                "confirmed": bool(recent_document.confirmed),
-                "document_extract_unverified": json.dumps(extracted, ensure_ascii=False)[:5000]
-            }
+        if req.document_id:
+            selected=db.query(AIDocument).filter(AIDocument.business_id==biz.id,AIDocument.id==req.document_id).first()
+            if not selected:raise HTTPException(404,"Document negasit")
+            extracted=json.loads(selected.data_json or "{}")
+            data["selected_document"]={"kind":selected.kind,"filename":selected.filename,
+                "confirmed":bool(selected.confirmed),
+                "extract_for_review":str(extracted.get("preview") or "")[:12000] or
+                  json.dumps({"rows":extracted.get("rows",[])[:50],"notes":extracted.get("notes",[]),
+                    "uncertain_fields":extracted.get("uncertain_fields",[])},ensure_ascii=False)[:12000]}
         recent_messages = db.query(AIMessage).filter(AIMessage.business_id == biz.id).order_by(AIMessage.id.desc()).limit(12).all()
         conversation = "\n".join(x.role + ": " + x.content[:1000] for x in reversed(recent_messages))
         languages={"ro":"Romanian","en":"English","de":"German","fr":"French","it":"Italian","es":"Spanish","nl":"Dutch","pl":"Polish","hu":"Hungarian"}
@@ -546,35 +583,23 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                   context_for(req.topic,p.sector,
                               confirmed_sales=bool(sales["sales_lines"]),
                               confirmed_costs=bool(sales["margin_data_complete"])))
-        contextual=("Datele firmei, cu statusul de verificare al documentelor:\n" +
-                    json.dumps(data,ensure_ascii=False) +
-                    "\nIstoricul conversatiei:\n" + conversation)
-        answer = await ask_model(system, contextual, usage_now(db, biz), db,
-                                 advanced=req.topic in ("products", "margin", "performance", "invoices"))
-        active = answer is not None
-        if not active:
-            answer = ("Pot analiza activitatea ta de tip " + profile(p.sector)["label"] + ". " +
-                      weekly_request(p.sector) + " " +
-                      ("In acest moment nu am vanzari confirmate." if not sales["sales_lines"]
-                       else "Incarcarile confirmate arata venituri de " + str(sales["total_revenue"]) + " " + p.currency + ".") +
-                      " Chatul generativ va fi activ dupa configurarea furnizorului AI si a bugetului.")
-        if not active and req.language!="ro":
-            guided={
-                "en":"The generative AI provider is not connected. Your saved profile is available. To calculate profitability, add confirmed sales, variable costs and fixed expenses for the same period. I will not assume missing figures.",
-                "de":"Der generative KI-Anbieter ist nicht verbunden. Ihr gespeichertes Profil ist verfügbar. Für die Rentabilitätsberechnung erfassen Sie bestätigte Umsätze, variable Kosten und Fixkosten für denselben Zeitraum. Fehlende Zahlen werden nicht geschätzt.",
-                "fr":"Le fournisseur d’IA générative n’est pas connecté. Votre profil enregistré est disponible. Pour calculer la rentabilité, ajoutez les ventes confirmées, les coûts variables et les charges fixes de la même période. Les chiffres manquants ne seront pas inventés.",
-                "it":"Il fornitore di IA generativa non è collegato. Il profilo salvato è disponibile. Per calcolare la redditività, aggiungi vendite confermate, costi variabili e costi fissi dello stesso periodo. Non verranno inventati dati mancanti.",
-                "es":"El proveedor de IA generativa no está conectado. Tu perfil guardado está disponible. Para calcular la rentabilidad, añade ventas confirmadas, costes variables y costes fijos del mismo período. No se inventarán cifras que falten.",
-                "nl":"De aanbieder van generatieve AI is niet verbonden. Uw opgeslagen profiel is beschikbaar. Voeg voor de rentabiliteit bevestigde verkopen, variabele kosten en vaste kosten van dezelfde periode toe. Ontbrekende cijfers worden niet verzonnen.",
-                "pl":"Dostawca generatywnej AI nie jest połączony. Zapisany profil jest dostępny. Aby obliczyć rentowność, dodaj potwierdzoną sprzedaż, koszty zmienne i koszty stałe z tego samego okresu. Brakujące wartości nie będą wymyślane.",
-                "hu":"A generatív AI szolgáltató nincs csatlakoztatva. A mentett profil elérhető. A jövedelmezőség kiszámításához add meg az azonos időszak igazolt értékesítéseit, változó és fix költségeit. A hiányzó adatokat nem találom ki."
-            }
-            answer=guided.get(req.language,answer)
-        db.add(AIMessage(business_id=biz.id, role="assistant", topic=req.topic,
-                         content=answer[:12000], created_at=now()))
+        # Preserve the newest question before the bounded context; do not let
+        # long uploaded documents displace the actual user request.
+        contextual=("Intrebarea curenta (raspunde direct):\n"+req.text.strip()+
+                    "\nDatele firmei (date neconfirmate marcate separat):\n"+
+                    json.dumps(data,ensure_ascii=False)[:20000]+
+                    "\nIstoricul conversatiei:\n"+conversation[-6500:])
+        answer=await ask_model(system,contextual,usage,db,
+            advanced=bool(req.document_id) or req.topic in ("products","margin","performance","invoices"))
+        if not answer:
+            raise HTTPException(503,detail={"code":"provider_unavailable",
+                "message":"Furnizorul AI nu a raspuns. Pastreaza intrebarea si incearca din nou."})
+        db.add_all([AIMessage(business_id=biz.id,role="user",topic=req.topic,
+                              content=req.text.strip(),created_at=now()),
+                    AIMessage(business_id=biz.id,role="assistant",topic=req.topic,
+                              content=answer[:12000],created_at=now())])
         db.commit()
-        return {"answer": answer, "mode": "ai" if active else "guided",
-                "source": "profilul firmei si date agregate confirmate"}
+        return {"answer":answer,"mode":"ai","source":"profilul firmei si date agregate confirmate"}
     @r.post("/campaigns")
     async def draft_campaign(req: CampaignRequest, biz=Depends(owner), db: Session = Depends(db_session)):
         allowed = {"all", "active_0_7", "inactive_8_30", "inactive_31_90", "inactive_91_365", "product_buyers"}
@@ -688,16 +713,25 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                             x.unit_variable_cost if x.unit_variable_cost is not None else "",
                             x.customer_uuid or ""] for x in sales],
                           "loial_vanzari.csv")
+    def ads_records(db,biz):
+        records=[]
+        seen=set()
+        for customer in db.query(Customer).filter(Customer.business_id==biz.id,Customer.email.isnot(None)).all():
+            consent=db.query(Consent).filter(Consent.customer_id==customer.id,
+                Consent.purpose=="personalized_ads").order_by(Consent.id.desc()).first()
+            email=(customer.email or "").strip()
+            if consent and consent.granted==1 and "@" in email and email.casefold() not in seen:
+                records.append([email])
+                seen.add(email.casefold())
+        return records
+    @r.get("/exports/summary")
+    def export_summary(biz=Depends(owner),db:Session=Depends(db_session)):
+        return {"customers":db.query(Customer).filter(Customer.business_id==biz.id).count(),
+                "sales":len(active_sales(db,biz,limit=100000)),
+                "ads_consented":len(ads_records(db,biz))}
     @r.get("/exports/ads-consented.csv")
-    def ads_csv(biz=Depends(owner), db: Session = Depends(db_session)):
-        customers = db.query(Customer).filter(Customer.business_id == biz.id,
-                                               Customer.email.isnot(None)).all()
-        records = []
-        for x in customers:
-            if db.query(Consent).filter(Consent.customer_id == x.id,
-                    Consent.purpose == "personalized_ads", Consent.granted == 1).first():
-                records.append([x.email])
-        return export_csv(["email"], records, "loial_ads_consimtamant.csv")
+    def ads_csv(biz=Depends(owner),db:Session=Depends(db_session)):
+        return export_csv(["email"],ads_records(db,biz),"loial_ads_consimtamant.csv")
     @r.get("/message-templates")
     def message_templates(biz=Depends(owner), db: Session = Depends(db_session)):
         return [{"key": key, "label": tpl["label"],
