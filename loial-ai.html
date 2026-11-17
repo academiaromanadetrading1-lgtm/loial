@@ -81,12 +81,25 @@ header{padding:14px max(24px,calc((100% - 1392px)/2));flex-wrap:wrap}
 .campaign-wallet-preview .wallet-message p{font:inherit;color:inherit;margin:1em 0;white-space:normal}
 .campaign-wallet-preview .wallet-note{font:12px/1.5 system-ui,-apple-system,Arial;color:#54655b;margin:9px 0 0}
 .campaign-wallet-preview[hidden]{display:none}
+.loial-specialist{margin:12px 0;padding:14px 18px;background:#fff;border-left:4px solid #2d6a4f}
+.specialist-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.specialist-kicker{font-size:11px;font-weight:800;letter-spacing:.05em;color:#2d6a4f}
+.specialist-top strong{font-size:16px}
+.specialist-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.specialist-actions button{flex:1 1 210px;text-align:left;font-size:13px;background:#f4f8f5;color:#20573c;border:1px solid #dfeae2}
+.loial-specialist summary{cursor:pointer;color:#2d6a4f;font-weight:700}
+.wallet-message p{white-space:pre-wrap!important;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
 <header><a class="brand" href="/platform.html">◉ LOIAL • AI BUSINESS</a><a class="back" href="/platform.html">← Panou firmă</a></header>
 <main class="layout workspace">
 <nav class="workspace-nav" aria-label="Instrumente LOIAL"><button class="workspace-tab active" type="button" data-workspace="chat" aria-pressed="true"><span aria-hidden="true">◉</span><span>Conversație</span></button><button class="workspace-tab" type="button" data-workspace="documents" aria-pressed="false"><span aria-hidden="true">▤</span><span>Documente și facturi</span></button><button class="workspace-tab" type="button" data-workspace="sales" aria-pressed="false"><span aria-hidden="true">▧</span><span>Bonuri și vânzări</span></button><button class="workspace-tab" type="button" data-workspace="reports" aria-pressed="false"><span aria-hidden="true">▥</span><span>Rapoarte și indicatori</span></button><button class="workspace-tab" type="button" data-workspace="customers" aria-pressed="false"><span aria-hidden="true">◎</span><span>Clienți și exporturi</span></button><button class="workspace-tab" type="button" data-workspace="messages" aria-pressed="false"><span aria-hidden="true">✉</span><span>Campanii și mesaje</span></button></nav>
+<aside class="card loial-specialist" id="specialistGuide" aria-label="LOIAL AI">
+  <div class="specialist-top"><span class="specialist-kicker">LOIAL AI · 24/7</span><strong id="specialistRole"></strong></div>
+  <p id="specialistValue"></p>
+  <details id="specialistDetails" open><summary id="specialistSummary"></summary><div id="specialistActions" class="specialist-actions"></div><p class="tiny" id="specialistNote"></p></details>
+</aside>
 <div id="workspaceNotice" class="status" role="status" aria-live="polite" hidden></div>
 <section class="workspace-view active" id="view-chat" data-view="chat" ><div class="conversation-layout"><aside class="card profile-card" id="profileCard">
 <details class="profile-details" id="profileDetails" open><summary>Consultantul afacerii tale</summary><div class="profile-content">
@@ -286,6 +299,7 @@ function showWorkspace(key,updateHash=true){
   const notice=$('workspaceNotice');if(notice)notice.hidden=true;
   if(updateHash)history.replaceState(null,'',location.pathname+location.search+(key==='chat'?'':'#'+key));
   if(key==='chat')$('chat').scrollTop=$('chat').scrollHeight;
+  document.dispatchEvent(new CustomEvent('loial:workspace',{detail:key}));
 }
 document.querySelectorAll('[data-workspace]').forEach(b=>b.addEventListener('click',()=>showWorkspace(b.dataset.workspace)));
 $('openAttachments').onclick=()=>showWorkspace('documents');
@@ -944,6 +958,56 @@ function renderWalletMessagePreview(){
 for(const id of ['subject','offer','productFilter','promotionDeadline','promotionTime','promotionTerms'])$(id).addEventListener('input',renderWalletMessagePreview);
 document.addEventListener('loial:language',renderWalletMessagePreview);
 renderWalletMessagePreview();
+const specialistKeys=['chat','documents','sales','reports','customers','messages'];
+const specialistTopics=[['general','performance'],['invoices','margin'],['products','slow'],['performance','margin'],['customers','campaign'],['campaign','customers']];
+const specialistTranslations={
+ro:{
+labels:['Cu ce te pot ajuta acum?','Alege o întrebare sau descrie-mi problema. O pregătesc în conversație; tu decizi dacă o trimiți.'],
+pages:[
+['Managerul tău de afacere','Analizez situația firmei, explic problemele și propun soluții bazate pe datele disponibile.','Ce ar trebui să îmbunătățesc în firmă?','Care sunt prioritățile mele pentru săptămâna aceasta?'],
+['Asistent financiar și documentar','Te ajut să verifici facturi, extragi date și înțelegi costurile. Tu confirmi documentele; nu înlocuiesc contabilitatea legală.','Cum verific și clasific aceste cheltuieli?','Ce costuri pot optimiza fără să afectez activitatea?'],
+['Analist de vânzări','Te ajut să înregistrezi bonuri, urmărești produsele și înțelegi ce se vinde și ce marjă generează.','Ce produse contribuie cel mai mult la marjă?','Ce produse se vând greu și cum le pot promova?'],
+['Director financiar virtual','Analizez rentabilitatea, pragul de rentabilitate și indicatorii firmei; pot simula decizii înainte să le aplici.','Cum îmi pot îmbunătăți profitabilitatea?','Cum calculez pragul de rentabilitate al firmei?'],
+['Specialist în relații cu clienții','Te ajut să identifici segmentele, să înțelegi cumpărăturile și să propui acțiuni de fidelizare și revenire.','Ce segmente de clienți ar trebui să prioritizez?','Cum încurajez a doua cumpărătură și revenirea?'],
+['Specialist marketing și retenție','Construiesc oferte pentru segmentul ales, formulez mesaje și îți propun idei de reactivare. Tu verifici și aprobi orice trimitere.','Ce campanie de retenție să pregătesc pentru afacerea mea?','Cum cresc revenirea clienților fără reduceri inutile?']]},
+en:{labels:['How can I help you now?','Choose a question or describe your problem. Review it in chat before sending.'],pages:[
+['Business manager','Analyze your business and suggest practical priorities based on available data.','What should I improve in my business?','What are my priorities this week?'],
+['Finance and document assistant','Review invoices, extract information and understand costs. You confirm records; this is not statutory accounting.','How should I review and classify expenses?','Which costs could I optimize?'],
+['Sales analyst','Record receipts, track products and understand sales and margins.','Which products contribute most to margin?','How can I promote slow-selling products?'],
+['Virtual financial director','Analyze profitability, break-even and business indicators; simulate decisions before acting.','How can I improve profitability?','How do I calculate break-even?'],
+['Customer relationship specialist','Understand customer segments and purchases; plan loyalty and repeat visits.','Which customer segments should I prioritize?','How can I encourage repeat purchases?'],
+['Marketing and retention specialist','Build offers, write messages and suggest retention ideas. You approve each send.','What retention campaign should I prepare?','How can I increase repeat visits without unnecessary discounts?']]}
+};
+const specialistExtra={
+de:[['Wie kann ich helfen?','Wähle eine Frage und prüfe sie vor dem Senden.'],['Geschäftsmanager','Finanz- und Dokumentenassistent','Verkaufsanalyst','Virtueller Finanzleiter','Kundenbetreuung','Marketing und Kundenbindung']],
+fr:[['Comment puis-je vous aider ?','Choisissez une question et vérifiez-la avant envoi.'],['Gestionnaire d’entreprise','Assistant financier et documentaire','Analyste des ventes','Directeur financier virtuel','Relations clients','Marketing et fidélisation']],
+it:[['Come posso aiutarti?','Scegli una domanda e controllala prima di inviarla.'],['Gestore aziendale','Assistente finanziario e documentale','Analista vendite','Direttore finanziario virtuale','Relazioni clienti','Marketing e fidelizzazione']],
+es:[['¿Cómo puedo ayudarte?','Elige una pregunta y revísala antes de enviarla.'],['Gestor empresarial','Asistente financiero y documental','Analista de ventas','Director financiero virtual','Relaciones con clientes','Marketing y retención']],
+nl:[['Hoe kan ik helpen?','Kies een vraag en controleer deze vóór verzending.'],['Bedrijfsmanager','Financieel en documentassistent','Verkoopanalist','Virtueel financieel directeur','Klantrelaties','Marketing en klantbehoud']],
+pl:[['Jak mogę pomóc?','Wybierz pytanie i sprawdź je przed wysłaniem.'],['Menedżer firmy','Asystent finansowy i dokumentów','Analityk sprzedaży','Wirtualny dyrektor finansowy','Relacje z klientami','Marketing i utrzymanie klientów']],
+hu:[['Hogyan segíthetek?','Válassz kérdést, és ellenőrizd küldés előtt.'],['Üzleti vezető','Pénzügyi és dokumentumasszisztens','Értékesítési elemző','Virtuális pénzügyi vezető','Ügyfélkapcsolatok','Marketing és ügyfélmegtartás']]
+};
+function renderSpecialistGuide(key){
+ const i=Math.max(0,specialistKeys.indexOf(key||document.querySelector('[data-view].active')?.dataset.view));
+ const lang=language(), localized=specialistTranslations[lang], extra=specialistExtra[lang];
+ const content=(localized||specialistTranslations.en).pages[i], labels=localized?localized.labels:extra?extra[0]:specialistTranslations.en.labels;
+ $('specialistRole').textContent=extra?extra[1][i]:content[0];
+ $('specialistValue').textContent=content[1];$('specialistSummary').textContent=labels[0];$('specialistNote').textContent=labels[1];
+ const actions=$('specialistActions');actions.replaceChildren();
+ content.slice(2).forEach((question,j)=>{
+   const button=document.createElement('button');button.type='button';button.textContent=question;
+   button.onclick=()=>{
+     if(sending)return;
+     const input=$('message'), existing=input.value.trim();
+     if(existing&&existing!==question&&!confirm(lang==='ro'?'Înlocuiești întrebarea nestrimisă?':'Replace the unsent question?'))return;
+     currentTopic=specialistTopics[i][j];selectedDocument=null;$('selectedDocument').hidden=true;
+     showWorkspace('chat');input.value=question;input.focus();
+   };actions.appendChild(button);
+ });
+}
+document.addEventListener('loial:workspace',e=>renderSpecialistGuide(e.detail));
+document.addEventListener('loial:language',()=>renderSpecialistGuide());
+renderSpecialistGuide();
 init();
 </script>
 </body>
