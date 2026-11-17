@@ -391,3 +391,42 @@ def test_simulation_first_survives_provider_length_limit(app_client,monkeypatch)
     result=client.post("/api/loial-ai/chat",headers=h,json={"text":"Reia analiza"})
     assert result.status_code==503
     assert len(client.get("/api/loial-ai/history",headers=h).json())==2
+
+
+def test_provider_rejects_concurrent_same_business_and_releases_guard(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+    import loial_business_ai as ai
+    async def scenario():
+        entered=asyncio.Event()
+        release=asyncio.Event()
+        calls=[]
+        async def mock_once(system, question, usage, db, *args):
+            calls.append(usage.business_id)
+            if question=="first":
+                entered.set()
+                await release.wait()
+            if question=="error":
+                raise RuntimeError("simulated failure")
+            return "ok"
+        monkeypatch.setattr(ai,"_ask_model_once",mock_once)
+        refreshed=[]
+        db=SimpleNamespace(refresh=lambda u:refreshed.append(u.business_id))
+        one=SimpleNamespace(business_id=101)
+        two=SimpleNamespace(business_id=102)
+        task=asyncio.create_task(ai.ask_model("s","first",one,db))
+        await entered.wait()
+        assert await ai.ask_model("s","duplicate",one,db) is None
+        assert await ai.ask_model("s","different",two,db)=="ok"
+        release.set()
+        assert await task=="ok"
+        try:
+            await ai.ask_model("s","error",one,db)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("expected simulated failure")
+        assert await ai.ask_model("s","retry",one,db)=="ok"
+        assert calls==[101,102,101,101]
+        assert refreshed==calls
+    asyncio.run(scenario())
