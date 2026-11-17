@@ -68,11 +68,17 @@ def effective_entitlements(db,business_id,state=None):
     if state is None:
         state=db.get(LoialSubscription,business_id)
     paid=entitlements(state)
+    from loial_multilocation import direct_plan, inherited_access, GroupMember
     if paid["active"]:
-        return paid
+        return {**paid,"plan":direct_plan(db,business_id,state)}
     if manual_grant(db,business_id):
-        return {"active":True,"status":"manual_grant"}
-    return paid
+        return {"active":True,"status":"manual_grant","plan":"business"}
+    # Some isolated test deployments initialize only the old billing metadata.
+    from sqlalchemy import inspect
+    if inspect(db.connection()).has_table(GroupMember.__tablename__):
+        inherited=inherited_access(db,business_id)
+        if inherited:return inherited
+    return {**paid,"plan":"start"}
 
 def invoice_period(invoice):
     """Use billed service period, not webhook delivery date, for deduplication."""
@@ -236,6 +242,10 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
         if os.getenv("LOIAL_PUBLIC_FREE_PILOT","0")=="1":
             raise HTTPException(status_code=503,
                 detail="Programul LOIAL este momentan in pilot gratuit; abonamentele vor fi disponibile ulterior")
+        from loial_multilocation import GroupMember
+        from sqlalchemy import inspect
+        if inspect(db.connection()).has_table(GroupMember.__tablename__) and db.get(GroupMember,biz.id):
+            raise HTTPException(409,"Locatia apartine unei organizatii")
         key=os.getenv("LOIAL_STRIPE_SECRET_KEY","")
         if plan not in ("business","probusiness"):
             raise HTTPException(422,"Plan invalid")
