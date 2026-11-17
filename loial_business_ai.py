@@ -250,8 +250,8 @@ async def ask_model(system, question, usage, db, picture=None, advanced=False):
     if not settings or usage.cost_eur >= budget:
         return None
     key, rates = settings
-    selected_model = os.getenv("LOIAL_AI_ECONOMY_MODEL", "gpt-4.1-nano")
-    if advanced:
+    selected_model = os.getenv("LOIAL_AI_ECONOMY_MODEL", "gpt-6-luna")
+    if advanced or picture:
         strong = os.getenv("LOIAL_AI_ADVANCED_MODEL", "").strip()
         advanced_in = os.getenv("LOIAL_AI_ADVANCED_INPUT_USD_PER_M", "").strip()
         advanced_out = os.getenv("LOIAL_AI_ADVANCED_OUTPUT_USD_PER_M", "").strip()
@@ -268,8 +268,9 @@ async def ask_model(system, question, usage, db, picture=None, advanced=False):
         mime, raw = picture
         parts.append({"type": "image_url", "image_url": {"url":
                       "data:" + mime + ";base64," + base64.b64encode(raw).decode()}})
-    payload = {"model": selected_model,
-               "max_tokens": 1100 if advanced else 850, "messages": [
+    payload = {"model": selected_model, "store": False,
+               "max_completion_tokens": 1800 if (advanced or picture) else 1100,
+               "reasoning_effort": "none", "messages": [
                   {"role": "system", "content": system},
                   {"role": "user", "content": parts}]}
     try:
