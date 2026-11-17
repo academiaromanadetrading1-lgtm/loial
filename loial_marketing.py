@@ -46,14 +46,47 @@ TEMPLATES = {
     },
 }
 
-def campaign_message(text, product):
-    """Include the selected product without inventing an offer or changing its name."""
+# The same copy is mirrored in the campaign editor. No invented discount or expiry.
+PROMOTION_COPY = {
+    "ro": ("În promoție: ", "Profită de ofertă acum!", "Valabilă până la "),
+    "en": ("On promotion: ", "Take advantage of the offer now!", "Valid until "),
+    "de": ("Im Angebot: ", "Nutze das Angebot jetzt!", "Gültig bis "),
+    "fr": ("En promotion : ", "Profitez de l’offre dès maintenant !", "Valable jusqu’au "),
+    "it": ("In promozione: ", "Approfitta subito dell’offerta!", "Valida fino al "),
+    "es": ("En promoción: ", "¡Aprovecha la oferta ahora!", "Válida hasta el "),
+    "nl": ("In de aanbieding: ", "Profiteer nu van de aanbieding!", "Geldig tot "),
+    "pl": ("W promocji: ", "Skorzystaj z oferty już teraz!", "Ważna do "),
+    "hu": ("Akcióban: ", "Használd ki az ajánlatot most!", "Érvényes eddig: "),
+}
+
+def campaign_message(text, product, language="ro", deadline=""):
+    """Build a deterministic promotion and call to action for preview and delivery."""
     message = text.strip()
     product = product.strip()
-    if not product or product.lower() in message.lower():
+    if not product:
         return message
-    suffix = "\n\n" + product if message else product
-    return message[:2000-len(suffix)].rstrip() + suffix if message else suffix
+    prefix, action, validity = PROMOTION_COPY.get(language, PROMOTION_COPY["ro"])
+    lines = [prefix + product + "."]
+    if deadline:
+        lines.append(validity + deadline + ".")
+    lines.append(action)
+    # The footer is exact and idempotent: the server will reject any other payload.
+    footer = "\n".join(lines)
+    if message == footer or message.endswith("\n\n" + footer):
+        return message
+    return message[:2000-len(footer)-2].rstrip() + "\n\n" + footer if message else footer
+
+
+def validate_promotion_deadline(value):
+    if not value:
+        return ""
+    try:
+        parsed = date.fromisoformat(value)
+        if parsed.isoformat() != value or parsed < date.today():
+            raise ValueError()
+    except (TypeError, ValueError):
+        raise ValueError("Data de expirare trebuie sa fie o data valida, cel putin astazi.")
+    return value
 
 
 class SafeFormat(dict):
