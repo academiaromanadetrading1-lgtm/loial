@@ -256,6 +256,15 @@
         <p id="dashAmounts" style="font-weight:700"></p>
         <p id="dashRecruited"></p>
         <div id="dashLedger" style="font-size:13px;line-height:1.7"></div>
+        <h3 style="margin-top:20px">Contul Wise pentru comisioane</h3>
+        <p id="ambWiseStatus" style="font-size:13px">Detalii Wise neconfirmate</p>
+        <form id="ambWiseForm">
+          <label for="ambWiseDetails">Detalii de plată Wise (email sau cont verificat)</label>
+          <input id="ambWiseDetails" autocomplete="off" maxlength="150" minlength="6" required placeholder="Email Wise sau cont bancar">
+          <label for="ambWisePassword">Parola contului LOIAL, pentru confirmare</label>
+          <input id="ambWisePassword" type="password" autocomplete="current-password" required>
+          <button type="submit" class="btn-secondary">Actualizează contul Wise</button>
+        </form>
         <h3 style="margin-top:20px">Firmele mele și firmele ambasadorilor recrutați direct</h3>
         <div id="dashFirmActivity" style="font-size:13px;line-height:1.7"></div>
         <button type="button" class="btn-secondary" onclick="reloadAmbassador()">Actualizează plățile</button>
@@ -373,6 +382,8 @@
     document.getElementById('dashAmounts').textContent=
       'În așteptare: '+ledger.pending_eur.toFixed(2)+' EUR | Aprobat: '+
       ledger.approved_eur.toFixed(2)+' EUR | Achitat: '+ledger.paid_eur.toFixed(2)+' EUR';
+    document.getElementById('ambWiseStatus').textContent=
+      ledger.wise_details_saved?'Contul Wise este salvat.':'Completează datele Wise pentru virarea comisioanelor.';
     document.getElementById('dashRecruited').textContent=
       'Ambasadori recrutați direct: '+ledger.sponsored_ambassadors;
     const firms=document.getElementById('dashFirmActivity');
@@ -401,7 +412,30 @@
       container.appendChild(div);
     }
   }
-  function copyRefUrl(){navigator.clipboard.writeText(document.getElementById('dashRefUrl').value);}
+  document.getElementById('ambWiseForm').onsubmit=async event=>{
+    event.preventDefault();
+    if(!ambassadorToken){fail('Autentificarea a expirat.');return;}
+    const details=document.getElementById('ambWiseDetails');
+    const password=document.getElementById('ambWisePassword');
+    const submit=event.currentTarget.querySelector('button[type="submit"]');
+    submit.disabled=true;
+    statusBox.textContent='';
+    try{
+      const response=await fetch('/api/loial-revenue/ambassador/wise-details',{
+        method:'PUT',
+        headers:{...authHeaders(),'Content-Type':'application/json'},
+        body:JSON.stringify({password:password.value,
+          account_details:details.value.trim()})});
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok)throw Error(payload.detail||'Actualizarea nu a reușit.');
+      details.value='';
+      password.value='';
+      document.getElementById('ambWiseStatus').textContent='Detaliile Wise au fost salvate.';
+      await reloadAmbassador();
+    }catch(error){fail(error.message);}
+    finally{password.value='';submit.disabled=false;}
+  };
+    function copyRefUrl(){navigator.clipboard.writeText(document.getElementById('dashRefUrl').value);}
   function copyInvite(){navigator.clipboard.writeText(document.getElementById('dashRecruitUrl').value);}
   function logoutAmb(){
     ambassadorToken='';
