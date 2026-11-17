@@ -1837,7 +1837,12 @@ def quick_register(request: Request, req: QuickRegisterRequest, db: Session = De
         raise HTTPException(status_code=400, detail="Email deja înregistrat")
 
     clean_ref = sanitize_input(req.ref_code or "", 60)
-    agent = db.query(SalesAgent).filter(SalesAgent.qr_code == clean_ref).first() if clean_ref else None
+    agent = db.query(SalesAgent).filter(
+        SalesAgent.qr_code==clean_ref,
+        SalesAgent.active.is_(True)).first() if clean_ref else None
+    if clean_ref and (not agent or agent.role!="ambassador"):
+        raise HTTPException(status_code=422,
+            detail="Cod de recomandare invalid sau inactiv. Verifica linkul ambasadorului.")
 
     if len(req.password)<10:
         raise HTTPException(status_code=422,detail="Parola trebuie sa aiba minimum 10 caractere")
