@@ -26,7 +26,7 @@ from loial_financial_simulation import RULES as SIMULATION_RULES, enrich_answer
 from loial_analytics import customer_segments, sector_summary, abc_products, money, manager_findings, break_even_analysis
 from loial_academic_methods import context_for
 from loial_knowledge import guidance
-from loial_marketing import TEMPLATES, render as render_template, campaign_message
+from loial_marketing import TEMPLATES, render as render_template, campaign_message, validate_promotion_deadline
 
 BaseAI = declarative_base()
 
@@ -132,7 +132,9 @@ class CampaignRequest(BaseModel):
     objective: str = Field(min_length=3, max_length=250)
     audience: str = Field(default="inactive_31_90", max_length=60)
     product: str = Field(default="", max_length=200)
-    offer: str = Field(default="", max_length=300)
+    offer: str = Field(default="", max_length=2000)
+    language: str = Field(default="ro", max_length=2)
+    deadline: str = Field(default="", max_length=10)
 
 TOPICS = [
     ("performance", "Cum merge afacerea?"),
@@ -665,6 +667,10 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         allowed = {"all", "active_0_7", "inactive_8_30", "inactive_31_90", "inactive_91_365", "product_buyers"}
         if req.audience not in allowed:
             raise HTTPException(status_code=422, detail="Segment invalid")
+        try:
+            deadline = validate_promotion_deadline(req.deadline) if req.product.strip() else ""
+        except ValueError as exc:
+            raise HTTPException(422, str(exc))
         p = account_profile(db, biz)
         subject = "Noutati de la " + biz.name[:100]
         message = ("Buna! " + req.offer if req.offer else
@@ -672,10 +678,10 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         summary = sector_summary(p.sector, rows(db, biz))
         structured = {"business": biz.name, "sector": profile(p.sector)["label"],
                       "objective": req.objective, "audience": req.audience,
-                      "promoted_product_or_service": req.product, "offer_explicit": req.offer, "products": summary["products"][:5]}
+                      "promoted_product_or_service": req.product, "offer_explicit": req.offer, "deadline": deadline, "language": req.language, "products": summary["products"][:5]}
         prompt = ("Esti redactorul campaniilor Loial. Propune un mesaj scurt, clar si natural pentru "
                   "afacerea descrisa. Returneaza NUMAI JSON valid cu cheile subject si text. "
-                   "Daca produsul sau serviciul promovat este completat, mentioneaza explicit denumirea exacta in text, natural. "
+                   "Scrie in limba indicata. Daca produsul sau serviciul este completat, mentioneaza explicit promotia si incurajeaza cumpararea sau programarea acum. Foloseste o data limita numai daca a fost furnizata. Nu inventa urgenta, raritate sau reduceri. "
                   "Nu inventa reduceri, preturi, promisiuni, stocuri, termene ori performante. "
                   "Nu mentiona public ca destinatarul a fost profilat dupa cumparaturi. "
                   "Nu comunica produse sensibile. Include doar oferte aprobate explicit de administrator.")
@@ -693,7 +699,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                     generated = True
             except ValueError:
                 pass
-        message = campaign_message(message[:2000], req.product)
+        message = campaign_message(message[:2000], req.product, req.language, deadline)
         draft = AICampaign(business_id=biz.id, audience=req.audience, product=req.product.strip() or None,
                            objective=req.objective, subject=subject, content=message, status="draft")
         db.add(draft)
@@ -801,7 +807,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                 for key, tpl in TEMPLATES.items()]
 
     @r.get("/message-templates/{template_key}/preview")
-    def preview_template(template_key: str, product: str = "", biz=Depends(owner),
+    def preview_template(template_key: str, product: str = "", language: str = "ro", deadline: str = "", biz=Depends(owner),
                          db: Session = Depends(db_session)):
         if template_key not in TEMPLATES:
             raise HTTPException(status_code=404, detail="Sablon inexistent")
@@ -809,7 +815,11 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                  "stamps": 2, "target": getattr(biz, "stamps_required", None) or 6,
                  "remaining": 4, "reward": biz.reward_text or "Premiu fidelitate",
                  "product": product.strip()[:200] or "produsul preferat", "offer": "Detalii la locatie."})
-        result["text"] = campaign_message(result["text"], product[:200])
+        try:
+            deadline = validate_promotion_deadline(deadline) if product.strip() else ""
+        except ValueError as exc:
+            raise HTTPException(422, str(exc))
+        result["text"] = campaign_message(result["text"], product[:200], language, deadline)
         return result
 
     @r.get("/customers")
