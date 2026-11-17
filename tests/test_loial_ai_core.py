@@ -430,3 +430,45 @@ def test_provider_rejects_concurrent_same_business_and_releases_guard(monkeypatc
         assert calls==[101,102,101,101]
         assert refreshed==calls
     asyncio.run(scenario())
+
+
+def test_provider_charges_unusable_response_and_estimates_missing_usage(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+    import loial_business_ai as ai
+    for key,value in {
+        "LOIAL_AI_OPENAI_API_KEY":"test-key",
+        "LOIAL_AI_ECONOMY_MODEL":"test-model",
+        "LOIAL_AI_INPUT_USD_PER_M":"1",
+        "LOIAL_AI_OUTPUT_USD_PER_M":"2",
+        "LOIAL_AI_USD_TO_EUR":"1",
+        "LOIAL_AI_MONTHLY_BUDGET_EUR":"1",
+    }.items():
+        monkeypatch.setenv(key,value)
+    responses=iter([
+        {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":25}},
+        {"choices":[{"message":{"content":None}}]},
+        {"choices":[{"message":{"content":"ok"}}],
+         "usage":{"prompt_tokens":-5,"completion_tokens":True}},
+    ])
+    class MockClient:
+        def __init__(self,**kwargs):pass
+        async def __aenter__(self):return self
+        async def __aexit__(self,*args):pass
+        async def post(self,url,**kwargs):
+            data=next(responses)
+            return SimpleNamespace(raise_for_status=lambda:None,json=lambda:data)
+    monkeypatch.setattr(ai.httpx,"AsyncClient",MockClient)
+    usage=SimpleNamespace(input_tokens=0,output_tokens=0,cost_eur=0.0)
+    commits=[]
+    db=SimpleNamespace(commit=lambda:commits.append(True))
+    assert asyncio.run(ai.ask_model("s","q",usage,db)) is None
+    assert abs(usage.cost_eur-0.00015)<1e-10
+    assert asyncio.run(ai.ask_model("s","q",usage,db)) is None
+    assert usage.input_tokens==614
+    assert usage.output_tokens==1125
+    assert asyncio.run(ai.ask_model("s","q",usage,db))=="ok"
+    assert usage.input_tokens==1128
+    assert usage.output_tokens==2225
+    assert abs(usage.cost_eur-0.005578)<1e-10
+    assert len(commits)==3
