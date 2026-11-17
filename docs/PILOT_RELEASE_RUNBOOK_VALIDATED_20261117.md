@@ -67,3 +67,21 @@ Execuția GitHub Actions #520 (44079730202), job 134026871699, commit c533b96e67
 
 ## Publicare post-pilot — 17.11.2026
 După aprobarea explicită a operatorului, Railway deployment e9ee05b7-26b2-4025-bb87-10b3227486f9 SUCCESS, branch release/loial-pilot-c533b96, commit efectiv c533b96e67017f701f82e86158e131305170c05e. Startup complet, volum persistent montat, /health și /it/ HTTP 200; solicitarea externă /wp-admin/install.php a primit 404. Nu s-au modificat variabilele ori activat Stripe. Retestarea extinsă HTTP pe această versiune, dispozitivele fizice, apelul AI real și validarea comercială rămân de efectuat.
+
+
+## Actualizare 18.11.2026 — echipa virtuală și gate comercial
+- CI #522: 185 teste; deploy 5330c974ab25721aaa167f4b4e657f4a15f87ad8 SUCCESS.
+- CI #523 (44146386044): 185 izolate + 1 integrare PASS; deploy 053cede88d5dc2ad30f44d69c7bfe1c0d8124c5b SUCCESS. Operatorul a confirmat în browser previzualizarea și generarea AI reală pentru campanie; captura a evidențiat date contradictorii.
+- CI #524: 186 PASS, 1 FAIL: modelul de test Biz nu includea reward_text; corectat în fixture conform modelului de producție, fără a relaxa testul.
+- CI #525 (44189382743, job 134414392849): 187 izolate + 1 integrare PASS. Compilare Python, sintaxă JS și PWA PASS. Commit validat 6e9f86fae8c420faf0f9ff7b1e66d5c0930b7175.
+- După aprobarea operatorului, deployment Railway 6fb968ac-9ba9-494c-aff8-e2dee8821a76 SUCCESS, branch release/loial-specialists-6e9f86f, hash efectiv confirmat. Volum montat, startup complet, port 8080, /health și / HTTP 200, zero răspunsuri 5xx în eșantionul de loguri verificat. Nicio modificare de configurare Stripe, API sau volum. Nu reprezintă test complet de disponibilitate sau încărcare. Backupul anterior nu este unul nou.
+
+### Acceptanță înainte de comercializare
+1. Cont Business autorizat existent: verifică cele șase secțiuni, întrebările specialistului, păstrarea întrebărilor nestrimise, limba și istoricul. Verifică starea AI și consumul efectiv; fără expunerea cheilor. Generarea reală a unei campanii a fost observată în captura operatorului, dar conversația financiară și documentele rămân nevalidate.
+2. Campanie fictivă: produs croissant, beneficiu 6 lei în loc de 8 lei, termen viitor ales în calendar, ora 18:00. Verifică o singură dată, beneficiul exact, îndemnul și textul fără reduceri inventate; nu trimite clienților reali. Testează editarea și previzualizarea fără apel AI. Pentru trimitere folosește exclusiv destinatarul de test consimțit. Verifică identitatea textului în portofel, fără livrare către alte persoane. Verifică marcarea expiratului și eventualele diferențe de stil separat; nu presupune implementare completă a acestora.
+3. Pe Android și iPhone: instalare PWA pe ecran, activare card, QR, ștampilă unică, recuperare și inbox. Nu considera testul SQLite dovadă pentru dispozitive reale.
+4. Confirmă identitatea juridică a operatorului, datele de contact, condițiile abonamentelor și anulării, confidențialitatea, fiscalitatea și procedura de suport. Nu inventa date ale firmei.
+5. Stripe TEST înainte de orice checkout real: abonare, factură, plată eșuată, anulare, webhook, reînnoire, refund/dispută, comision ambasador; reconciliere cu registrul. Fără activare live înainte de acceptanță și aprobarea operatorului.
+6. Test de încărcare separat (aprobare dacă implică costuri) și verificare backup extern criptat; pilot gradual până la 100 firme. Nu pretinde capacitate demonstrată la 100 firme.
+7. Lansarea comercială rămâne blocată până la acceptanța reală și configurarea plăților. Nu porni noi execuții CI ori API plătite fără aprobare.
+
