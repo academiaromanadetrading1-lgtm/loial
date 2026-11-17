@@ -26,7 +26,7 @@ from loial_financial_simulation import RULES as SIMULATION_RULES, enrich_answer
 from loial_analytics import customer_segments, sector_summary, abc_products, money, manager_findings, break_even_analysis
 from loial_academic_methods import context_for
 from loial_knowledge import guidance
-from loial_marketing import TEMPLATES, render as render_template
+from loial_marketing import TEMPLATES, render as render_template, campaign_message
 
 BaseAI = declarative_base()
 
@@ -672,9 +672,10 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         summary = sector_summary(p.sector, rows(db, biz))
         structured = {"business": biz.name, "sector": profile(p.sector)["label"],
                       "objective": req.objective, "audience": req.audience,
-                      "product_filter": req.product, "offer_explicit": req.offer, "products": summary["products"][:5]}
+                      "promoted_product_or_service": req.product, "offer_explicit": req.offer, "products": summary["products"][:5]}
         prompt = ("Esti redactorul campaniilor Loial. Propune un mesaj scurt, clar si natural pentru "
                   "afacerea descrisa. Returneaza NUMAI JSON valid cu cheile subject si text. "
+                   "Daca produsul sau serviciul promovat este completat, mentioneaza explicit denumirea exacta in text, natural. "
                   "Nu inventa reduceri, preturi, promisiuni, stocuri, termene ori performante. "
                   "Nu mentiona public ca destinatarul a fost profilat dupa cumparaturi. "
                   "Nu comunica produse sensibile. Include doar oferte aprobate explicit de administrator.")
@@ -687,11 +688,12 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                 if (isinstance(candidate, dict) and isinstance(candidate.get("subject"), str)
                     and isinstance(candidate.get("text"), str) and
                         candidate["subject"].strip() and candidate["text"].strip()):
-                    subject = candidate["subject"].strip()[:180]
+                    subject = candidate["subject"].strip()[:120]
                     message = candidate["text"].strip()[:2000]
                     generated = True
             except ValueError:
                 pass
+        message = campaign_message(message[:2000], req.product)
         draft = AICampaign(business_id=biz.id, audience=req.audience, product=req.product.strip() or None,
                            objective=req.objective, subject=subject, content=message, status="draft")
         db.add(draft)
@@ -799,14 +801,16 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                 for key, tpl in TEMPLATES.items()]
 
     @r.get("/message-templates/{template_key}/preview")
-    def preview_template(template_key: str, biz=Depends(owner),
+    def preview_template(template_key: str, product: str = "", biz=Depends(owner),
                          db: Session = Depends(db_session)):
         if template_key not in TEMPLATES:
             raise HTTPException(status_code=404, detail="Sablon inexistent")
-        return render_template(template_key, {"business": biz.name, "name": "Client",
+        result = render_template(template_key, {"business": biz.name, "name": "Client",
                  "stamps": 2, "target": getattr(biz, "stamps_required", None) or 6,
                  "remaining": 4, "reward": biz.reward_text or "Premiu fidelitate",
-                 "product": "produsul preferat", "offer": "Detalii la locatie."})
+                 "product": product.strip()[:200] or "produsul preferat", "offer": "Detalii la locatie."})
+        result["text"] = campaign_message(result["text"], product[:200])
+        return result
 
     @r.get("/customers")
     def customer_directory(page: int = 1, biz=Depends(owner),
