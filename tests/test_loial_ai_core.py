@@ -191,3 +191,58 @@ def test_campaign_and_customer_history_are_isolated(app_client):
     assert second["items"][0]["name"] == "Client Garaj"
     assert client.get("/api/loial-ai/customers/2/purchases",headers=headers1).status_code == 404
     assert client.get("/api/loial-ai/customers/1/purchases",headers=headers2).status_code == 404
+
+
+def test_chat_unconfigured_is_not_a_fake_ai_answer(app_client):
+    client,auth=app_client
+    h=auth("owner1@test.invalid")
+    assert client.get("/api/loial-ai/context",headers=h).json()["ai_status"]=="not_configured"
+    result=client.post("/api/loial-ai/chat",headers=h,json={"text":"Cum cresc marja?"})
+    assert result.status_code==503
+    assert result.json()["detail"]["code"]=="not_configured"
+    assert client.get("/api/loial-ai/history",headers=h).json()==[]
+
+
+def test_provider_chat_contains_actual_latest_question_and_selected_document(app_client,monkeypatch):
+    import loial_business_ai as ai
+    client,auth=app_client
+    h=auth("owner1@test.invalid")
+    monkeypatch.setattr(ai,"provider_status",lambda usage:"configured")
+    calls=[]
+    async def mocked_model(system,question,usage,db,**kwargs):
+        calls.append((system,question,kwargs))
+        return "Para mejorar el margen necesitamos los costes variables."
+    monkeypatch.setattr(ai,"ask_model",mocked_model)
+    raw=b"sold_at,product,quantity,unit_price\n2026-11-11,Coffee,1,10\n"
+    doc=client.post("/api/loial-ai/documents",headers=h,
+        files={"file":("test.csv",raw,"text/csv")}).json()["id"]
+    assert client.get(f"/api/loial-ai/documents/{doc}/preview",headers=auth("owner2@test.invalid")).status_code==404
+    preview=client.get(f"/api/loial-ai/documents/{doc}/preview",headers=h)
+    assert preview.status_code==200 and preview.json()["rows"][0]["product"]=="Coffee"
+    data={"text":"Como mejorar el margen?","topic":"margin","language":"es","document_id":doc}
+    denied=client.post("/api/loial-ai/chat",headers=auth("owner2@test.invalid"),json=data)
+    assert denied.status_code==404
+    result=client.post("/api/loial-ai/chat",headers=h,json=data)
+    assert result.status_code==200,result.text
+    assert result.json()["mode"]=="ai"
+    assert len(calls)==1
+    assert "Spanish" in calls[0][0]
+    assert data["text"] in calls[0][1][:200]
+    assert "Coffee" in calls[0][1]
+    assert calls[0][2]["advanced"] is True
+    history=client.get("/api/loial-ai/history",headers=h).json()
+    assert len(history)==2 and history[0]["text"]==data["text"]
+    async def unavailable(*args,**kwargs):return None
+    monkeypatch.setattr(ai,"ask_model",unavailable)
+    failed=client.post("/api/loial-ai/chat",headers=h,json={"text":"Nueva pregunta"})
+    assert failed.status_code==503 and failed.json()["detail"]["code"]=="provider_unavailable"
+    assert len(client.get("/api/loial-ai/history",headers=h).json())==2
+
+
+def test_export_counts_respect_tenant_and_consent(app_client):
+    client,auth=app_client
+    first=client.get("/api/loial-ai/exports/summary",headers=auth("owner1@test.invalid"))
+    second=client.get("/api/loial-ai/exports/summary",headers=auth("owner2@test.invalid"))
+    assert first.json()=={"customers":1,"sales":0,"ads_consented":1}
+    assert second.json()=={"customers":1,"sales":0,"ads_consented":0}
+    assert client.get("/api/loial-ai/exports/customers.xlsx",headers=auth("owner1@test.invalid")).content.startswith(b"PK")
