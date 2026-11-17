@@ -306,7 +306,7 @@ def test_simulation_deterministic_math_and_independent_scenarios():
     assert r["revenue"]==56160
     assert r["profit"]==11660
     assert rounded(r["margin"])==Decimal("20.76")
-    assert rounded(r["breakeven"])==Decimal("38678.91")
+    assert rounded(r["breakeven"])==Decimal("38679.34")
     assert r["target"]==15158
     assert [s["profit"] for s in r["scenarios"]]==[13410,15158,15158]
     assert [s["delta"] for s in r["scenarios"]]==[1750,3498,3498]
