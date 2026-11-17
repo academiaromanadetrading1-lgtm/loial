@@ -562,9 +562,15 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
         raise HTTPException(status_code=401, detail="Email sau parolă incorectă")
 
     log_auth_event(email, True, ip)
-    token = create_access_token({"sub": email, "role": role})
-    biz_id_val = business.id if business else None
-    response.set_cookie(key="loial_token", value=token, httponly=True, max_age=86400, samesite="lax")
+    biz_id_val = business.id if role=="business" and business else None
+    claims={"sub":email,"role":role}
+    if biz_id_val is not None:claims["business_id"]=biz_id_val
+    if role=="ambassador" and agent:claims["agent_id"]=agent.id
+    token=create_access_token(claims)
+    response.set_cookie(key="loial_token",value=token,httponly=True,
+                        secure=os.getenv("LOIAL_PUBLIC_ORIGIN","https://loial.space").startswith("https://"),
+                        max_age=min(86400,ACCESS_TOKEN_EXPIRE_MINUTES*60),
+                        samesite="lax")
     return {
         "access_token": token,
         "token_type": "bearer",
