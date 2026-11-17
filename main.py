@@ -583,6 +583,7 @@ def logout_endpoint():
 
 @app.get("/customers")
 def get_customers(page: int = 1, limit: int = 20, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Lista globala de clienti a fost retrasa. Foloseste panoul firmei autentificate.")
     limit = min(limit, 100)
     offset = (page - 1) * limit
     customers = db.query(Customer).offset(offset).limit(limit).all()
@@ -592,6 +593,7 @@ def get_customers(page: int = 1, limit: int = 20, current_user: User = Depends(g
 @app.post("/customers")
 @limiter.limit("30/minute")
 def add_customer(request: Request, c: CustomerCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Inscrierea legacy fara atribuire la firma este dezactivata.")
     name = sanitize_input(c.name, 100)
     customer = Customer(name=name, lang=sanitize_input(c.lang, 5), email=sanitize_input(c.email or "", 100), lat=c.lat, lng=c.lng, last_visit=datetime.now().strftime("%Y-%m-%d"))
     db.add(customer)
@@ -602,6 +604,7 @@ def add_customer(request: Request, c: CustomerCreate, current_user: User = Depen
 @app.post("/stamp")
 @limiter.limit("60/minute")
 def add_stamp(request: Request, req: StampRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Stampilarea fara PIN si audit a fost retrasa. Foloseste scan-universal.")
     customer = db.query(Customer).filter(Customer.id == req.customer_id).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
@@ -618,6 +621,7 @@ def add_stamp(request: Request, req: StampRequest, current_user: User = Depends(
 
 @app.get("/stats")
 def get_stats(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Statisticile globale de clienti nu sunt disponibile intre firme.")
     total = db.query(func.count(Customer.id)).scalar()
     active = db.query(func.count(Customer.id)).filter(Customer.stamps > 0).scalar()
     at_risk = db.query(func.count(Customer.id)).filter(Customer.stamps == 0).scalar()
@@ -661,10 +665,12 @@ def generate_qr(customer_id: int, current_user: User = Depends(get_current_user)
 
 @app.get("/locations")
 def get_locations(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Locatiile legacy globale sunt dezactivate.")
     return db.query(Location).all()
 
 @app.post("/locations")
 def add_location(loc: LocationCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Adaugarea locatiilor fara verificarea firmei este dezactivata.")
     location = Location(**loc.dict())
     db.add(location)
     db.commit()
@@ -673,6 +679,7 @@ def add_location(loc: LocationCreate, current_user: User = Depends(get_current_u
 
 @app.post("/nearby")
 def nearby(lat: float, lng: float, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Cautarea veche a locatiilor partajate este retrasa.")
     locs = db.query(Location).all()
     results = []
     for loc in locs:
@@ -683,7 +690,7 @@ def nearby(lat: float, lng: float, current_user: User = Depends(get_current_user
 
 @app.post("/payment")
 def create_payment(req: PaymentRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    raise HTTPException(status_code=410, detail="Abonamentele platite se confirma numai din Wise Business, dupa reconciliere.")
+    raise HTTPException(status_code=410, detail="Abonamentele LOIAL se incaseaza exclusiv prin Stripe Checkout, dupa webhook verificat.")
     prices = {"starter": 0, "pro": 49, "network": 199}
     if req.plan not in prices:
         raise HTTPException(status_code=400, detail="Invalid plan")
@@ -699,6 +706,7 @@ def list_payments(current_user: User = Depends(get_current_user), db: Session = 
 
 @app.post("/notify")
 def send_notification(req: NotificationRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Notificarea arbitrarilor clienti fara proprietar verificat este retrasa.")
     notif = Notification(id=str(uuid.uuid4())[:8], customer_id=req.customer_id, message=req.message, channel=req.channel, date=datetime.now().isoformat(), status="sent")
     db.add(notif)
     db.commit()
@@ -717,7 +725,7 @@ def legacy_apple_wallet_endpoint(customer_id:int):
 
 @app.post("/payment/stripe")
 def create_stripe_payment(req: PaymentRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    raise HTTPException(status_code=410, detail="LOIAL foloseste exclusiv Wise Business. Checkout Stripe retras.")
+    raise HTTPException(status_code=410, detail="Checkout Stripe vechi este retras. Foloseste /api/loial-stripe/checkout.")
     prices = {"starter": 0, "pro": 4900, "network": 19900}
     if req.plan not in prices:
         raise HTTPException(status_code=400, detail="Invalid plan")
