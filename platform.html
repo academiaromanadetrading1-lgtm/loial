@@ -1150,7 +1150,7 @@ async function loadAcquisition(){
     const response=await authorizedFetch('/api/admin/pilot-metrics');
     if(!response.ok)throw Error('Date indisponibile');
     const d=await response.json();
-    status.textContent=d.tracked_business_accounts+' conturi atribuite · '+d.registered_cards+' carduri · '+d.stamp_operations+' operațiuni de ștampilare';
+    status.textContent=d.tracked_business_accounts+' conturi atribuite · '+d.active_accounts+' conturi cu ștampile · '+d.accounts_with_cards+' conturi cu carduri · '+d.registered_cards+' carduri · '+d.stamp_operations+' operațiuni de ștampilare';
     const labels={card:'Card digital',receipt:'Bon digital',poster:'Afiș QR',demo:'Demonstrație',ambassador:'Ambasador',industry:'Pagini SEO',review:'Feedback',direct:'Direct'};
     for(const [key,n] of Object.entries(d.by_source).sort((a,b)=>b[1]-a[1])){
       const label=document.createElement('p');label.textContent=(labels[key]||key)+' · '+n;
