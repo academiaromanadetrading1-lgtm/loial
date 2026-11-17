@@ -409,10 +409,10 @@ def seed_pricing(db):
     pro_plan = db.query(Pricing).filter(Pricing.plan == "pro").first()
     if not pro_plan:
         db.add(Pricing(plan="starter", base_price=0, updated_at=datetime.now().isoformat()))
-        db.add(Pricing(plan="pro", base_price=65, updated_at=datetime.now().isoformat()))
+        db.add(Pricing(plan="pro", base_price=67, updated_at=datetime.now().isoformat()))
         db.add(Pricing(plan="network", base_price=199, updated_at=datetime.now().isoformat()))
     else:
-        pro_plan.base_price = 65
+        pro_plan.base_price = 67
         pro_plan.updated_at = datetime.now().isoformat()
     if db.query(VATRate).count() == 0:
         vat_rates = [
@@ -741,6 +741,7 @@ def create_stripe_payment(req: PaymentRequest, current_user: User = Depends(get_
 
 @app.post("/email")
 def send_email(to: str, subject: str, body: str, current_user: User = Depends(get_current_user)):
+    raise HTTPException(status_code=410,detail="Trimiterea de e-mailuri din endpointul generic a fost dezactivata.")
     if SENDGRID_KEY:
         try:
             from sendgrid import SendGridAPIClient
@@ -1498,6 +1499,7 @@ def agent_payouts(agent_id: int, current_user: User = Depends(get_current_user),
 
 @app.post("/invoices/create")
 def create_invoice(business_id: int, amount: float, description: str = "Loial Pro Subscription", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Facturarea abonamentelor se face exclusiv prin fluxul Stripe.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
@@ -1582,6 +1584,12 @@ def create_wise_payout(agent_id: int, amount: float, current_user: User = Depend
 
 @app.get("/pricing")
 def get_pricing(country: str = "RO", db: Session = Depends(get_db)):
+    # LOIAL currently does not add VAT to its EUR 67 subscription price.
+    return [{"plan":"pro","base_price":67,"vat_rate":0,"vat_amount":0,
+             "total":67,"currency":"EUR","country":country.upper(),
+             "billing_provider":"stripe","interval":"month"},
+            {"plan":"starter","base_price":0,"vat_rate":0,"vat_amount":0,
+             "total":0,"currency":"EUR","country":country.upper()}]
     plans = db.query(Pricing).all()
     vat = db.query(VATRate).filter(VATRate.country_code == country.upper()).first()
     vat_rate = vat.rate if vat else 0
@@ -1601,6 +1609,7 @@ def get_pricing(country: str = "RO", db: Session = Depends(get_db)):
 
 @app.put("/pricing/{plan}")
 def update_pricing(plan: str, base_price: float, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Pretul LOIAL se schimba numai prin actualizarea verificata a configuratiei Stripe.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     pricing = db.query(Pricing).filter(Pricing.plan == plan).first()
@@ -1618,6 +1627,7 @@ def get_vat_rates(db: Session = Depends(get_db)):
 
 @app.put("/vat-rates/{country}")
 def update_vat_rate(country: str, rate: float, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Configurarea TVA a fluxului vechi este retrasa.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     vat = db.query(VATRate).filter(VATRate.country_code == country.upper()).first()
@@ -1631,6 +1641,7 @@ def update_vat_rate(country: str, rate: float, current_user: User = Depends(get_
 
 @app.post("/invoices/create")
 def create_invoice(business_id: int, plan: str = "pro", country: str = "RO", description: str = "", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410,detail="Facturarea abonamentelor se face exclusiv prin fluxul Stripe.")
     if current_user.role not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin only")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
