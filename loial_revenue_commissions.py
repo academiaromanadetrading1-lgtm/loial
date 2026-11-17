@@ -754,13 +754,14 @@ def install_revenue(app,engine,factory,Agent,Business,User,secret,algorithm):
                            row.created_at,row.payout_reference or ""])
         receipts=book.create_sheet("Incasari verificate")
         receipts.append(["ID factura","ID firma","Ambasador direct","Luna",
-                         "Incasare EUR","Status"])
+                         "Incasare EUR","Procesator","Status"])
         invoices=db.query(PaidMerchantInvoice).filter(
             PaidMerchantInvoice.period==period,
-            PaidMerchantInvoice.provider_customer_id=="wise_business").all()
+            PaidMerchantInvoice.eligible==1).all()
         for row in invoices:
             receipts.append([row.id,row.business_id,row.agent_id,row.period,
                              row.gross_paid_cents/100,
+                             "Wise" if row.provider_customer_id=="wise_business" else "Stripe",
                              "Rambursat" if row.refunded else "Verificat"])
         for sheet in book.worksheets:
             sheet.freeze_panes="A2"
