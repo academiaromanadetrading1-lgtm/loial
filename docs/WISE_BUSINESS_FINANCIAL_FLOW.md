@@ -1,3 +1,5 @@
+> **ARHIVAT — înlocuit la 17.11.2026.** Nu folosi instrucțiunile de încasare de mai jos. Regula curentă: **Stripe LOIAL încasează 67 EUR/lună**, confirmă automat abonamentul prin webhook; **Wise Business este exclusiv pentru plata comisioanelor ambasadorilor**. Document autoritativ: [STRIPE_LOIAL_LAUNCH_67_EUR.md](STRIPE_LOIAL_LAUNCH_67_EUR.md).
+
 # LOIAL — Wise Business, sursa unică pentru încasări și comisioane
 Data: 2026-11-17. Decizie de produs aprobată. Acest document nu activează transferuri.
 
