@@ -44,8 +44,9 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 <label for="currency">Moneda rapoartelor</label>
 <select id="currency"><option value="RON">RON</option><option value="EUR">EUR</option><option value="USD">USD</option><option value="GBP">GBP</option></select>
 <label for="details">Cum funcționează afacerea ta?</label>
-<textarea id="details" placeholder="Ex.: Lucrez cu Uber și Bolt, am o mașină electrică și țin evidența kilometrilor."></textarea>
-<button class="ghost" style="width:100%;margin:8px 0 15px" id="saveProfile">Salvează profilul</button>
+<textarea id="details" maxlength="1200" placeholder="Ex.: Lucrez cu Uber și Bolt, am o mașină electrică și țin evidența kilometrilor."></textarea>
+<button class="ghost" style="width:100%;margin:8px 0 5px" id="saveProfile">Salvează profilul</button>
+<div id="profileFeedback" class="status" role="status" aria-live="polite" style="margin:4px 0 15px" hidden></div>
 <h2>Ce vrei să analizăm?</h2>
 <div id="topics" class="topics-grid"></div>
 </aside>
@@ -204,12 +205,22 @@ Am verificat factura, valoarea, data și baza TVA. Confirm că informațiile sun
 </section>
 </aside>
 </main>
+<script src="/loial-i18n.js"></script>
 <script>
 const API='/api/loial-ai';
 const token=localStorage.getItem('token') || '';
 const $=x=>document.getElementById(x);
 let currentTopic='general', canUse=false, currentIndustry='general', currentCampaignId=null;
 let pendingMessageKey='', pendingMessageFingerprint='';
+let savedProfile=null, feedbackKey='', connectionKey='', savingProfile=false;
+const tr=s=>window.LoialLang?LoialLang.t(s):s;
+const language=()=>window.LoialLang?LoialLang.get():'ro';
+function renderProfileHeadline(){if(savedProfile)$('headline').textContent=savedProfile.business+' • '+tr(savedProfile.industry.label)+' • '+savedProfile.currency;}
+function feedback(key,err=false,detail=''){feedbackKey=key;const box=$('profileFeedback');box.hidden=false;box.classList.toggle('error',err);box.textContent=tr(key)+(detail?' — '+detail:'');}
+function applySavedProfile(p){savedProfile=p;currentIndustry=p.industry.key;renderProfileHeadline();renderMetricChoices();if(window.LoialLang)LoialLang.apply();}
+function dirty(){return savedProfile&&($('sector').value!==savedProfile.industry.key||$('details').value!==savedProfile.description||$('currency').value!==savedProfile.currency);}
+for(const id of ['sector','details','currency'])$(id).addEventListener('input',()=>{if(savedProfile&&!savingProfile)feedback(dirty()?'Modificări nesalvate':'Profil salvat');});
+document.addEventListener('loial:language',()=>{renderProfileHeadline();if(connectionKey)status(tr(connectionKey));if(feedbackKey)feedback(feedbackKey);if(!savingProfile)$('saveProfile').textContent=tr('Salvează profilul');});
 const sectorMetrics={
   rideshare:[['revenue','Încasări din curse'],['online_hours','Ore online'],['kilometres','Kilometri parcurși'],['platform_fees','Comisioane Uber/Bolt'],['fuel_energy','Combustibil sau încărcări']],
   atelier_auto:[['revenue','Încasări atelier'],['billed_hours','Ore facturate'],['worked_hours','Ore lucrate']],
@@ -248,14 +259,14 @@ async function init(){
   if(!token){status('Autentifică-te ca administrator Business.',true);return;}
   try{
     const c=await api('/context');
-    canUse=true;currentIndustry=c.industry.key;status(c.ai_connected?'Loial AI este conectat':'Analizele și importurile sunt disponibile; conversația AI necesită activarea furnizorului');
-    $('headline').textContent=c.business+' • '+c.industry.label+' • '+c.currency;
+    canUse=true;currentIndustry=c.industry.key;connectionKey=c.ai_connected?'Loial AI este conectat':'Analizele și importurile sunt disponibile; conversația AI necesită activarea furnizorului';status(tr(connectionKey));
+    savedProfile=c;renderProfileHeadline();
     $('sector').replaceChildren();
     c.sectors.forEach(s=>{const opt=document.createElement('option');opt.value=s.key;opt.textContent=s.label;$('sector').appendChild(opt);});
     $('sector').value=currentIndustry;
     $('currency').value=c.currency||'RON';
     $('details').value=c.description||'';
-    renderMetricChoices();
+    applySavedProfile(c);feedback('Profil încărcat');
     const templates=await api('/message-templates');
     templates.forEach(x=>{
       const o=document.createElement('option');o.value=x.key;
@@ -264,6 +275,7 @@ async function init(){
     });
     c.topics.forEach(t=>{const b=document.createElement('button');b.type='button';b.className='topic';b.dataset.topic=t.key;b.textContent=t.label;
       b.addEventListener('click',()=>setTopic(t.key,t.label));$('topics').appendChild(b);});
+    if(window.LoialLang)LoialLang.apply();
     const h=await api('/history');if(h.length){h.forEach(x=>bubble(x.role,x.text));}else{bubble('assistant','Bun venit! Spune-mi ce tip de activitate ai sau alege o temă din stânga. Te voi întreba doar ce date sunt necesare pentru analiză.');}
     await loadFiles();
     await loadMessageRecipients();
@@ -287,18 +299,31 @@ async function send(){
   if(!canUse)return;
   const text=$('message').value.trim();if(!text)return;
   $('send').disabled=true;$('message').value='';bubble('user',text);
-  try{const r=await api('/chat',{method:'POST',body:JSON.stringify({text,topic:currentTopic})});bubble('assistant',r.answer);}
+  try{const r=await api('/chat',{method:'POST',body:JSON.stringify({text,topic:currentTopic,language:language()})});bubble('assistant',r.answer);}
   catch(e){bubble('meta','Eroare: '+e.message);}
   finally{$('send').disabled=false;}
 }
 $('send').addEventListener('click',send);
 $('message').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
 $('saveProfile').addEventListener('click',async()=>{
-  if(!canUse)return;
-  try{const s=await api('/profile',{method:'PUT',body:JSON.stringify({sector:$('sector').value,description:$('details').value,currency:$('currency').value})});
-    currentIndustry=s.industry.key;renderMetricChoices();
-    status('Profil salvat: '+s.industry.label);}
-  catch(e){status(e.message,true);}
+  if(!canUse||savingProfile)return;
+  const btn=$('saveProfile');
+  savingProfile=true;btn.disabled=true;
+  const fields=['sector','details','currency'].map($);
+  fields.forEach(el=>el.disabled=true);
+  btn.textContent=tr('Se salvează…');feedback('Se salvează…');
+  try{
+    const requested={sector:$('sector').value,description:$('details').value.trim(),currency:$('currency').value};
+    const result=await api('/profile',{method:'PUT',body:JSON.stringify(requested)});
+    if(result.status!=='saved')throw Error('Unexpected save response');
+    // Confirm persisted data using a separate GET, rather than trusting local input.
+    const verified=await api('/context',{cache:'no-store'});
+    if(verified.industry.key!==requested.sector||verified.description!==requested.description||verified.currency!==requested.currency)
+      throw Error('Profile verification failed');
+    $('sector').value=verified.industry.key;$('details').value=verified.description;$('currency').value=verified.currency;
+    applySavedProfile(verified);feedback('Profil salvat');
+  }catch(e){feedback('Salvarea a eșuat',true,e.message);}
+  finally{savingProfile=false;fields.forEach(el=>el.disabled=false);btn.disabled=false;btn.textContent=tr('Salvează profilul');}
 });
 async function loadFiles(){
   const files=await api('/documents');$('files').replaceChildren();
