@@ -43,6 +43,10 @@ def install_loial_identity(app, engine, session_factory, BusinessAccount,
                            SalesAgent, Sale, pwd_context, secret, algorithm,
                            wallet_access_model, wallet_hash, tier_func):
     IdentityBase.metadata.create_all(bind=engine)
+    # This identity dashboard reads verified receipts; it must work when the
+    # identity module is installed independently in tests or modular pilots.
+    from loial_revenue_commissions import RevenueBase
+    RevenueBase.metadata.create_all(bind=engine)
     router = APIRouter(prefix="/api/loial-identity", tags=["Independent Loial Roles"])
 
     def session():
