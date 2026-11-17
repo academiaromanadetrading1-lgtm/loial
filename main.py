@@ -492,6 +492,11 @@ class NotificationRequest(BaseModel):
 # Public HTML and PWA assets are exposed via explicit FileResponse routes below.
 # Legacy /static was unused by current UI; requests now return 404.
 
+@app.get("/loial-i18n.js")
+def loial_localization_script():
+    return FileResponse("loial-i18n.js",media_type="application/javascript",
+                        headers={"Cache-Control":"no-cache"})
+
 @app.get("/login.html")
 def login_page():
     return FileResponse("login.html")
