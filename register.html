@@ -76,7 +76,8 @@ document.getElementById('regForm').onsubmit = async (e) => {
     business_name: document.getElementById('bizName').value.trim(),
     reward: document.getElementById('reward').value.trim(),
     color: document.getElementById('color').value,
-    ref_code: savedRef
+    ref_code: savedRef,
+    acquisition_source: new URLSearchParams(location.search).get('utm_source') || 'direct'
   };
   try {
     const res = await fetch('/api/register', {
@@ -94,6 +95,7 @@ document.getElementById('regForm').onsubmit = async (e) => {
     localStorage.removeItem('draft_biz');
     localStorage.removeItem('draft_reward');
     localStorage.removeItem('draft_color');
+    localStorage.removeItem('loial_ref_code');
     location.href = '/platform.html';
   } catch (err) {
     errBox.textContent = err.message;
