@@ -183,6 +183,11 @@
     </div>
 
     <div class="card" id="contAmbasador">
+      <div id="manualActivatePanel" hidden>
+        <h2>Invitație personală de ambasador LOIAL</h2>
+        <p>Administratorul te-a desemnat ca ambasador. Alege o parolă pentru acest cont. Contul tău de firmă sau cardul existent rămâne neschimbat. Detaliile Wise le poți adăuga ulterior.</p>
+        <form id="manualActivateForm"><label for="manualActivatePassword">Parolă nouă</label><input id="manualActivatePassword" type="password" minlength="10" required autocomplete="new-password"><button type="submit" class="btn-primary">Activează contul meu de ambasador</button></form>
+      </div>
       <div id="enrollPanel">
         <span class="tier-tag">Cont Gratuit Partener</span>
         <h2>Creează-ți sau deschide contul de Ambasador</h2>
@@ -315,7 +320,33 @@
       renderAmbDashboard(agent,ledger);
     }catch(error){fail(error.message);logoutAmb();}
   }
-  if(ambassadorToken)reloadAmbassador();
+  let activationToken=new URLSearchParams(location.hash.slice(1)).get('activate')||'';
+  if(activationToken){
+    history.replaceState(null,'',location.pathname+location.search);
+    ambassadorToken='';
+    sessionStorage.removeItem('loial_ambassador_token');
+    document.getElementById('enrollPanel').classList.add('hidden');
+    document.getElementById('loginPanel').classList.add('hidden');
+    document.getElementById('manualActivatePanel').hidden=false;
+  }else if(ambassadorToken)reloadAmbassador();
+  document.getElementById('manualActivateForm').onsubmit=async event=>{
+    event.preventDefault();
+    const password=document.getElementById('manualActivatePassword');
+    const button=event.currentTarget.querySelector('button');
+    button.disabled=true;statusBox.textContent='';
+    try{
+      const res=await fetch('/api/ambassador/activate-invite',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({activation_token:activationToken,password:password.value})});
+      const result=await res.json();
+      if(!res.ok)throw Error(result.detail||'Activarea a eșuat.');
+      ambassadorToken=result.access_token;activationToken='';
+      sessionStorage.setItem('loial_ambassador_token',ambassadorToken);
+      document.getElementById('manualActivatePanel').hidden=true;
+      await reloadAmbassador();
+    }catch(e){fail(e.message);}
+    finally{password.value='';button.disabled=false;}
+  };
   // Poll only while the ambassador dashboard is visible; registration never
   // triggers simulated commissions. Verified payments appear on next refresh.
   setInterval(()=>{
