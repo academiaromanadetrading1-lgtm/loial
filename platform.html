@@ -355,7 +355,7 @@
 
     <div class="card">
       <h2>Activitate LOIAL: conturi, recrutări și plăți confirmate</h2>
-      <p style="font-size:12px;color:var(--text-muted)">Actualizată la deschiderea panoului sau prin buton; încasările apar numai după reconcilierea Wise.</p>
+      <p style="font-size:12px;color:var(--text-muted)">Actualizată la deschiderea panoului sau prin buton; încasările Stripe apar după confirmarea automată prin webhook.</p>
       <button type="button" class="btn-secondary" onclick="loadSuperAdmin()">Actualizează activitatea</button>
       <div id="adminActivity" aria-live="polite" style="font-size:13px;line-height:1.7"></div>
     </div>
@@ -445,7 +445,6 @@
     return fetch(url, { ...options, headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token } });
   }
   let premiumWalletReady = null;
-  loadWiseCheckout();
   let verifiedAmbassador = null;
 
   async function roleApi(path,opts={}){
