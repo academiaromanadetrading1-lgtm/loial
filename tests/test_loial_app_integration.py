@@ -36,6 +36,13 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                 assert icon.headers["content-type"]=="image/png"
                 assert icon.content.startswith(b"\x89PNG\r\n\x1a\n")
             assert client.get("/sw.js").status_code==200
+            # Nothing in the repository root (DB, source, secret manager files)
+            # may be disclosed over the former /static mount.
+            for sensitive in ("/static/main.py","/static/.env",
+                              "/static/loial.db","/static/.git/config",
+                              "/static/requirements.txt"):
+                assert client.get(sensitive).status_code==404,sensitive
+
             assert client.get("/loial-pwa-install.js").status_code==200
             assert client.get("/loial-offline.html").status_code==200
             available = client.get("/api/premium-wallet/availability")
