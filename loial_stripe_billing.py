@@ -320,6 +320,13 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
                 db.add(state)
             if state.subscription_id and state.subscription_id!=subscription and entitlements(state)["active"]:
                 raise HTTPException(status_code=409,detail="Alt abonament activ asociat firmei")
+            if state.subscription_id!=subscription:
+                # A new subscription starts with no access until its own
+                # verified invoice arrives, even after a prior cancellation.
+                state.status="pending"
+                state.paid_until=None
+                state.grace_until=None
+                state.last_paid_invoice=None
             state.customer_id=customer
             state.subscription_id=subscription
             state.updated_at=utc_iso(now_utc())
