@@ -488,7 +488,9 @@ class NotificationRequest(BaseModel):
     message: str
     channel: str = "wallet"
 
-app.mount("/static", StaticFiles(directory="."), name="static")
+# Never serve the repository root: it can include source code, backups and secrets.
+# Public HTML and PWA assets are exposed via explicit FileResponse routes below.
+# Legacy /static was unused by current UI; requests now return 404.
 
 @app.get("/login.html")
 def login_page():
