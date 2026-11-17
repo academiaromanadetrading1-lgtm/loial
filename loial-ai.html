@@ -30,13 +30,33 @@ button:disabled{opacity:.55;cursor:not-allowed}.ghost{background:#fff;color:var(
 hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 @media(max-width:1100px){.layout{grid-template-columns:250px minmax(0,1fr)}.right{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}}
 @media(max-width:720px){.layout{display:flex;flex-direction:column;margin:10px auto;padding:0 10px}.card,.right{width:100%}.right{display:block}.chat{height:48vh}.brand{font-size:16px}.topics-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.topic{margin:0;font-size:12px}.compose button{padding:10px}}
+/* Responsive workspace: only the selected view occupies the page. */
+.layout.workspace{display:block;max-width:1440px;width:100%;padding:0 24px;margin:20px auto 32px}
+header{padding:14px max(24px,calc((100% - 1392px)/2));flex-wrap:wrap}
+.workspace-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;padding:7px;background:#fff;border:1px solid var(--line);border-radius:15px;margin:0 0 14px}
+.workspace-tab{display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;min-height:46px;background:transparent;color:var(--muted);border:1px solid transparent;font-size:13px;padding:8px 10px;overflow-wrap:anywhere}
+.workspace-tab>span:first-child{font-size:17px}.workspace-tab.active{color:var(--green);background:var(--soft);border-color:#bbd8c5}
+.workspace-view[hidden]{display:none!important}.conversation-layout{display:grid;grid-template-columns:minmax(240px,310px) minmax(0,1fr);gap:16px;align-items:start}
+.chat-card{display:flex;flex-direction:column;min-height:600px;height:calc(100dvh - 164px);max-height:920px}
+.chat-card .chat{flex:1;min-height:180px;height:auto}.chat-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.mode-label{font-size:11px;background:#f4eee0;border-radius:20px;padding:5px 10px;color:#785b22;white-space:normal}.mode-label.online{background:var(--soft);color:var(--green)}
+.chat-card .bubble{max-width:92%}.chat-card .compose{padding-top:8px;border-top:1px solid var(--line);align-items:end}.compose textarea{min-width:0}
+.profile-details>summary{font-weight:800;font-size:16px;cursor:pointer;margin-bottom:10px}.profile-content #details{min-height:112px}
+.tool-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}.tool-grid.single{grid-template-columns:minmax(0,1fr);max-width:980px;margin:0 auto}
+.tool-grid .panel{margin:0;padding:24px}.tool-grid .report{max-height:480px}.tool-grid .file-list{max-height:340px}.file-row{overflow-wrap:anywhere}.file-row span{min-width:0;flex:1}.tool-grid input[type=file]{max-width:100%}
+#documentPreview{overflow-wrap:anywhere;background:#f3f7f4;padding:14px;border:1px solid var(--line);border-radius:10px}
+@media(max-width:1050px){.workspace-nav{grid-template-columns:repeat(3,minmax(0,1fr))}.chat-card{height:calc(100dvh - 230px);min-height:500px}.conversation-layout{grid-template-columns:240px minmax(0,1fr)}}
+@media(max-width:760px){.layout.workspace{padding:0 10px;margin:10px auto 20px}.workspace-nav{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:5px}.workspace-tab{flex-direction:column;gap:2px;font-size:11px;line-height:1.25;min-height:56px;padding:5px}.conversation-layout,.tool-grid{display:flex;flex-direction:column}.profile-card,.chat-card,.tool-grid .panel{width:100%;min-width:0}.profile-card{padding:12px 14px}.profile-details>summary{margin:0}.profile-content{padding-top:12px}.chat-card{height:calc(100dvh - 265px);min-height:400px;padding:14px}.tool-grid .panel{padding:16px}header{padding:12px 10px;gap:8px}.brand{font-size:14px}.back{font-size:12px}.chat-card textarea{font-size:16px}.compose button{min-width:42px;padding:10px}.chat-card .bubble{font-size:14px;max-width:95%}}
+@media(max-width:380px){.workspace-tab{font-size:10px}.brand{font-size:13px}}
+
 </style>
 </head>
 <body>
 <header><a class="brand" href="/platform.html">◉ LOIAL • AI BUSINESS</a><a class="back" href="/platform.html">← Panou firmă</a></header>
-<main class="layout">
-<aside class="card">
-<h2>Consultantul afacerii tale</h2>
+<main class="layout workspace">
+<nav class="workspace-nav" aria-label="Instrumente LOIAL"><button class="workspace-tab active" type="button" data-workspace="chat" aria-pressed="true"><span aria-hidden="true">◉</span><span>Conversație</span></button><button class="workspace-tab" type="button" data-workspace="documents" aria-pressed="false"><span aria-hidden="true">▤</span><span>Documente și facturi</span></button><button class="workspace-tab" type="button" data-workspace="sales" aria-pressed="false"><span aria-hidden="true">▧</span><span>Bonuri și vânzări</span></button><button class="workspace-tab" type="button" data-workspace="reports" aria-pressed="false"><span aria-hidden="true">▥</span><span>Rapoarte și indicatori</span></button><button class="workspace-tab" type="button" data-workspace="customers" aria-pressed="false"><span aria-hidden="true">◎</span><span>Clienți și exporturi</span></button><button class="workspace-tab" type="button" data-workspace="messages" aria-pressed="false"><span aria-hidden="true">✉</span><span>Campanii și mesaje</span></button></nav>
+<section class="workspace-view active" id="view-chat" data-view="chat" ><div class="conversation-layout"><aside class="card profile-card" id="profileCard">
+<details class="profile-details" id="profileDetails" open><summary>Consultantul afacerii tale</summary><div class="profile-content">
 <p>Loial îți explică vânzările, costurile, clienții și oportunitățile, adaptat activității tale.</p>
 <div class="status" id="connection">Se verifică accesul la Loial Business...</div>
 <label for="sector">Tip de activitate</label>
@@ -49,45 +69,24 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 <div id="profileFeedback" class="status" role="status" aria-live="polite" style="margin:4px 0 15px" hidden></div>
 <h2>Ce vrei să analizăm?</h2>
 <div id="topics" class="topics-grid"></div>
-</aside>
-<section class="card">
+</div></details></aside><section class="card chat-card">
 <h1>Loial AI</h1>
-<p id="headline">Consultant managerial, prin conversații exclusiv text</p>
+<div class="chat-top"><p id="headline">Consultant managerial, prin conversații exclusiv text</p><span id="aiMode" class="mode-label" role="status"></span></div>
 <div class="chat" id="chat" aria-live="polite"></div>
 <div class="compose">
 <textarea id="message" aria-label="Mesaj către Loial AI" placeholder="Scrie întrebarea ta..."></textarea>
-<button id="send">Trimite</button>
+<button id="openAttachments" type="button" class="ghost" title="Documente și facturi" aria-label="Documente și facturi">＋</button><button id="send">Trimite</button>
 </div>
 <p class="tiny">Loial folosește datele confirmate ale firmei. Când lipsesc informații, le solicită. Recomandările nu înlocuiesc contabilul.</p>
 </section>
-<aside class="right">
-<section class="card panel" id="receipts">
-<h2>Bonuri cu QR Loial • pilot</h2>
-<p>Înregistrează bonul real și produsele. Loial creează un QR unic pe care îl poți afișa sau tipări separat de bonul fiscal.</p>
-<label for="receiptNumber">Numărul bonului / comenzii</label>
-<input id="receiptNumber" maxlength="100" placeholder="Ex.: Bon-2026-1042">
-<label for="receiptItems">Linii de bon</label>
-<textarea id="receiptItems" rows="4" placeholder="Produs;Cantitate;Preț unitar;Cost variabil (opțional)
-Ex.: Revizie auto;1;220;65"></textarea>
-<button type="button" id="issueReceipt" style="width:100%;margin-top:9px">Generează QR pentru bon</button>
-<div class="report" id="receiptStatus" role="status"></div>
-<img id="receiptQR" alt="QR unic de revendicare a bonului" style="width:190px;max-width:100%;display:none;margin:12px auto;">
-<div id="receiptUrlBox" style="display:none">
-  <input id="receiptUrl" readonly aria-label="Link de revendicare">
-  <button class="ghost" type="button" id="copyReceipt" style="width:100%;margin-top:6px">Copiază linkul bonului</button>
-</div>
-<button class="ghost" type="button" id="showReceipts" style="width:100%;margin-top:9px">Bonuri recente și retururi</button>
-<div id="receiptList" class="file-list"></div>
-<p class="tiny">Integrarea directă cu POS-ul sau casa fiscală necesită suportul sistemului de vânzări. Codul QR fiscal standard nu transmite automat produsele către Loial.</p>
-</section>
-<section class="card panel">
+</div></section>
+<section class="workspace-view" id="view-documents" data-view="documents" hidden><div class="tool-grid"><section class="card panel">
 <h2>Documente și capturi</h2>
 <p>Încarcă facturi, fotografii, screenshoturi, PDF, Excel sau CSV. Verifică întotdeauna datele extrase.</p>
 <input type="file" id="attachment" accept=".jpg,.jpeg,.png,.webp,.pdf,.xlsx,.csv,image/*" aria-label="Document de analizat">
 <button id="upload" style="width:100%;margin-top:10px">Încarcă și prelucrează</button>
-<div class="file-list" id="files"></div>
-</section>
-<section class="card panel" id="expensesPanel">
+<div id="documentFeedback" class="status" role="status" hidden></div><div class="file-list" id="files"></div><pre id="documentPreview" class="report" hidden></pre>
+</section><section class="card panel" id="expensesPanel">
 <h2>Facturi și cheltuieli confirmate</h2>
 <p>Introdu valorile de pe factură sau selectează o fotografie/PDF încărcat. Loial le folosește numai după confirmarea ta.</p>
 <label for="expenseDoc">Document asociat (opțional)</label>
@@ -122,16 +121,34 @@ Am verificat factura, valoarea, data și baza TVA. Confirm că informațiile sun
 <div class="report" id="expenseOutput" role="status"></div>
 <button type="button" class="ghost" id="expenseReport" style="width:100%;margin-top:9px">Vezi cheltuielile confirmate</button>
 <p class="tiny">Loial nu transformă automat o fotografie în înregistrare contabilă și nu deduce profitul net din cheltuieli incomplete.</p>
-</section>
-<section class="card panel">
+</section></div></section>
+<section class="workspace-view" id="view-sales" data-view="sales" hidden><div class="tool-grid single"><section class="card panel" id="receipts">
+<h2>Bonuri cu QR Loial • pilot</h2>
+<p>Înregistrează bonul real și produsele. Loial creează un QR unic pe care îl poți afișa sau tipări separat de bonul fiscal.</p>
+<label for="receiptNumber">Numărul bonului / comenzii</label>
+<input id="receiptNumber" maxlength="100" placeholder="Ex.: Bon-2026-1042">
+<label for="receiptItems">Linii de bon</label>
+<textarea id="receiptItems" rows="4" placeholder="Produs;Cantitate;Preț unitar;Cost variabil (opțional)
+Ex.: Revizie auto;1;220;65"></textarea>
+<button type="button" id="issueReceipt" style="width:100%;margin-top:9px">Generează QR pentru bon</button>
+<div class="report" id="receiptStatus" role="status"></div>
+<img id="receiptQR" alt="QR unic de revendicare a bonului" style="width:190px;max-width:100%;display:none;margin:12px auto;">
+<div id="receiptUrlBox" style="display:none">
+  <input id="receiptUrl" readonly aria-label="Link de revendicare">
+  <button class="ghost" type="button" id="copyReceipt" style="width:100%;margin-top:6px">Copiază linkul bonului</button>
+</div>
+<button class="ghost" type="button" id="showReceipts" style="width:100%;margin-top:9px">Bonuri recente și retururi</button>
+<div id="receiptList" class="file-list"></div>
+<p class="tiny">Integrarea directă cu POS-ul sau casa fiscală necesită suportul sistemului de vânzări. Codul QR fiscal standard nu transmite automat produsele către Loial.</p>
+</section></div></section>
+<section class="workspace-view" id="view-reports" data-view="reports" hidden><div class="tool-grid"><section class="card panel">
 <h2>Raport și solicitare săptămânală</h2>
 <div class="actions">
 <button class="ghost" id="weekly">Ce date îți trebuie?</button>
 <button class="ghost" id="reportBtn">Vezi raportul</button>
 </div>
 <div class="report" id="report"></div>
-</section>
-<section class="card panel" id="breakEvenPanel">
+</section><section class="card panel" id="breakEvenPanel">
 <h2>Pragul de rentabilitate</h2>
 <p>Verifică aproximativ ce vânzări ar trebui să realizeze firma pentru a acoperi costurile fixe. Loial calculează numai din datele confirmate, fără estimări inventate.</p>
 <label for="bePeriod">Luna analizată</label>
@@ -145,20 +162,27 @@ Am verificat factura, valoarea, data și baza TVA. Confirm că informațiile sun
 <button class="ghost" id="runBreakEven" style="width:100%">Analizează pragul</button>
 <div id="beResult" class="report" role="status"></div>
 <p class="tiny">Acesta este un indicator de gestiune, nu un calcul automat al profitului net sau o înregistrare contabilă.</p>
-</section>
-<section class="card panel">
-<h2>Clienți și cumpărături</h2>
-<button class="ghost" id="showClients" style="width:100%">Vezi clienții firmei</button>
-<div id="customerList" class="file-list" style="margin-top:10px"></div>
-</section>
-<section class="card panel">
+</section><section class="card panel">
 <h2>Indicatori pentru activitatea ta</h2>
 <label for="metricName">Indicator</label><select id="metricName"></select>
 <label for="metricValue">Valoarea raportată</label><input type="number" step="any" id="metricValue" placeholder="Ex.: 125">
 <label for="metricPeriod">Perioada (ex.: 2026-W47)</label><input id="metricPeriod" maxlength="30" placeholder="2026-W47">
 <button class="ghost" id="saveMetric" style="width:100%;margin-top:9px">Salvează indicatorul</button>
-</section>
-<section class="card panel" id="messagesSection">
+</section></div></section>
+<section class="workspace-view" id="view-customers" data-view="customers" hidden><div class="tool-grid"><section class="card panel">
+<h2>Clienți și cumpărături</h2>
+<button class="ghost" id="showClients" style="width:100%">Vezi clienții firmei</button>
+<div id="customerList" class="file-list" style="margin-top:10px"></div>
+</section><section class="card panel">
+<h2>Exporturi</h2>
+<div class="actions">
+<button class="ghost" data-export="customers.xlsx">Clienți Excel</button>
+<button class="ghost" data-export="sales.xlsx">Vânzări Excel</button>
+<button class="ghost" data-export="ads-consented.csv">Publicitate CSV</button>
+</div><div class="actions"><button class="ghost" data-export="customers.csv">Clienți CSV</button><button class="ghost" data-export="sales.csv">Vânzări CSV</button></div><div id="exportFeedback" class="status" role="status" hidden></div>
+<p class="tiny">Audiențele publicitare includ numai clienți cu consimțământul necesar înregistrat.</p>
+</section></div></section>
+<section class="workspace-view" id="view-messages" data-view="messages" hidden><div class="tool-grid single"><section class="card panel" id="messagesSection">
 <h2>Mesaje directe în Loial</h2>
 <p>Trimite o ofertă sau o noutate în portofelul Loial. Fără email, SMS, cote lunare sau contracte externe.</p>
 <label for="template">Mesaje predefinite</label><select id="template"><option value="">Selectează un mesaj...</option></select>
@@ -193,17 +217,7 @@ Am verificat factura, valoarea, data și baza TVA. Confirm că informațiile sun
 <h2>Mesaje trimise</h2>
 <button class="ghost" id="refreshSent" style="width:100%">Actualizează rezultatele</button>
 <div class="report" id="sentHistory"></div>
-</section>
-<section class="card panel">
-<h2>Exporturi</h2>
-<div class="actions">
-<button class="ghost" data-export="customers.csv">Clienți CSV</button>
-<button class="ghost" data-export="sales.csv">Vânzări CSV</button>
-<button class="ghost" data-export="ads-consented.csv">Publicitate</button>
-</div>
-<p class="tiny">Audiențele publicitare includ numai clienți cu consimțământul necesar înregistrat.</p>
-</section>
-</aside>
+</section></div></section>
 </main>
 <script src="/loial-i18n.js"></script>
 <script>
@@ -212,6 +226,19 @@ const token=localStorage.getItem('token') || '';
 const $=x=>document.getElementById(x);
 let currentTopic='general', canUse=false, currentIndustry='general', currentCampaignId=null;
 let pendingMessageKey='', pendingMessageFingerprint='';
+function showWorkspace(key,updateHash=true){
+  if(!document.querySelector('[data-view="'+key+'"]'))key='chat';
+  for(const panel of document.querySelectorAll('[data-view]')){panel.hidden=panel.dataset.view!==key;panel.classList.toggle('active',!panel.hidden);}
+  for(const tab of document.querySelectorAll('[data-workspace]')){const active=tab.dataset.workspace===key;tab.classList.toggle('active',active);tab.setAttribute('aria-pressed',String(active));}
+  if(updateHash)history.replaceState(null,'',location.pathname+location.search+(key==='chat'?'':'#'+key));
+  if(key==='chat')$('chat').scrollTop=$('chat').scrollHeight;
+}
+document.querySelectorAll('[data-workspace]').forEach(b=>b.addEventListener('click',()=>showWorkspace(b.dataset.workspace)));
+$('openAttachments').onclick=()=>showWorkspace('documents');
+if(matchMedia('(max-width:760px)').matches)$('profileDetails').open=false;
+showWorkspace(location.hash.slice(1)||'chat',false);
+window.addEventListener('hashchange',()=>showWorkspace(location.hash.slice(1)||'chat',false));
+
 let savedProfile=null, feedbackKey='', connectionKey='', savingProfile=false;
 const tr=s=>window.LoialLang?LoialLang.t(s):s;
 const language=()=>window.LoialLang?LoialLang.get():'ro';
@@ -280,9 +307,7 @@ async function init(){
     await loadFiles();
     await loadMessageRecipients();
     await refreshSent();
-    if(location.hash==='#messages'){
-      document.getElementById('messagesSection').scrollIntoView({behavior:'smooth',block:'start'});
-    }
+    showWorkspace(location.hash.slice(1)||'chat',false);
     const weekly=await api('/weekly');
     $('weekly').title=weekly.automated_delivery
       ?'Loial pregătește săptămânal solicitarea în această conversație.'
@@ -410,7 +435,7 @@ $('expenseReport').onclick=async()=>{
     $('expenseOutput').textContent=lines.join('\n');
   }catch(e){$('expenseOutput').textContent=e.message;}
 };
-$('weekly').onclick=async()=>{try{const r=await api('/weekly');bubble('assistant',r.message);}catch(e){status(e.message,true);}};
+$('weekly').onclick=async()=>{try{const r=await api('/weekly');showWorkspace('chat');bubble('assistant',r.message);}catch(e){status(e.message,true);}};
 $('reportBtn').onclick=async()=>{
   try{
     const r=await api('/report'),s=r.sales;
@@ -436,7 +461,7 @@ $('reportBtn').onclick=async()=>{
     }
     lines.push('','Limitări:',...r.limitations.map(x=>'• '+x));
     $('report').textContent=lines.join('\n');
-    bubble('meta','Raportul a fost actualizat în panoul din dreapta.');
+    // Report remains visible in the selected Reports view.
   }catch(e){status(e.message,true);}
 };
 $('runBreakEven').onclick=async()=>{
@@ -487,7 +512,7 @@ $('showClients').onclick=async()=>{
         try{
           const data=await api('/customers/'+c.id+'/purchases');
           const items=data.purchases.slice(0,15).map(p=>'• '+p.date+' • '+p.product+' × '+p.quantity+' = '+p.total).join('\n');
-          bubble('assistant','Istoricul lui '+data.name+':\n'+(items||'Nu avem produse asociate acestui client în exporturile confirmate.')+'\n'+data.note);
+          showWorkspace('chat');bubble('assistant','Istoricul lui '+data.name+':\n'+(items||'Nu avem produse asociate acestui client în exporturile confirmate.')+'\n'+data.note);
         }catch(e){status(e.message,true);}
       };list.appendChild(b);
     }
