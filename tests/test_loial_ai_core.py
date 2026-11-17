@@ -80,6 +80,7 @@ def app_client(monkeypatch):
         name = Column(String)
         business_type = Column(String)
         plan = Column(String)
+        reward_text = Column(String, default="A 6-a e din partea casei!")
     class Customer(DB):
         __tablename__ = "customers"
         id = Column(Integer, primary_key=True)
