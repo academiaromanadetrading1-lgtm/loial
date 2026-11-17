@@ -9,6 +9,7 @@ import json
 import os
 import math
 import logging
+import threading
 from datetime import date, datetime, timezone
 from typing import Optional
 
@@ -245,7 +246,34 @@ def provider_status(usage):
         return "budget_exhausted"
     return "configured"
 
+# One in-flight provider request per business in this worker. Reject rather
+# than queue duplicate requests; a cross-worker budget ledger is still needed
+# before horizontally scaling the service.
+_provider_guard = threading.Lock()
+_provider_inflight = set()
+
 async def ask_model(system, question, usage, db, picture=None, advanced=False, completion_limit=None, return_finish_reason=False):
+    business_id = getattr(usage, "business_id", None)
+    if business_id is None:
+        # Pure provider-payload unit tests use an unpersisted usage object.
+        return await _ask_model_once(system, question, usage, db, picture, advanced,
+                                     completion_limit, return_finish_reason)
+    with _provider_guard:
+        if business_id in _provider_inflight:
+            return None
+        _provider_inflight.add(business_id)
+    try:
+        # Refresh the usage row after admission, not before, to prevent stale
+        # session counters from overwriting a completed request's accounting.
+        db.refresh(usage)
+        return await _ask_model_once(system, question, usage, db, picture, advanced,
+                                     completion_limit, return_finish_reason)
+    finally:
+        with _provider_guard:
+            _provider_inflight.discard(business_id)
+
+
+async def _ask_model_once(system, question, usage, db, picture=None, advanced=False, completion_limit=None, return_finish_reason=False):
     settings = model_settings()
     budget = monthly_budget()
     if not settings or usage.cost_eur >= budget:
