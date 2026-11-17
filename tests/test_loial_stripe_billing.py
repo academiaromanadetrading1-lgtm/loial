@@ -215,3 +215,34 @@ def test_delayed_payment_failure_must_match_current_subscription():
         assert not subscription_event_matches(None,"cus_loial","sub_loial")
     finally:
         db.close()
+
+
+def test_refund_of_old_period_preserves_new_period_and_paid_commission():
+    from loial_stripe_billing import apply_full_subscription_refund
+    db,state=db_fixture()
+    try:
+        first=invoice("in_first")
+        first["payment_intent"]="pi_first"
+        assert book(db,state,first)["credited"]
+        assert book(db,state,invoice("in_current",12))["credited"]
+        old=db.query(PaidMerchantInvoice).filter_by(external_invoice_id="in_first").one()
+        assert old.payment_intent_id=="pi_first"
+        old_activation=db.query(AmbassadorCommission).filter_by(
+            invoice_id=old.id,kind="activation").one()
+        old_activation.status="paid"
+        until=state.paid_until
+        result=apply_full_subscription_refund(db,old,Agent,recompute_recurring)
+        assert result["manual_recovery_required"] is True
+        assert old_activation.status=="paid"
+        assert state.paid_until==until
+        assert state.last_paid_invoice=="in_current"
+        assert apply_full_subscription_refund(db,old,Agent,recompute_recurring)["duplicate"]
+        current=db.query(PaidMerchantInvoice).filter_by(external_invoice_id="in_current").one()
+        result=apply_full_subscription_refund(db,current,Agent,recompute_recurring)
+        assert result["reversed"] is True
+        assert not entitlements(state)["active"]
+        assert state.grace_until is None
+        assert db.query(AmbassadorCommission).filter_by(
+            invoice_id=current.id,kind="recurring").one().status=="reversed"
+    finally:
+        db.close()
