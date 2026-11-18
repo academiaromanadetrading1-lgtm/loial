@@ -103,7 +103,7 @@ header{padding:14px max(24px,calc((100% - 1392px)/2));flex-wrap:wrap}
 </aside>
 <section class="card" id="managementHub" style="margin-bottom:16px">
 <div class="specialist-kicker">LOIAL AI · 24/7</div><h2>Explorează echipa virtuală</h2><p>Analiză economică aplicată. Alege un specialist și discută despre situația firmei. Nu introduce parole sau date personale inutile.</p>
-<div id="managementRoles" class="management-grid" data-no-translate></div><p id="managementContext" role="status" data-no-translate></p><div id="roleFollowups" class="specialist-actions" data-no-translate></div>
+<div id="managementRoles" class="management-grid" data-no-translate></div><p id="managementContext" role="status" data-no-translate></p><div id="roleFollowups" class="specialist-actions" data-no-translate></div><div id="roleTools" class="specialist-actions" data-no-translate></div>
 </section>
 <div id="workspaceNotice" class="status" role="status" aria-live="polite" hidden></div>
 <section class="workspace-view active" id="view-chat" data-view="chat" ><div class="conversation-layout"><aside class="card profile-card" id="profileCard">
@@ -344,7 +344,7 @@ const tr=s=>window.LoialLang?LoialLang.t(s):s;
 const language=()=>window.LoialLang?LoialLang.get():'ro';
 function renderProfileHeadline(){if(savedProfile)$('headline').textContent=savedProfile.business+' • '+tr(savedProfile.industry.label)+' • '+savedProfile.currency;}
 function feedback(key,err=false,detail=''){feedbackKey=key;const box=$('profileFeedback');box.hidden=false;box.classList.toggle('error',err);box.textContent=tr(key)+(detail?' — '+detail:'');}
-function applySavedProfile(p){savedProfile=p;currentIndustry=p.industry.key;renderProfileHeadline();renderMetricChoices();if(window.LoialLang)LoialLang.apply();}
+function applySavedProfile(p){if(savedProfile&&savedProfile.currency!==p.currency){loanScenario=null;teamScenario=null;$('loanResult').replaceChildren();$('teamResult').replaceChildren();$('discussLoan').hidden=true;$('discussTeam').hidden=true;$('managementOverviewResult').replaceChildren();}savedProfile=p;currentIndustry=p.industry.key;renderProfileHeadline();renderMetricChoices();if(window.LoialLang)LoialLang.apply();}
 function dirty(){return savedProfile&&($('sector').value!==savedProfile.industry.key||$('details').value!==savedProfile.description||$('currency').value!==savedProfile.currency);}
 for(const id of ['sector','details','currency'])$(id).addEventListener('input',()=>{if(savedProfile&&!savingProfile)feedback(dirty()?'Modificări nesalvate':'Profil salvat');});
 document.addEventListener('loial:language',()=>{renderProfileHeadline();if(connectionKey)status(tr(connectionKey));if(feedbackKey)feedback(feedbackKey);setAIStatus(aiStatus);if(!savingProfile)$('saveProfile').textContent=tr('Salvează profilul');});
@@ -491,7 +491,7 @@ function bubble(role,text){
   else b.textContent=text;
   $('chat').appendChild(b);$('chat').scrollTop=$('chat').scrollHeight;
 }
-function setTopic(key,label){currentTopic=key;renderManagementRoles();
+function setTopic(key,label){if(sending)return;currentTopic=key;renderManagementRoles();
   document.querySelectorAll('.topic').forEach(x=>x.classList.toggle('active',x.dataset.topic===key));
   if(!sending&&!$('message').value.trim())$('message').value=tr(label); $('message').placeholder=tr('Scrie întrebarea ta...');
   $('message').focus();
@@ -514,7 +514,7 @@ async function init(){
       o.textContent=x.label+(x.requires_marketing_permission?' • marketing':'');
       $('template').appendChild(o);
     });
-    c.topics.forEach(t=>{const b=document.createElement('button');b.type='button';b.className='topic';b.dataset.topic=t.key;b.textContent=t.label;
+    c.topics.filter(t=>!managementRoles.some(x=>x[0]===t.key)).forEach(t=>{const b=document.createElement('button');b.type='button';b.className='topic';b.dataset.topic=t.key;b.textContent=t.label;
       b.addEventListener('click',()=>setTopic(t.key,t.label));$('topics').appendChild(b);});
     if(window.LoialLang)LoialLang.apply();
     const h=await api('/history');if(h.length){h.forEach(x=>bubble(x.role,x.text));}else{bubble('assistant',tr('Bun venit! Spune-mi ce tip de activitate ai sau alege o temă din stânga. Te voi întreba doar ce date sunt necesare pentru analiză.'));}
@@ -1033,7 +1033,7 @@ function renderSpecialistGuide(key){
      if(sending)return;
      const input=$('message'), existing=input.value.trim();
      if(existing&&existing!==question&&!confirm(lang==='ro'?'Înlocuiești întrebarea nestrimisă?':'Replace the unsent question?'))return;
-     currentTopic=specialistTopics[i][j]||'general';document.querySelectorAll('.topic').forEach(x=>x.classList.toggle('active',x.dataset.topic===currentTopic));selectedDocument=null;$('selectedDocument').hidden=true;
+     currentTopic=specialistTopics[i][j]||'general';document.querySelectorAll('.topic').forEach(x=>x.classList.toggle('active',x.dataset.topic===currentTopic));if(i!==1){selectedDocument=null;$('selectedDocument').hidden=true;}
      showWorkspace('chat');renderManagementRoles();input.value=question;input.focus();
    };actions.appendChild(button);
  });
@@ -1058,7 +1058,7 @@ const managementRoles=[
 ];
 function chooseManagementRole(key,question,initial=false){
  const role=managementRoles.find(x=>x[0]===key);if(!role||sending)return;
- const input=$('message'),ro=language()==='ro',draft=question||(ro?role[3]:role[4]);
+ const input=$('message'),ro=language()==='ro',draft=question||mgCopy(role[3],role[4]);
  if(input.value.trim()&&input.value.trim()!==draft&&!initial&&!confirm(ro?'Înlocuiești întrebarea nestrimisă?':'Replace the unsent question?'))return;
  currentTopic=key;document.querySelectorAll('.topic').forEach(x=>x.classList.toggle('active',x.dataset.topic===key));
  if(key!=='invoices'){selectedDocument=null;$('selectedDocument').hidden=true;}
@@ -1078,10 +1078,28 @@ const roleFollowups={
  risk:[['Ce fac dacă vânzările scad cu 20%?','What can I do if sales fall by 20%?'],['Care este rezerva minimă de lichiditate?','How can I estimate a liquidity buffer?'],['Cum prioritizez riscurile firmei?','How can I prioritize business risks?']],
  mentor:[['Explică-mi diferența dintre profit și cash-flow.','Explain the difference between profit and cash flow.'],['Cum decid dacă o investiție merită?','How do I evaluate an investment?'],['Ce indicatori ar trebui să urmăresc săptămânal?','Which metrics should I monitor weekly?']]
 };
+const roleTools={
+ general:[['reports','managementOverview','Indicatorii firmei','Business metrics'],['reports','decisionJournal','Jurnalul deciziilor','Decision journal']],
+ performance:[['reports','healthGoals','Business Health','Business Health'],['reports','breakEvenPanel','Pragul de rentabilitate','Break-even']],
+ invoices:[['documents','attachment','Încarcă documente','Upload documents']],
+ products:[['sales','issueReceipt','Înregistrează bonuri','Record receipts'],['reports','managementOverview','Evoluția vânzărilor','Sales trend']],
+ people:[['reports','teamOperations','Compară productivitatea','Compare productivity']],
+ financing:[['reports','financeSimulator','Simulator de finanțare','Financing simulator']],
+ campaign:[['messages','messagesSection','Construiește campania','Build a campaign']],
+ customers:[['customers','showClients','Vezi clienții firmei','View customers']],
+ inventory:[['reports','decisionJournal','Urmărește reducerea pierderilor','Track waste reduction'],['reports','metricName','Înregistrează indicatori','Record metrics']],
+ operations:[['reports','teamOperations','Compară productivitatea','Compare productivity'],['reports','decisionJournal','Jurnalul deciziilor','Decision journal']],
+ risk:[['reports','healthGoals','Business Health','Business Health'],['reports','financeSimulator','Simulator de finanțare','Financing simulator']],
+ mentor:[['reports','decisionJournal','Aplică și măsoară o decizie','Apply and measure a decision']]
+};
+function openManagementTool(work,id){
+ showWorkspace(work);const target=$(id);if(target){target.scrollIntoView({block:'start',behavior:'auto'});if(target.matches('button,input,select,textarea'))target.focus({preventScroll:true});}
+}
 function renderRoleFollowups(){
- const box=$('roleFollowups');box.replaceChildren();const role=managementRoles.find(x=>x[0]===currentTopic);
+ const box=$('roleFollowups'),tools=$('roleTools');box.replaceChildren();tools.replaceChildren();const role=managementRoles.find(x=>x[0]===currentTopic);
  if(!role)return;
  for(const pair of roleFollowups[role[0]]||[]){const b=document.createElement('button');b.type='button';b.textContent=mgCopy(pair[0],pair[1]);b.onclick=()=>chooseManagementRole(role[0],mgCopy(pair[0],pair[1]));box.append(b);}
+ for(const [work,id,label,en] of roleTools[role[0]]||[]){const b=document.createElement('button');b.type='button';b.className='ghost';b.textContent=mgCopy(label,en)+' →';b.onclick=()=>openManagementTool(work,id);tools.append(b);}
 }
 function renderManagementRoles(){
  const ro=language()==='ro',box=$('managementRoles');box.replaceChildren();
@@ -1101,7 +1119,7 @@ $('runLoan').onclick=()=>{
  if(inputs.some(x=>x.value.trim()===''||!x.checkValidity())||vals.some(x=>!Number.isFinite(x))||!Number.isInteger(vals[2])){out.textContent='Completează toate cele cinci valori valide; introdu 0 dacă nu există rate anterioare.';return;}
  const [principal,annual,months,cash,existing]=vals,r=annual/1200;
  const installment=r===0?principal/months:principal*r/(-Math.expm1(-months*Math.log1p(r)));
- const debt=installment+existing,interest=installment*months-principal,available=cash-debt,dscr=cash/debt;
+ const debt=installment+existing,interest=Math.max(0,installment*months-principal),available=cash-debt,dscr=cash/debt;
  const currency=savedProfile?.currency||'RON',fmt=x=>new Intl.NumberFormat(language(),{maximumFractionDigits:2}).format(x)+' '+currency;
  const grid=document.createElement('div');grid.className='management-metrics';
  for(const [label,value] of [['Rată nouă / lună',fmt(installment)],['Dobândă totală',fmt(interest)],['Disponibil după toate ratele',fmt(available)],['DSCR estimat',dscr.toFixed(2)+'×'],['DSCR la flux −20%',(cash*.8/debt).toFixed(2)+'×']]){const tile=document.createElement('div'),title=document.createElement('small'),v=document.createElement('strong');title.textContent=label;v.textContent=value;tile.append(title,v);grid.append(tile);}
@@ -1175,7 +1193,7 @@ function renderHealth(result){
  metricTiles(out,[[mgCopy('Perioada','Period'),result.period],[mgCopy('Atingerea țintelor','Goal attainment'),no?mgCopy('Date insuficiente','Insufficient data'):result.score+'/100']]);
  for(const d of healthDimensions){const v=result.dimensions[d[0]];if(v)managementBar(out,mgCopy(d[1],d[2]),v.score+' / 100 ('+v.actual+' / '+v.target+')',v.score/100);}
  const note=document.createElement('p');note.textContent=mgCopy('Medie egal ponderată a valorilor actual / țintă, limitate la 0–100. Date declarate; nu este o evaluare externă.','Equal-weight mean of actual/target capped at 0–100. Declared data; not an external rating.');out.append(note);
- for(const key of result.priorities.slice(0,3)){const d=healthDimensions.find(x=>x[0]===key);if(!d)continue;const p=document.createElement('p');p.textContent=mgCopy(d[1]+': '+d[3],d[2]+': '+d[4]);out.append(p);}
+ for(const key of result.priorities.slice(0,3)){const d=healthDimensions.find(x=>x[0]===key);if(!d)continue;const p=document.createElement('p');p.textContent=mgCopy(d[1],d[2])+': '+mgCopy(d[3],d[4]);out.append(p);}
  if(no){const p=document.createElement('p');p.textContent=mgCopy('Lipsesc: ','Missing: ')+result.missing.map(k=>{const d=healthDimensions.find(x=>x[0]===k);return d?mgCopy(d[1],d[2]):k;}).join(', ');out.append(p);}
  $('discussHealth').hidden=false;
 }
