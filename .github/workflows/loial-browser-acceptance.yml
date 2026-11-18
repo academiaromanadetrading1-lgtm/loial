@@ -1,0 +1,24 @@
+name: LOIAL browser acceptance
+on:
+  push:
+    branches:
+      - chatgpt/loial-staging-acceptance-20261118
+    paths:
+      - scripts/browser-acceptance.approved
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install playwright
+      - run: python -m playwright install --with-deps chromium
+      - name: Run browser acceptance
+        env:
+          LOIAL_QA_ADMIN_PASSWORD: ${{ secrets.LOIAL_QA_ADMIN_PASSWORD }}
+        run: python scripts/staging_browser_acceptance.py
