@@ -85,6 +85,27 @@ class AIMetric(BaseAI):
     value = Column(Float)
     source = Column(String(100))
 
+class ManagementSnapshot(BaseAI):
+    __tablename__ = "loial_management_snapshots"
+    id = Column(Integer, primary_key=True)
+    business_id = Column(Integer, index=True, nullable=False)
+    period = Column(String(7), nullable=False)
+    data_json = Column(Text, nullable=False)
+    created_at = Column(String(40), nullable=False)
+
+class ManagementDecision(BaseAI):
+    __tablename__ = "loial_management_decisions"
+    id = Column(Integer, primary_key=True)
+    business_id = Column(Integer, index=True, nullable=False)
+    title = Column(String(180), nullable=False)
+    metric = Column(String(80), nullable=False)
+    baseline = Column(Float, nullable=False)
+    target = Column(Float, nullable=False)
+    due = Column(String(10), nullable=False)
+    observed = Column(Float, nullable=True)
+    reviewed_at = Column(String(40), nullable=True)
+    created_at = Column(String(40), nullable=False)
+
 class AICampaign(BaseAI):
     __tablename__ = "loial_ai_campaigns"
     id = Column(Integer, primary_key=True)
@@ -127,6 +148,69 @@ class MetricRequest(BaseModel):
     period: str = Field(min_length=4, max_length=30)
     value: float
     source: str = Field(default="administrator", max_length=100)
+
+HEALTH_DIMENSIONS = ("sales", "margin", "liquidity", "debt_coverage", "retention", "productivity")
+
+class HealthPair(BaseModel):
+    actual: float = Field(ge=-1e9, le=1e9)
+    target: float = Field(gt=0, le=1e9)
+
+class HealthRequest(BaseModel):
+    period: str = Field(min_length=7, max_length=7)
+    comparable: bool
+    no_debt: bool = False
+    metrics: dict[str, HealthPair]
+
+def calculate_management_health(req: HealthRequest):
+    """Descriptive goal-attainment index, never a credit rating or a prediction."""
+    try:
+        if date.fromisoformat(req.period + "-01").strftime("%Y-%m") != req.period:
+            raise ValueError()
+    except ValueError:
+        raise ValueError("Invalid month")
+    if not req.comparable:
+        raise ValueError("Confirm comparable data and targets")
+    if set(req.metrics) - set(HEALTH_DIMENSIONS):
+        raise ValueError("Unknown metric")
+    if req.no_debt and "debt_coverage" in req.metrics:
+        raise ValueError("Debt coverage conflicts with no-debt declaration")
+    active = [k for k in HEALTH_DIMENSIONS if not (req.no_debt and k == "debt_coverage")]
+    missing = [k for k in active if k not in req.metrics]
+    values = {}
+    for name, pair in req.metrics.items():
+        a, t = pair.actual, pair.target
+        if not math.isfinite(a) or not math.isfinite(t) or t <= 0:
+            raise ValueError("Invalid metric")
+        if name in ("sales", "liquidity", "retention", "productivity") and a < 0:
+            raise ValueError("Negative value not allowed for metric")
+        if name == "retention" and (a > 100 or t > 100):
+            raise ValueError("Retention percentage outside 0–100")
+        values[name] = {"actual": a, "target": t, "score": round(max(0, min(100, a / t * 100)), 1)}
+    priorities = sorted(values, key=lambda k: values[k]["score"])
+    return {"period": req.period, "method": "goal_attainment_v1", "source": "administrator_declared",
+            "score": round(sum(x["score"] for x in values.values()) / len(active), 1) if not missing else None,
+            "dimensions": values, "missing": missing, "no_debt": req.no_debt,
+            "priorities": [k for k in priorities if values[k]["score"] < 100],
+            "ai_calls": 0}
+
+class ManagementDecisionRequest(BaseModel):
+    title: str = Field(min_length=3, max_length=180)
+    metric: str = Field(min_length=2, max_length=80)
+    baseline: float = Field(ge=-1e9, le=1e9)
+    target: float = Field(ge=-1e9, le=1e9)
+    due: str = Field(min_length=10, max_length=10)
+
+class ManagementReviewRequest(BaseModel):
+    observed: float = Field(ge=-1e9, le=1e9)
+
+def decision_result(row):
+    delta = None if row.observed is None else round(row.observed - row.baseline, 6)
+    reached = None if row.observed is None else (
+        row.observed >= row.target if row.target > row.baseline else row.observed <= row.target)
+    return {"id": row.id, "title": row.title, "metric": row.metric,
+            "baseline": row.baseline, "target": row.target, "due": row.due,
+            "observed": row.observed, "delta": delta, "reached": reached,
+            "reviewed_at": row.reviewed_at, "created_at": row.created_at}
 
 class CampaignRequest(BaseModel):
     objective: str = Field(min_length=3, max_length=250)
@@ -452,6 +536,68 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                 "automated_delivery": automated,
                 "last_weekly_request_at": cycle.created_at if cycle else None,
                 "channel": "loial_ai_chat", "external_messages": 0}
+    @r.post("/management-health")
+    def save_management_health(req: HealthRequest, biz=Depends(owner), db: Session = Depends(db_session)):
+        try:
+            result = calculate_management_health(req)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc))
+        if result["missing"]:
+            return result
+        p = account_profile(db, biz)
+        result["currency"] = p.currency
+        db.add(ManagementSnapshot(business_id=biz.id, period=req.period,
+                                  data_json=json.dumps(result, allow_nan=False), created_at=now()))
+        db.commit()
+        return result
+
+    @r.get("/management-health")
+    def get_management_health(biz=Depends(owner), db: Session = Depends(db_session)):
+        records = db.query(ManagementSnapshot).filter(ManagementSnapshot.business_id == biz.id).order_by(
+            ManagementSnapshot.id.desc()).limit(100).all()
+        unique = {}
+        for item in records:
+            unique.setdefault(item.period, json.loads(item.data_json))
+        return {"snapshots": [unique[k] for k in sorted(unique, reverse=True)[:12]]}
+
+    @r.get("/management-decisions")
+    def management_decisions(biz=Depends(owner), db: Session = Depends(db_session)):
+        records = db.query(ManagementDecision).filter(ManagementDecision.business_id == biz.id).order_by(
+            ManagementDecision.id.desc()).limit(100).all()
+        return [decision_result(x) for x in records]
+
+    @r.post("/management-decisions")
+    def create_management_decision(req: ManagementDecisionRequest, biz=Depends(owner), db: Session = Depends(db_session)):
+        try:
+            due = date.fromisoformat(req.due)
+            if due.isoformat() != req.due:
+                raise ValueError()
+        except ValueError:
+            raise HTTPException(422, "Invalid date")
+        if not req.title.strip() or not req.metric.strip() or req.baseline == req.target or not all(
+                math.isfinite(x) for x in (req.baseline, req.target)):
+            raise HTTPException(422, "Invalid decision or unchanged target")
+        row = ManagementDecision(business_id=biz.id, title=req.title.strip(), metric=req.metric.strip(),
+                                 baseline=req.baseline, target=req.target, due=req.due, created_at=now())
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return decision_result(row)
+
+    @r.post("/management-decisions/{decision_id}/review")
+    def review_management_decision(decision_id: int, req: ManagementReviewRequest,
+                                   biz=Depends(owner), db: Session = Depends(db_session)):
+        row = db.query(ManagementDecision).filter(ManagementDecision.business_id == biz.id,
+                                                 ManagementDecision.id == decision_id).first()
+        if row is None:
+            raise HTTPException(404, "Decision not found")
+        if not math.isfinite(req.observed):
+            raise HTTPException(422, "Invalid value")
+        row.observed, row.reviewed_at = req.observed, now()
+        db.commit()
+        db.refresh(row)
+        return decision_result(row)
+
     @r.get("/management-overview")
     def management_overview(biz=Depends(owner), db: Session = Depends(db_session)):
         p = account_profile(db, biz)
