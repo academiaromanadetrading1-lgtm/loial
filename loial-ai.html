@@ -1124,12 +1124,12 @@ function managementBar(parent,label,value,ratio){
 $('loadManagementOverview').onclick=async()=>{
  const out=$('managementOverviewResult');out.textContent='Se încarcă…';$('loadManagementOverview').disabled=true;
  try{
-  const data=await api('/management-overview');out.replaceChildren();const fmt=x=>new Intl.NumberFormat(language(),{maximumFractionDigits:2}).format(x)+' '+data.currency;
-  if(!data.latest){out.textContent='Nu există vânzări înregistrate. Importă bonurile și costurile înainte de analiză.';return;}
+  const [data,goals]=await Promise.all([api('/management-overview'),api('/management-health')]);out.replaceChildren();const fmt=x=>new Intl.NumberFormat(language(),{maximumFractionDigits:2}).format(x)+' '+data.currency;
+  if(!data.latest){out.textContent='Nu există vânzări înregistrate. Importă bonurile și costurile înainte de analiză.';if(goals.snapshots.length){const x=goals.snapshots[0];metricTiles(out,[[mgCopy('Perioada','Period'),x.period],[mgCopy('Atingerea țintelor','Goal attainment'),x.score+'/100']]);}return;}
   const l=data.latest;
-  metricTiles(out,[['Ultima perioadă cu date',l.period],['Vânzări înregistrate',fmt(l.revenue)],['Contribuție estimată',l.contribution===null?'Date lipsă':fmt(l.contribution)],['Scor sănătate','Date insuficiente']]);
+  metricTiles(out,[['Ultima perioadă cu date',l.period],['Vânzări înregistrate',fmt(l.revenue)],['Contribuție estimată',l.contribution===null?'Date lipsă':fmt(l.contribution)],[mgCopy('Atingerea țintelor','Goal attainment'),goals.snapshots.find(x=>x.period===l.period)?.score!=null?goals.snapshots.find(x=>x.period===l.period).score+'/100':mgCopy('Date insuficiente','Insufficient data')]]);
   const max=Math.max(1,...data.series.map(x=>Math.abs(x.revenue)));for(const m of data.series)managementBar(out,m.period,fmt(m.revenue),Math.max(0,m.revenue)/max);
-  const note=document.createElement('p');note.textContent='Contribuția nu este profit net. Perioadele fără date nu sunt afișate; verifică moneda și baza TVA. '+(data.sample_limited?'Eșantion limitat la 10.000 linii. ':'')+'Pentru scorul complet sunt necesare lichiditatea, datoriile, retenția și capacitatea operațională.';out.append(note);
+  const note=document.createElement('p');note.textContent='Contribuția nu este profit net. Perioadele fără date nu sunt afișate; verifică moneda și baza TVA. '+(data.sample_limited?'Eșantion limitat la 10.000 linii. ':'')+'Scorul obiectivelor provine din datele declarate ale aceleiași luni, nu din vânzări estimate.';out.append(note);
  }catch(e){out.textContent=e.message;}finally{$('loadManagementOverview').disabled=false;}
 };
 let teamScenario=null;
