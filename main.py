@@ -528,14 +528,8 @@ def index_page():
 
 @app.get("/")
 def root(request: Request):
-    token = request.cookies.get("loial_token")
-    if token:
-        try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            return FileResponse("platform.html")
-        except:
-            pass
-    return FileResponse("index.html")
+    # Public homepage is always public, including authenticated visitors.
+    return FileResponse("index.html", headers={"Cache-Control":"no-cache"})
 
 @app.post("/auth/login")
 @limiter.limit("20/minute")
