@@ -100,3 +100,38 @@ def test_favicon_is_public_and_valid_ico():
         with Image.open(BytesIO(response.content)) as icon:
             assert icon.format == "ICO"
             assert {(16, 16), (32, 32), (48, 48)} <= icon.ico.sizes()
+
+
+def test_management_hub_routes_and_private_tools():
+    import re
+    html=source("loial-ai.html")
+    dashboard=source("platform.html")
+    roles=re.findall(r'href="/loial-ai\.html\?specialist=([a-z]+)"',dashboard)
+    assert set(roles)=={"general","performance","invoices","products","people",
+                       "financing","campaign","customers","inventory","operations","risk","mentor"}
+    assert len(roles)==12
+    ids=re.findall(r'\bid="([\w-]+)"',html)
+    assert len(ids)==len(set(ids))
+    for element in ("managementRoles","roleFollowups","roleTools","managementOverview",
+                    "healthGoals","healthResult","financeSimulator","teamOperations",
+                    "decisionJournal","discussLoan","discussHealth","discussTeam"):
+        assert element in ids
+    for endpoint in ("management-overview","management-health","management-decisions"):
+        assert "/"+endpoint in html
+    role_selection=html.split("function chooseManagementRole(",1)[1].split("const roleFollowups=",1)[0]
+    assert "input.value=draft" in role_selection
+    assert "send()" not in role_selection and "api(" not in role_selection
+    assert "data-no-translate" in html
+
+def test_management_question_dictionary_covers_all_roles_and_starters():
+    import re
+    html=source("loial-ai.html")
+    dictionary=source("loial-i18n.js")
+    roles=html.split("const managementRoles=[",1)[1].split("];",1)[0]
+    starts=re.findall(r"\['[a-z]+','([^']+)','[^']+','([^']+)'",roles)
+    followups=html.split("const roleFollowups={",1)[1].split("};",1)[0]
+    questions=re.findall(r"\['([^']+)','[^']+'\]",followups)
+    assert len(starts)==12 and len(questions)==36
+    for label,question in starts:
+        assert label in dictionary and question in dictionary
+    assert all(q in dictionary for q in questions)
