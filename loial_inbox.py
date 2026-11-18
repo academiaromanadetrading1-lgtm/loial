@@ -366,8 +366,9 @@ def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent
         cards=cards_for(db,wallet.wallet_uuid)
         allowed={c.id:c.business_id for c in cards}
         if not allowed: return {"threads":[],"unread":0}
-        from sqlalchemy import func,case
-        rows=db.query(InboxDelivery.business_id,func.count(InboxDelivery.id),func.sum(case((InboxDelivery.read_at.is_(None),1),else_=0)),func.max(InboxDelivery.id)).filter(InboxDelivery.customer_id.in_(allowed)).group_by(InboxDelivery.business_id).order_by(func.max(InboxDelivery.id).desc()).all()
+        from sqlalchemy import func,case,and_,or_
+        tenant_filter=or_(*(and_(InboxDelivery.customer_id==cid,InboxDelivery.business_id==bid) for cid,bid in allowed.items()))
+        rows=db.query(InboxDelivery.business_id,func.count(InboxDelivery.id),func.sum(case((InboxDelivery.read_at.is_(None),1),else_=0)),func.max(InboxDelivery.id)).filter(tenant_filter).group_by(InboxDelivery.business_id).order_by(func.max(InboxDelivery.id).desc()).all()
         output=[]
         for bid,total,unread,last_id in rows:
             biz=db.query(BusinessAccount).filter_by(id=bid).first()
@@ -396,11 +397,11 @@ def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent
 
     @route.post("/read/{delivery_id}")
     def mark_read(delivery_id: int, wallet=Depends(client), db: Session = Depends(db_session)):
-        allowed = {c.id for c in cards_for(db, wallet.wallet_uuid)}
+        allowed = {c.id:c.business_id for c in cards_for(db, wallet.wallet_uuid)}
         delivery = db.query(InboxDelivery).filter(
             InboxDelivery.id == delivery_id,
             InboxDelivery.customer_id.in_(allowed)).first()
-        if not delivery:
+        if not delivery or allowed.get(delivery.customer_id)!=delivery.business_id:
             raise HTTPException(status_code=404, detail="Mesaj negasit")
         if delivery.read_at is None:
             delivery.read_at = now()

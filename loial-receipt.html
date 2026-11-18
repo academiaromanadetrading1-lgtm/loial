@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="ro"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Bon Loial • Activează ștampila</title>
 <style>
 :root{color-scheme:light;--green:#2d6a4f;--ink:#142c1e;--line:#dfe7e0}
@@ -49,6 +50,10 @@ async function preview(){
       div.append(name,cost);$('lines').appendChild(div);
     }
     $('total').textContent='Total înregistrat: '+data.total.toFixed(2)+' '+data.currency;
+    if(data.status==='claimed' && localStorage.getItem('loial_wallet_inbox_token')){
+      const res=await fetch('/api/loial-receipts/payment-status?'+new URLSearchParams({token}),{cache:'no-store',headers:{'X-Loial-Wallet-Token':localStorage.getItem('loial_wallet_inbox_token')}});
+      if(res.ok){const x=await res.json();if(x.status==='claimed'){state(x.stamp_granted?'✓ Plata confirmată. Ștampilă înregistrată!':'✓ Plata confirmată. Tranzacție înregistrată.','ok');return;}}
+    }
     if(!['issued','awaiting_payment','reserved'].includes(data.status)){
       state('Acest bon a fost deja revendicat sau a fost anulat.','error');return;
     }
@@ -81,7 +86,7 @@ async function reserve(){
       if(!res.ok)return;const x=await res.json();
       if(x.status==='claimed'||x.status==='refunded'){
         clearInterval(poll);$('approvalQr').hidden=true;$('refreshApproval').hidden=true;
-        state(x.status==='claimed'?'✓ Plata confirmată. Ștampilă înregistrată!':'Tichet anulat.',x.status==='claimed'?'ok':'error');
+        state(x.status==='claimed'?(x.stamp_granted?'✓ Plata confirmată. Ștampilă înregistrată!':'✓ Plata confirmată. Recompensa existentă este disponibilă.'):'Tichet anulat.',x.status==='claimed'?'ok':'error');
       }
     }catch(e){}},2500);
   }catch(e){state(e.message,'error');$('claim').disabled=false;}

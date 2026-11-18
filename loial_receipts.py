@@ -407,7 +407,9 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
         if not reservation or reservation.wallet_uuid!=access.wallet_uuid: raise HTTPException(404,"Tichet negasit")
         if rec.status=="claimed":
             customer=db.query(Customer).filter(Customer.business_id==rec.business_id,(Customer.wallet_uuid==access.wallet_uuid)|(Customer.uuid==access.wallet_uuid)).first()
-            return {"status":"claimed","stamps":customer.stamps if customer else None}
+            from loial_scans import StampAward
+            award=db.query(StampAward).filter_by(business_id=rec.business_id,operation_key="receipt:"+str(rec.id),source="receipt").first()
+            return {"status":"claimed","stamps":customer.stamps if customer else None,"stamp_granted":bool(award)}
         return {"status":rec.status}
 
     @router.post("/refund")

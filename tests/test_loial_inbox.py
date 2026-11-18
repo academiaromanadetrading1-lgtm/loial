@@ -290,3 +290,48 @@ def test_promotion_exact_preview_and_deadline(env):
         message=campaign_message("x"*2000,"Revizie",lang)
         assert len(message)<=2000
         assert campaign_message(message,"Revizie",lang)==message
+
+
+def test_grouped_inbox_private_and_counts_all_history(env):
+    client,session,Business,Customer,Consent,tokens,boss,wallet=env
+    from loial_inbox import InboxEntry,InboxDelivery
+    p="/api/loial-inbox/"
+    a=wallet(tokens[0]); b=wallet(tokens[1])
+    assert client.get(p+"threads").status_code==401
+    for n in (1,2):
+        sent=client.post(p+"send",headers=boss("boss"+str(n)+"@example.test"),json={"subject":"Oferta "+str(n),"text":"Noutati de la firma","audience":"all"})
+        assert sent.status_code==200,sent.text
+    data=client.get(p+"threads",headers=a).json()
+    assert data["unread"]==2
+    assert {x["business_id"] for x in data["threads"]}=={1,2}
+    assert client.get(p+"threads",headers=b).json()["threads"]==[]
+    assert client.get(p+"threads/2",headers=b).status_code==404
+    first=client.get(p+"threads/1",headers=a).json()
+    assert len(first["messages"])==1
+    did=first["messages"][0]["delivery_id"]
+    assert client.get(p+"threads",headers=a).json()["unread"]==2
+    assert client.post(p+"read/"+str(did),headers=b).status_code==404
+    assert client.post(p+"read/"+str(did),headers=a).status_code==200
+    assert client.get(p+"threads",headers=a).json()["unread"]==1
+    assert client.post(p+"preferences",headers=a,json={"business_id":1,"enabled":False}).status_code==200
+    assert client.get(p+"threads/1",headers=a).json()["offers_enabled"] is False
+    assert client.get(p+"threads/2",headers=a).json()["offers_enabled"] is True
+
+def test_grouped_inbox_pages_without_marking_read(env):
+    client,session,Business,Customer,Consent,tokens,boss,wallet=env
+    from loial_inbox import queue_service_event
+    with session() as db:
+        biz=db.get(Business,1); c=db.get(Customer,1)
+        for n in range(55):
+            assert queue_service_event(db,biz,c,kind="stamp",event_key="page-"+str(n))
+        db.commit()
+    p="/api/loial-inbox/"
+    headers=wallet(tokens[0])
+    thread=client.get(p+"threads/1",headers=headers).json()
+    assert len(thread["messages"])==50
+    assert thread["next_before"]
+    tail=client.get(p+"threads/1",headers=headers,params={"before":thread["next_before"]}).json()
+    assert len(tail["messages"])==5
+    assert tail["next_before"] is None
+    assert not ({x["delivery_id"] for x in thread["messages"]}&{x["delivery_id"] for x in tail["messages"]})
+    assert client.get(p+"threads",headers=headers).json()["unread"]==55
