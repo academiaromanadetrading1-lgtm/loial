@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - chatgpt/loial-pilot-hardening-20261117
+      - chatgpt/loial-crm-receipt-engagement-20261118
     paths:
       - '.github/workflows/loial-ai-tests.yml'
 
@@ -120,3 +121,5 @@ jobs:
 # Authorized single eight-minute retest after aligning reward fixture with production.
 
 # Authorized single eight-minute integrated validation of premium management, health and specialist tools.
+
+# Owner authorized one eight-minute isolated validation of Smart Receipt and CRM on 2026-11-18.
