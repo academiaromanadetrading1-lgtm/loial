@@ -246,3 +246,36 @@ def test_refund_of_old_period_preserves_new_period_and_paid_commission():
             invoice_id=current.id,kind="recurring").one().status=="reversed"
     finally:
         db.close()
+
+
+def test_incomplete_invoice_lines_and_proration_are_rejected():
+    for change in ("truncated", "proration", "nested_proration", "quantity"):
+        inv=invoice("in_invalid")
+        line=inv["lines"]["data"][0]
+        if change=="truncated": inv["lines"]["has_more"]=True
+        elif change=="proration": line["proration"]=True
+        elif change=="nested_proration":
+            line["parent"]={"subscription_item_details":{"proration":True}}
+        else: line["quantity"]=2
+        assert not invoice_is_eligible(inv,"price_loial_67"), change
+
+
+def test_missing_subscription_never_credits_bound_customer():
+    db,state=db_fixture()
+    try:
+        inv=invoice("in_missing_subscription")
+        inv.pop("subscription")
+        assert book(db,state,inv)=={"review":"missing_subscription"}
+        assert db.query(PaidMerchantInvoice).count()==0
+        assert db.query(AmbassadorCommission).count()==0
+        assert not entitlements(state)["active"]
+    finally:
+        db.close()
+
+
+def test_invalid_timestamp_does_not_crash_invoice_processing():
+    from loial_stripe_billing import from_unix,invoice_period
+    assert from_unix(10**100) is None
+    inv=invoice("in_invalid_period")
+    inv["lines"]["data"][0]["period"]["end"]=10**100
+    assert invoice_period(inv)==(None,None)
