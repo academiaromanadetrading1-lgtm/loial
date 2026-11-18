@@ -2417,7 +2417,9 @@ def get_biz_full_data(business_id: int, credentials: HTTPAuthorizationCredential
     
     color = biz.card_color or "#2d6a4f"
     initial = biz.name if biz.name else "L"
-    join_url = "https://" + "loial.space" + "/join/" + str(biz.id)
+    from loial_stripe_billing import effective_entitlements
+    access = effective_entitlements(db, biz.id)
+    join_url = os.getenv("LOIAL_PUBLIC_ORIGIN", "https://loial.space").rstrip("/") + "/join/" + str(biz.id)
     png_bytes = create_premium_qr_bytes(join_url, color=color, initial=initial)
     qr_b64 = "data:image/png;base64," + base64.b64encode(png_bytes).decode()
     
@@ -2426,6 +2428,8 @@ def get_biz_full_data(business_id: int, credentials: HTTPAuthorizationCredential
         "name": biz.name,
         "email": biz.email,
         "plan": biz.plan or "free",
+        "effective_plan": access.get("plan", "start") if access["active"] else "start",
+        "premium_active": bool(access["active"] and access.get("plan") in ("business", "probusiness")),
         "max_customers": biz.max_customers or 50,
         "reward_text": biz.reward_text or "Oferta ta aici",
         "stamps_required": getattr(biz, "stamps_required", None) or 6,
