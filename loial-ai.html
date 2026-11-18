@@ -193,6 +193,15 @@ Ex.: Revizie auto;1;220;65"></textarea>
 </div>
 <button class="ghost" type="button" id="showReceipts" style="width:100%;margin-top:9px">Bonuri recente și retururi</button>
 <div id="receiptList" class="file-list"></div>
+<details style="margin-top:18px"><summary>Integrare automată cu programul de imprimare</summary>
+<p class="tiny">Cheia este dedicată firmei și permite doar emiterea notelor neîncasate. Programul de gestiune trebuie configurat să apeleze API-ul și să imprime QR-ul returnat.</p>
+<button type="button" class="ghost" id="printStatus">Verifică integrarea</button>
+<button type="button" id="printRotate">Generează / schimbă cheia</button>
+<button type="button" class="ghost" id="printRevoke">Dezactivează integrarea</button>
+<p id="printInfo" role="status"></p>
+<input id="printKey" readonly hidden autocomplete="off" aria-label="Cheia privată de integrare">
+<button type="button" class="ghost" id="printCopy" hidden>Copiază cheia</button>
+<p class="tiny">Endpoint: /api/loial-receipts/integration/issue · Header: X-Loial-Receipt-Key</p></details>
 <p class="tiny">Integrarea directă cu POS-ul sau casa fiscală necesită suportul sistemului de vânzări. Codul QR fiscal standard nu transmite automat produsele către Loial.</p>
 </section></div></section>
 <section class="workspace-view" id="view-reports" data-view="reports" hidden><div class="tool-grid"><section class="card panel" id="managementOverview"><h2>LOIAL · Business Health</h2><p>Indicatori din vânzările înregistrate. Datele lipsă nu sunt interpretate ca zero.</p><button type="button" class="ghost" id="loadManagementOverview">Actualizează indicatorii</button><div id="managementOverviewResult" aria-live="polite" data-no-translate></div></section>
@@ -864,6 +873,10 @@ async function receiptApi(path,options={}){
   if(!res.ok)throw Error(result.detail||'Bonul nu a putut fi prelucrat');
   return result;
 }
+$('printStatus').onclick=async()=>{try{const d=await receiptApi('/integration');$('printInfo').textContent=d.active?'Integrare activă':'Integrare inactivă';}catch(e){$('printInfo').textContent=e.message;}};
+$('printRotate').onclick=async()=>{if(!confirm('Generezi o cheie nouă? Cheia veche va fi dezactivată.'))return;try{const d=await receiptApi('/integration/rotate',{method:'POST'});$('printKey').value=d.api_key;$('printKey').hidden=false;$('printCopy').hidden=false;$('printInfo').textContent='Salvează cheia acum. Nu va mai fi afișată după reîncărcarea paginii.';}catch(e){$('printInfo').textContent=e.message;}};
+$('printRevoke').onclick=async()=>{if(!confirm('Dezactivezi emiterea automată?'))return;try{await receiptApi('/integration/revoke',{method:'POST'});$('printKey').value='';$('printKey').hidden=true;$('printCopy').hidden=true;$('printInfo').textContent='Integrare dezactivată.';}catch(e){$('printInfo').textContent=e.message;}};
+$('printCopy').onclick=async()=>{try{await navigator.clipboard.writeText($('printKey').value);$('printInfo').textContent='Cheie copiată.';}catch(e){$('printKey').select();}};
 $('issueReceipt').onclick=async()=>{
   const ref=$('receiptNumber').value.trim();
   if(ref.length<2){$('receiptStatus').textContent='Completează numărul bonului.';return;}

@@ -282,3 +282,29 @@ def test_smart_receipt_expired_and_cancelled(setup_receipts,monkeypatch):
     assert client.post(prefix+"confirm-payment",json=req).status_code==409
     with factory() as db:
         assert db.query(AISale).count()==0
+
+def test_print_integration_scoped_reprint_and_revocation(setup_receipts):
+    client,factory,Receipt,a,b,owner,wallet=setup_receipts
+    p="/api/loial-receipts/"
+    key=client.post(p+"integration/rotate",headers=owner()).json()["api_key"]
+    headers={"X-Loial-Receipt-Key":key}
+    payload=receipt_payload("PRINT-1")
+    assert client.post(p+"integration/issue",json=payload).status_code==401
+    first=client.post(p+"integration/issue",headers=headers,json=payload)
+    assert first.status_code==200,first.text
+    data=first.json()
+    assert data["status"]=="awaiting_payment"
+    again=client.post(p+"integration/issue",headers=headers,json=payload)
+    assert again.status_code==200,again.text
+    assert again.json()["claim_url"]==data["claim_url"]
+    changed=receipt_payload("PRINT-1")
+    changed["lines"][0]["unit_price"]=201
+    assert client.post(p+"integration/issue",headers=headers,json=changed).status_code==409
+    assert client.get(p+"recent",headers=owner("owner2@test.invalid")).json()==[]
+    other_key=client.post(p+"integration/rotate",headers=owner("owner2@test.invalid")).json()["api_key"]
+    other=client.post(p+"integration/issue",headers={"X-Loial-Receipt-Key":other_key},json=payload)
+    assert other.status_code==200
+    assert other.json()["claim_url"]!=data["claim_url"]
+    assert client.post(p+"integration/revoke",headers=owner()).status_code==200
+    assert client.post(p+"integration/issue",headers=headers,json=payload).status_code==401
+    assert client.post(p+"integration/issue",headers={"X-Loial-Receipt-Key":other_key},json=payload).status_code==200

@@ -7,6 +7,7 @@ No access to SMS, WhatsApp, email, banking or fiscal systems.
 """
 import base64
 import hashlib
+import hmac
 import io
 import json
 import os
@@ -45,6 +46,12 @@ class Receipt(ReceiptBase):
     claimed_at=Column(String(40))
     claimed_wallet=Column(String(120))
     __table_args__=(UniqueConstraint("business_id","receipt_ref",name="uq_loial_receipt_per_merchant"),)
+
+class ReceiptIntegration(ReceiptBase):
+    __tablename__="loial_receipt_integrations"
+    business_id=Column(Integer,primary_key=True)
+    key_hash=Column(String(64),nullable=False,unique=True,index=True)
+    updated_at=Column(String(40),nullable=False)
 
 class SmartReservation(ReceiptBase):
     __tablename__="loial_smart_reservations"
@@ -157,21 +164,70 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
                              "price":item["unit_price"]} for item in data.get("rows",[])],
                 "status":record.status,"expires_at":record.expires_at}
 
+    def integration_token(bid,ref):
+        return hmac.new(jwt_secret.encode() if isinstance(jwt_secret,str) else jwt_secret,
+                        ("loial-print-v1:"+str(bid)+":"+ref).encode(),hashlib.sha256).hexdigest()
+
+    @router.get("/integration")
+    def integration_status(biz=Depends(owner),db:Session=Depends(database)):
+        row=db.get(ReceiptIntegration,biz.id)
+        return {"active":bool(row),"updated_at":row.updated_at if row else None,
+                "endpoint":"https://loial.space/api/loial-receipts/integration/issue"}
+
+    @router.post("/integration/rotate")
+    def integration_rotate(biz=Depends(owner),db:Session=Depends(database)):
+        raw=secrets.token_urlsafe(32)
+        row=db.get(ReceiptIntegration,biz.id)
+        if row:
+            row.key_hash=sha256(raw);row.updated_at=utc_now().isoformat()
+        else:
+            db.add(ReceiptIntegration(business_id=biz.id,key_hash=sha256(raw),updated_at=utc_now().isoformat()))
+        db.commit()
+        return {"api_key":raw,"notice":"Salveaza cheia in aplicatia de emitere. Cheia veche nu mai este valida."}
+
+    @router.post("/integration/revoke")
+    def integration_revoke(biz=Depends(owner),db:Session=Depends(database)):
+        row=db.get(ReceiptIntegration,biz.id)
+        if row: db.delete(row);db.commit()
+        return {"active":False}
+
+    @router.post("/integration/issue")
+    @((limiter.limit("120/minute")) if limiter else (lambda f:f))
+    def integration_issue(request:Request,payload:IssueReceipt,db:Session=Depends(database)):
+        key=request.headers.get("X-Loial-Receipt-Key","").strip()
+        if not 40<=len(key)<=100: raise HTTPException(401,"Cheie de integrare invalida")
+        row=db.query(ReceiptIntegration).filter_by(key_hash=sha256(key)).first()
+        if not row: raise HTTPException(401,"Cheie de integrare invalida")
+        biz=db.get(BusinessAccount,row.business_id)
+        if not biz: raise HTTPException(401,"Firma indisponibila")
+        payload=payload.model_copy(update={"requires_payment_confirmation":True})
+        return issue_record(payload,biz,db,integrated=True)
+
     @router.post("/issue")
     def issue(request:IssueReceipt,biz=Depends(owner),db:Session=Depends(database)):
+        return issue_record(request,biz,db)
+
+    def issue_record(request,biz,db,integrated=False):
         ref=request.receipt_ref.strip()
         if len(ref)<2 or any(not row.product.strip() for row in request.lines):
             raise HTTPException(422,"Referinta sau produs invalid")
         duplicate=db.query(Receipt).filter(Receipt.business_id==biz.id,
                                            Receipt.receipt_ref==ref).first()
         if duplicate:
+            if integrated and duplicate.status in ("awaiting_payment","reserved"):
+                doc=db.query(AIDocument).filter_by(id=duplicate.document_id,business_id=biz.id).first()
+                data=json.loads(doc.data_json or "{}") if doc else {}
+                signature=sha256(request.model_dump_json())
+                raw=integration_token(biz.id,ref)
+                if data.get("integration_signature")==signature and datetime.fromisoformat(duplicate.expires_at)>utc_now() and hmac.compare_digest(duplicate.claim_hash,sha256(raw)):
+                    return issue_result(duplicate,raw)
             raise HTTPException(status_code=409,detail="Bonul a fost deja inregistrat in aceasta firma")
         total=monetary_total(request.lines)
         if total<=0 or total>Decimal("100000000"):
             raise HTTPException(status_code=422,detail="Totalul bonului trebuie sa fie pozitiv si rezonabil")
         if request.currency.upper() not in {"RON","EUR","USD","GBP"}:
             raise HTTPException(status_code=422,detail="Moneda nu este suportata")
-        raw=secrets.token_urlsafe(32)
+        raw=integration_token(biz.id,ref) if integrated else secrets.token_urlsafe(32)
         timestamp=utc_now()
         deadline=timestamp+timedelta(days=request.expires_days)
         rows=[{"product":r.product.strip(),"sku":r.sku.strip(),
@@ -180,12 +236,16 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
         data={"kind":"receipt","rows":rows,"total":str(total),
               "currency":request.currency.upper(),"receipt_ref":ref,
               "notes":["Date introduse/importate de comerciant; nu sunt obtinute automat din QR-ul fiscal."]}
+        if integrated: data["integration_signature"]=sha256(request.model_dump_json())
         pending=request.requires_payment_confirmation
         doc=AIDocument(business_id=biz.id,filename="bon-"+ref[:80],
                        sha256=sha256(str(biz.id)+":"+ref),kind="receipt_pending" if pending else "receipt",
                        data_json=json.dumps(data,ensure_ascii=False),
                        confirmed=0 if pending else 1,created_at=timestamp.isoformat())
-        db.add(doc);db.flush()
+        db.add(doc)
+        try: db.flush()
+        except IntegrityError:
+            db.rollback();raise HTTPException(409,"Tichet deja inregistrat")
         receipt=Receipt(business_id=biz.id,receipt_ref=ref,claim_hash=sha256(raw),
                         status="awaiting_payment" if pending else "issued",document_id=doc.id,total_minor=int(total*100),
                         currency=request.currency.upper(),issued_at=timestamp.isoformat(),
@@ -201,10 +261,13 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
             db.commit()
         except IntegrityError:
             db.rollback();raise HTTPException(409,"Tichet deja inregistrat")
+        return issue_result(receipt,raw)
+
+    def issue_result(receipt,raw):
         url="https://loial.space/loial-receipt.html?token="+quote(raw,safe="")
         return {"receipt_id":receipt.id,"status":receipt.status,"claim_url":url,
                 "qr_png_base64":"data:image/png;base64,"+create_receipt_qr_png(url),
-                "total":float(total),"currency":receipt.currency,
+                "total":receipt.total_minor/100,"currency":receipt.currency,
                 "expires_at":receipt.expires_at,
                 "notice":"QR Loial unic. Se poate imprima separat sau prin POS compatibil. Nu inlocuieste bonul fiscal."}
 
