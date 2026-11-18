@@ -28,7 +28,7 @@ def timestamp(value):
         return None
 
 def metrics(receipts,awards,products,now,currency="RON"):
-    valid=[(r,d) for r in receipts if (d:=timestamp(r.issued_at)) is not None and d<=now]
+    valid=[(r,d) for r in receipts if (d:=timestamp(getattr(r,"claimed_at",None) or r.issued_at)) is not None and d<=now]
     days=sorted({d.date() for r,d in valid})
     money=[r for r,d in valid if r.currency==currency]
     total=sum(r.total_minor for r in money)

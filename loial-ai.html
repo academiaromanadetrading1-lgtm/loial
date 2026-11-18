@@ -183,6 +183,7 @@ Am verificat factura, valoarea, data și baza TVA. Confirm că informațiile sun
 <label for="receiptItems">Linii de bon</label>
 <textarea id="receiptItems" rows="4" placeholder="Produs;Cantitate;Preț unitar;Cost variabil (opțional)
 Ex.: Revizie auto;1;220;65"></textarea>
+<label for="receiptMode">Tip document</label><select id="receiptMode"><option value="pending">Notă de plată – confirmare angajat după încasare</option><option value="paid">Bon deja încasat</option></select>
 <button type="button" id="issueReceipt" style="width:100%;margin-top:9px">Generează QR pentru bon</button>
 <div class="report" id="receiptStatus" role="status"></div>
 <img id="receiptQR" alt="QR unic de revendicare a bonului" style="width:190px;max-width:100%;display:none;margin:12px auto;">
@@ -884,8 +885,8 @@ $('issueReceipt').onclick=async()=>{
   $('issueReceipt').disabled=true;
   try{
     const res=await receiptApi('/issue',{method:'POST',
-      body:JSON.stringify({receipt_ref:ref,lines,currency:$('currency').value})});
-    $('receiptStatus').textContent='Bon înregistrat: '+res.total+' '+res.currency+
+      body:JSON.stringify({receipt_ref:ref,lines,currency:$('currency').value,requires_payment_confirmation:$('receiptMode').value==='pending'})});
+    $('receiptStatus').textContent=(res.status==='awaiting_payment'?'Notă în așteptarea încasării: ':'Bon înregistrat: ')+res.total+' '+res.currency+
       '. QR-ul poate fi revendicat o singură dată. Nu înlocuiește bonul fiscal.';
     $('receiptQR').src=res.qr_png_base64;$('receiptQR').style.display='block';
     $('receiptUrl').value=res.claim_url;$('receiptUrlBox').style.display='block';

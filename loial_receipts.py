@@ -23,6 +23,7 @@ from jose import JWTError, jwt
 from pydantic import BaseModel, Field
 from sqlalchemy import Column, Integer, String, Text, UniqueConstraint, update
 from sqlalchemy.orm import Session, declarative_base
+from sqlalchemy.exc import IntegrityError
 
 from loial_inbox import WalletInboxAccess, access_hash, queue_service_event
 from loial_analytics import money
@@ -159,6 +160,8 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
     @router.post("/issue")
     def issue(request:IssueReceipt,biz=Depends(owner),db:Session=Depends(database)):
         ref=request.receipt_ref.strip()
+        if len(ref)<2 or any(not row.product.strip() for row in request.lines):
+            raise HTTPException(422,"Referinta sau produs invalid")
         duplicate=db.query(Receipt).filter(Receipt.business_id==biz.id,
                                            Receipt.receipt_ref==ref).first()
         if duplicate:
@@ -194,7 +197,10 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
                           product=row["product"],quantity=row["quantity"],
                           unit_price=row["unit_price"],unit_variable_cost=row["unit_variable_cost"],
                           customer_uuid=None))
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback();raise HTTPException(409,"Tichet deja inregistrat")
         url="https://loial.space/loial-receipt.html?token="+quote(raw,safe="")
         return {"receipt_id":receipt.id,"status":receipt.status,"claim_url":url,
                 "qr_png_base64":"data:image/png;base64,"+create_receipt_qr_png(url),
@@ -243,7 +249,7 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
                               last_visit=utc_now().isoformat())
             db.add(customer);db.flush()
         target=getattr(biz,"stamps_required",None) or 6
-        if (customer.stamps or 0)>=target:
+        if expected_status!="reserved" and (customer.stamps or 0)>=target:
             raise HTTPException(status_code=409,detail="Revendica mai intai recompensa existenta")
         claimed=utc_now()
         statement=(update(Receipt).where(Receipt.id==receipt.id,Receipt.status==expected_status)
@@ -259,7 +265,10 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
                 db.add(AISale(business_id=biz.id,document_id=doc.id,row_number=n,sold_at=claimed.date().isoformat(),transaction_id=receipt.receipt_ref,product=row['product'],quantity=row['quantity'],unit_price=row['unit_price'],unit_variable_cost=row.get('unit_variable_cost'),customer_uuid=wallet_uuid))
             db.flush()
         previous=customer.last_visit
-        customer.stamps=(customer.stamps or 0)+1
+        # A paid purchase must remain in CRM even when the reward is already available.
+        stamp_granted=(customer.stamps or 0)<target
+        if stamp_granted:
+            customer.stamps=(customer.stamps or 0)+1
         customer.last_visit=claimed.isoformat()
         matching=db.query(AISale).filter(
             AISale.business_id==biz.id,AISale.document_id==receipt.document_id).all()
@@ -271,20 +280,21 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
                 away=(claimed-datetime.fromisoformat(previous.replace("Z","+00:00"))).days>=30
             except (ValueError,TypeError):
                 pass
-        queue_service_event(db,biz,customer,kind="stamp",returning=away,
-                            event_key="receipt-"+str(receipt.id))
-        from loial_scans import record_award
-        record_award(db,biz.id,customer.id,"receipt:"+str(receipt.id),
-                     "receipt",customer.stamps)
-        from loial_friend_referrals import credit_after_valid_stamp
-        credit_after_valid_stamp(db,wallet_uuid,biz.id,
-                                 "receipt:"+str(receipt.id))
+        if stamp_granted:
+            queue_service_event(db,biz,customer,kind="stamp",returning=away,
+                                event_key="receipt-"+str(receipt.id))
+            from loial_scans import record_award
+            record_award(db,biz.id,customer.id,"receipt:"+str(receipt.id),
+                         "receipt",customer.stamps)
+            from loial_friend_referrals import credit_after_valid_stamp
+            credit_after_valid_stamp(db,wallet_uuid,biz.id,
+                                     "receipt:"+str(receipt.id))
         from loial_wallet_sync import queue_google_refresh
         queue_google_refresh(db,biz.id,wallet_uuid)
         from loial_apple_updates import mark_customer_pass_changed
         mark_customer_pass_changed(db,biz.id,wallet_uuid)
         db.commit()
-        return {"status":"claimed","stamps":customer.stamps,"target":target,
+        return {"status":"claimed","stamp_granted":stamp_granted,"stamps":customer.stamps,"target":target,
                 "reward_unlocked":customer.stamps>=target,
                 "linked_products":len(matching),"business":biz.name}
 
@@ -345,7 +355,10 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
             raise HTTPException(status_code=404,detail="Bonul nu exista in aceasta firma")
         if r.status=="refunded":
             return {"status":"already_refunded"}
-        previously_claimed=r.status=="claimed"
+        previous_status=r.status
+        previously_claimed=previous_status=="claimed"
+        if db.execute(update(Receipt).where(Receipt.id==r.id,Receipt.status==previous_status).values(status="refunded")).rowcount!=1:
+            db.rollback();raise HTTPException(409,"Starea tichetului s-a modificat; actualizeaza")
         reversed_stamp=False
         if previously_claimed and r.claimed_wallet:
             from loial_scans import StampAward, record_award

@@ -29,6 +29,7 @@ def setup_receipts():
         plan=Column(String(50))
         reward_text=Column(String(200))
         stamps_required=Column(Integer)
+        staff_pin=Column(String(4),default="7826")
     class Customer(Base):
         __tablename__="customers"
         id=Column(Integer,primary_key=True)
@@ -208,3 +209,76 @@ def test_invalid_totals_and_missing_wallet_are_rejected(setup_receipts):
     assert client.post("/api/loial-receipts/issue",
        headers=owner(),json=bad).status_code==422
     assert client.get("/api/loial-receipts/preview",params={"token":"Z"*43}).status_code==404
+
+def test_smart_receipt_requires_employee_and_is_one_use(setup_receipts,monkeypatch):
+    from loial_business_ai import AISale
+    from loial_receipts import SmartReservation
+    from loial_scans import StampAward
+    import loial_receipts
+    client,factory,Receipt,a,b,owner,wallet=setup_receipts
+    urls=[]
+    original=loial_receipts.create_receipt_qr_png
+    def capture(url):
+        urls.append(url)
+        return original(url)
+    monkeypatch.setattr(loial_receipts,"create_receipt_qr_png",capture)
+    prefix="/api/loial-receipts/"
+    payload=receipt_payload("SMART-1")
+    payload["requires_payment_confirmation"]=True
+    issued=client.post(prefix+"issue",headers=owner(),json=payload)
+    assert issued.status_code==200,issued.text
+    assert issued.json()["status"]=="awaiting_payment"
+    token=issued.json()["claim_url"].split("token=")[1]
+    req={"receipt_token":token}
+    assert client.post(prefix+"claim",headers=wallet(a),json=req).status_code==409
+    assert client.post(prefix+"reserve",json=req).status_code==401
+    first=client.post(prefix+"reserve",headers=wallet(a),json=req)
+    assert first.status_code==200,first.text
+    old=urls[-1].split("receipt_approval=")[1]
+    assert client.post(prefix+"reserve",headers=wallet(b),json=req).status_code==409
+    assert client.get(prefix+"payment-status",headers=wallet(b),params={"token":token}).status_code==404
+    with factory() as db:
+        assert db.query(AISale).count()==0
+        assert db.query(StampAward).count()==0
+    assert client.post(prefix+"reserve",headers=wallet(a),json=req).status_code==200
+    new=urls[-1].split("receipt_approval=")[1]
+    assert old!=new
+    confirm={"business_id":1,"pin":"7826","approval_token":old}
+    assert client.post(prefix+"confirm-payment",json=confirm).status_code==404
+    confirm["approval_token"]=new
+    assert client.post(prefix+"confirm-payment",json={**confirm,"pin":"1111"}).status_code==401
+    assert client.post(prefix+"confirm-payment",json={**confirm,"business_id":2}).status_code==404
+    result=client.post(prefix+"confirm-payment",json=confirm)
+    assert result.status_code==200,result.text
+    assert result.json()["stamps"]==2
+    assert client.post(prefix+"confirm-payment",json=confirm).status_code==409
+    assert client.post(prefix+"reserve",headers=wallet(b),json=req).status_code==409
+    with factory() as db:
+        assert db.query(AISale).count()==2
+        assert {x.customer_uuid for x in db.query(AISale)}=={"wallet-1"}
+        assert db.query(StampAward).count()==1
+        assert db.query(SmartReservation).one().confirmed_at
+    assert client.get(prefix+"payment-status",headers=wallet(a),params={"token":token}).json()["status"]=="claimed"
+
+def test_smart_receipt_expired_and_cancelled(setup_receipts,monkeypatch):
+    from loial_receipts import SmartReservation
+    from loial_business_ai import AISale
+    import loial_receipts
+    client,factory,Receipt,a,b,owner,wallet=setup_receipts
+    urls=[]
+    monkeypatch.setattr(loial_receipts,"create_receipt_qr_png",lambda url: urls.append(url) or "test")
+    prefix="/api/loial-receipts/"
+    payload=receipt_payload("SMART-2")
+    payload["requires_payment_confirmation"]=True
+    token=client.post(prefix+"issue",headers=owner(),json=payload).json()["claim_url"].split("token=")[1]
+    assert client.post(prefix+"reserve",headers=wallet(a),json={"receipt_token":token}).status_code==200
+    approval=urls[-1].split("receipt_approval=")[1]
+    with factory() as db:
+        db.query(SmartReservation).one().approval_expires="2000-01-01T00:00:00+00:00"
+        db.commit()
+    req={"business_id":1,"pin":"7826","approval_token":approval}
+    assert client.post(prefix+"confirm-payment",json=req).status_code==410
+    assert client.post(prefix+"refund",headers=owner(),json={"receipt_ref":"SMART-2","reason":"Comanda anulata"}).status_code==200
+    assert client.post(prefix+"confirm-payment",json=req).status_code==409
+    with factory() as db:
+        assert db.query(AISale).count()==0
