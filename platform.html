@@ -1184,8 +1184,8 @@
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('biz_id');
-    try { await fetch('/auth/logout', { method: 'POST' }); } catch (e) {}
-    location.href = '/login.html';
+    try { await fetch('/auth/logout', { method: 'POST', signal: AbortSignal.timeout(4000) }); } catch (e) {}
+    location.replace('/');
   }
 </script>
 <script src="/loial-i18n.js"></script>
