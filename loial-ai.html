@@ -467,14 +467,16 @@ function renderRich(parent,text){
     const p=document.createElement('p');richInline(p,line);parent.append(p);i++;
   }
 }
-let pendingImage=null, imageReading=false, deleting=false;
+let pendingImage=null, imageReading=false, deleting=false, imageGeneration=0;
 const selectedMessages=new Set();
-function clearChatImage(){pendingImage=null;$('chatImageInput').value='';$('chatImageThumb').removeAttribute('src');$('chatImagePreview').hidden=true;}
+const selectionLimit=80;
+function clearChatImage(){imageGeneration++;pendingImage=null;$('chatImageInput').value='';$('chatImageThumb').removeAttribute('src');$('chatImagePreview').hidden=true;}
 async function stageChatImage(file){
  if(!file||sending||imageReading)return;
  if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>4*1024*1024){chatFeedback(mgCopy('Imagine PNG, JPEG sau WEBP, maximum 4 MB.','PNG, JPEG or WEBP, maximum 4 MB.'),true);return;}
- imageReading=true;
+ imageReading=true;const generation=++imageGeneration;
  try{const url=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);});
+ if(generation!==imageGeneration)return;
  pendingImage=url.split(',')[1];$('chatImageThumb').src=url;$('chatImagePreview').hidden=false;selectedDocument=null;$('selectedDocument').hidden=true;chatFeedback('');}
  catch(e){chatFeedback(mgCopy('Imaginea nu a putut fi citită.','Could not read image.'),true);}
  finally{imageReading=false;}
@@ -484,7 +486,7 @@ $('attachChatImage').onclick=()=>{if(!sending&&!imageReading)$('chatImageInput')
 $('removeChatImage').onclick=()=>{if(!sending)clearChatImage();};
 $('message').addEventListener('paste',e=>{const item=Array.from(e.clipboardData?.items||[]).find(x=>x.kind==='file'&&x.type.startsWith('image/'));if(item){e.preventDefault();stageChatImage(item.getAsFile());}});
 function updateSelection(){$('chatSelection').hidden=!selectedMessages.size;$('deleteSelected').disabled=deleting;}
-$('cancelSelection').onclick=()=>{if(deleting)return;selectedMessages.clear();document.querySelectorAll('.bubble.selected').forEach(x=>x.classList.remove('selected'));updateSelection();};
+$('cancelSelection').onclick=()=>{if(deleting)return;selectedMessages.clear();document.querySelectorAll('.bubble.selected').forEach(x=>{x.classList.remove('selected');x.querySelector('.message-controls button')?.setAttribute('aria-pressed','false');});updateSelection();};
 $('deleteSelected').onclick=async()=>{
  if(sending||deleting||!selectedMessages.size)return;
  if(!confirm(mgCopy('Ștergi definitiv mesajele selectate și imaginile lor din istoricul activ?','Delete selected messages and their images from active history?')))return;
@@ -492,13 +494,13 @@ $('deleteSelected').onclick=async()=>{
  try{await api('/history/delete',{method:'POST',body:JSON.stringify({ids})});for(const id of ids){const node=document.querySelector('.bubble[data-message-id="'+id+'"]');if(node){for(const img of node.querySelectorAll('img'))if(img.src.startsWith('blob:'))URL.revokeObjectURL(img.src);node.remove();}}selectedMessages.clear();chatFeedback('');}catch(e){chatFeedback(e.message,true);}finally{deleting=false;updateSelection();}
 };
 async function viewChatImage(id,img){
- try{const res=await fetch(API+'/history/'+id+'/image',{headers:{Authorization:'Bearer '+token},cache:'no-store'});if(!res.ok)return;const blob=await res.blob();if(!img.isConnected)return;img.src=URL.createObjectURL(blob);img.hidden=false;}catch(e){}
+ try{const res=await fetch(API+'/history/'+id+'/image',{headers:{Authorization:'Bearer '+token},cache:'no-store'});if(!res.ok){img.alt=mgCopy('Imagine indisponibilă','Image unavailable');img.hidden=false;return;}const blob=await res.blob();if(!img.isConnected)return;img.src=URL.createObjectURL(blob);img.hidden=false;}catch(e){}
 }
 function bubble(role,text,id=null,hasImage=false){
   const b=document.createElement('div');b.className='bubble '+(['assistant','user','meta'].includes(role)?role:'meta');
   if(role==='assistant'){b.classList.add('rich-answer');renderRich(b,text);}
   else b.textContent=text;
-  if(Number.isSafeInteger(id)){b.dataset.messageId=id;if(hasImage){const img=document.createElement('img');img.className='chat-picture';img.alt=mgCopy('Imagine atașată','Attached image');img.hidden=true;img.addEventListener('click',()=>{if(img.src){const dialog=document.createElement('dialog'),full=document.createElement('img'),close=document.createElement('button');full.src=img.src;full.style.cssText='max-width:85vw;max-height:78vh;object-fit:contain';close.textContent='×';close.onclick=()=>dialog.close();dialog.append(close,full);document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();}});b.append(img);viewChatImage(id,img);}const controls=document.createElement('div');controls.className='message-controls';const select=document.createElement('button');select.type='button';select.className='ghost';select.textContent=mgCopy('Selectează','Select');select.onclick=()=>{if(sending||deleting)return;if(selectedMessages.has(id))selectedMessages.delete(id);else selectedMessages.add(id);b.classList.toggle('selected',selectedMessages.has(id));updateSelection();};controls.append(select);b.append(controls);}
+  if(Number.isSafeInteger(id)){b.dataset.messageId=id;if(hasImage){const img=document.createElement('img');img.className='chat-picture';img.alt=mgCopy('Imagine atașată','Attached image');img.hidden=true;img.addEventListener('click',()=>{if(img.getAttribute('src')){const dialog=document.createElement('dialog'),full=document.createElement('img'),close=document.createElement('button');full.src=img.src;full.style.cssText='max-width:85vw;max-height:78vh;object-fit:contain';close.textContent='×';close.onclick=()=>dialog.close();dialog.append(close,full);document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();}});b.append(img);viewChatImage(id,img);}const controls=document.createElement('div');controls.className='message-controls';const select=document.createElement('button');select.type='button';select.className='ghost';select.textContent=mgCopy('Selectează','Select');select.setAttribute('aria-pressed','false');select.onclick=()=>{if(sending||deleting)return;if(selectedMessages.has(id))selectedMessages.delete(id);else if(selectedMessages.size<selectionLimit)selectedMessages.add(id);else {chatFeedback(mgCopy('Selectează cel mult 80 de mesaje.','Select up to 80 messages.'),true);return;}b.classList.toggle('selected',selectedMessages.has(id));select.setAttribute('aria-pressed',String(selectedMessages.has(id)));updateSelection();};controls.append(select);b.append(controls);}
   $('chat').appendChild(b);$('chat').scrollTop=$('chat').scrollHeight;
 }
 function setTopic(key,label){if(sending)return;currentTopic=key;renderManagementRoles();
