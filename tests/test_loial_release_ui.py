@@ -106,7 +106,14 @@ def test_management_hub_routes_and_private_tools():
     import re
     html=source("loial-ai.html")
     dashboard=source("platform.html")
-    roles=re.findall(r'href="/loial-ai\.html\?specialist=([a-z]+)"',dashboard)
+    roles=re.findall(r'data-premium-url="/loial-ai\.html\?specialist=([a-z]+)"',dashboard)
+    assert not re.search(r'<a\s+href="/loial-ai\.html',dashboard)
+    premium_tags=re.findall(r'<a\s+data-premium-url="/loial-ai\.html[^"]*"[^>]*>',dashboard)
+    assert len(premium_tags)==17
+    assert all('aria-disabled="true"' in tag and not re.search(r'\bhref=',tag) for tag in premium_tags)
+    assert "data.premium_active===true" in dashboard
+    assert "link.href=url" in dashboard
+    assert "link.removeAttribute('href')" in dashboard
     assert set(roles)=={"general","performance","invoices","products","people",
                        "financing","campaign","customers","inventory","operations","risk","mentor"}
     assert len(roles)==12
