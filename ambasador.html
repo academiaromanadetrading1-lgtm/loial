@@ -331,7 +331,7 @@
       const agent=identity.ambassador;
       if(!agent)throw Error('Contul de ambasador nu este activ.');
       renderAmbDashboard(agent,ledger);
-    }catch(error){fail(error.message);logoutAmb();}
+    }catch(error){fail(error.message);logoutAmb(false);}
   }
   let activationToken=new URLSearchParams(location.hash.slice(1)).get('activate')||'';
   if(activationToken){
@@ -510,6 +510,7 @@
     document.getElementById('dashboardPanel').classList.add('hidden');
     document.getElementById('enrollPanel').classList.remove('hidden');
     document.getElementById('loginPanel').classList.remove('hidden');
+    if(arguments[0]!==false)location.replace('/');
   }
 </script>
 <script src="/loial-i18n.js"></script>
