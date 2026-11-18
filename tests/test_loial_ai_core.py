@@ -535,3 +535,62 @@ def test_retention_campaign_valid_model_copy_and_template(app_client, monkeypatc
     assert preview.json()["sent"] is False
     p["terms"]="Valabil până la 20.11.2026"
     assert client.post("/api/loial-ai/campaigns",headers=h,json=p).status_code==422
+
+
+def test_management_health_formula_missing_and_no_debt():
+    from loial_business_ai import HealthRequest, calculate_management_health
+    data = {"period":"2026-10","comparable":True,"no_debt":True,
+            "metrics":{"sales":{"actual":80,"target":100},
+                       "margin":{"actual":-2,"target":5},
+                       "liquidity":{"actual":1.5,"target":1},
+                       "retention":{"actual":60,"target":75},
+                       "productivity":{"actual":20,"target":20}}}
+    result = calculate_management_health(HealthRequest(**data))
+    assert result["score"] == 72
+    assert result["priorities"][0] == "margin"
+    assert result["ai_calls"] == 0
+    del data["metrics"]["sales"]
+    result = calculate_management_health(HealthRequest(**data))
+    assert result["score"] is None and result["missing"] == ["sales"]
+    data["metrics"]["debt_coverage"] = {"actual":1,"target":1.5}
+    with pytest.raises(ValueError):
+        calculate_management_health(HealthRequest(**data))
+
+def test_management_health_storage_and_isolation(app_client):
+    client, headers = app_client
+    a,b = headers("owner1@test.invalid"),headers("owner2@test.invalid")
+    data={"period":"2026-10","comparable":True,"no_debt":True,
+          "metrics":{k:{"actual":1,"target":2} for k in
+                     ("sales","margin","liquidity","retention","productivity")}}
+    url="/api/loial-ai/management-health"
+    assert client.post(url,json=data,headers=a).json()["score"]==50
+    assert client.get(url,headers=a).json()["snapshots"][0]["period"]=="2026-10"
+    assert client.get(url,headers=b).json()["snapshots"]==[]
+    assert client.get(url,headers=headers("free@test.invalid")).status_code in (401,403)
+    data["period"]="2026-13"
+    assert client.post(url,json=data,headers=a).status_code==422
+
+def test_management_decision_followup_and_isolation(app_client):
+    client, headers = app_client
+    a,b=headers("owner1@test.invalid"),headers("owner2@test.invalid")
+    url="/api/loial-ai/management-decisions"
+    req={"title":"Reduce waste","metric":"Waste RON","baseline":500,"target":300,"due":"2026-12-01"}
+    res=client.post(url,json=req,headers=a)
+    assert res.status_code==200
+    item=res.json()
+    assert item["observed"] is None and item["reached"] is None
+    review=url+"/"+str(item["id"])+"/review"
+    assert client.get(url,headers=b).json()==[]
+    assert client.post(review,json={"observed":200},headers=b).status_code==404
+    res=client.post(review,json={"observed":250},headers=a)
+    assert res.json()["reached"] is True and res.json()["delta"]==-250
+    assert client.get(url,headers=a).json()[0]["observed"]==250
+    req["target"]=req["baseline"]
+    assert client.post(url,json=req,headers=a).status_code==422
+
+def test_management_overview_no_fake_zero(app_client):
+    client,headers=app_client
+    r=client.get("/api/loial-ai/management-overview",headers=headers("owner1@test.invalid"))
+    assert r.status_code==200
+    assert r.json()["latest"] is None and r.json()["series"]==[]
+    assert r.json()["health_score"] is None and r.json()["ai_calls"]==0
