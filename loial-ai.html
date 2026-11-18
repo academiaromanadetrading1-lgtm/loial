@@ -1111,7 +1111,7 @@ function renderManagementRoles(){
 document.addEventListener('loial:language',renderManagementRoles);
 renderManagementRoles();
 const requestedRole=new URLSearchParams(location.search).get('specialist');
-if(managementRoles.some(x=>x[0]===requestedRole))chooseManagementRole(requestedRole,null,true);
+if(managementRoles.some(x=>x[0]===requestedRole)){chooseManagementRole(requestedRole,null,true);const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete('specialist');history.replaceState(null,'',cleanUrl.pathname+cleanUrl.search+cleanUrl.hash);}
 let loanScenario=null;
 $('runLoan').onclick=()=>{
  const ids=['loanPrincipal','loanRate','loanMonths','loanCash','loanExisting'], inputs=ids.map($), vals=inputs.map(x=>Number(x.value));
@@ -1120,9 +1120,10 @@ $('runLoan').onclick=()=>{
  const [principal,annual,months,cash,existing]=vals,r=annual/1200;
  const installment=r===0?principal/months:principal*r/(-Math.expm1(-months*Math.log1p(r)));
  const debt=installment+existing,interest=Math.max(0,installment*months-principal),available=cash-debt,dscr=cash/debt;
- const currency=savedProfile?.currency||'RON',fmt=x=>new Intl.NumberFormat(language(),{maximumFractionDigits:2}).format(x)+' '+currency;
+ if(!savedProfile){out.textContent=mgCopy('Încarcă profilul firmei înainte de calcul.','Load the business profile before calculating.');return;}
+ const currency=savedProfile.currency,fmt=x=>new Intl.NumberFormat(language(),{maximumFractionDigits:2}).format(x)+' '+currency;
  const grid=document.createElement('div');grid.className='management-metrics';
- for(const [label,value] of [['Rată nouă / lună',fmt(installment)],['Dobândă totală',fmt(interest)],['Disponibil după toate ratele',fmt(available)],['DSCR estimat',dscr.toFixed(2)+'×'],['DSCR la flux −20%',(cash*.8/debt).toFixed(2)+'×']]){const tile=document.createElement('div'),title=document.createElement('small'),v=document.createElement('strong');title.textContent=label;v.textContent=value;tile.append(title,v);grid.append(tile);}
+ for(const [label,value] of [['Rată nouă / lună',fmt(installment)],['Dobândă totală',fmt(interest)],['Disponibil după toate ratele',fmt(available)],['DSCR estimat',dscr.toFixed(2)+'×'],['DSCR la flux −20%',(cash*.8/debt).toFixed(2)+'×']]){const tile=document.createElement('div'),title=document.createElement('small'),v=document.createElement('strong');title.textContent=tr(label);v.textContent=value;tile.append(title,v);grid.append(tile);}
  out.append(grid);const bar=document.createElement('div');bar.className='management-track';const fill=document.createElement('span');fill.style.width=Math.min(100,debt/Math.max(cash,.01)*100)+'%';bar.append(fill);out.append(bar);
  const note=document.createElement('p');note.textContent='Pondere rate în flux: '+(cash>0?(debt/cash*100).toFixed(1)+'%':'flux zero')+'. Scenariu declarat, nu recomandare de credit.';out.append(note);
  loanScenario={principal,annual,months,cash,existing,installment,interest,available,dscr,currency};$('discussLoan').hidden=false;
@@ -1133,10 +1134,10 @@ $('discussLoan').onclick=()=>{if(loanScenario)chooseManagementRole('financing','
 
 function metricTiles(parent,entries){
  const grid=document.createElement('div');grid.className='management-metrics';
- for(const [label,value] of entries){const tile=document.createElement('div'),title=document.createElement('small'),v=document.createElement('strong');title.textContent=label;v.textContent=value;tile.append(title,v);grid.append(tile);}parent.append(grid);
+ for(const [label,value] of entries){const tile=document.createElement('div'),title=document.createElement('small'),v=document.createElement('strong');title.textContent=tr(label);v.textContent=value;tile.append(title,v);grid.append(tile);}parent.append(grid);
 }
 function managementBar(parent,label,value,ratio){
- const line=document.createElement('p');line.textContent=label+' · '+value;parent.append(line);
+ const line=document.createElement('p');line.textContent=tr(label)+' · '+value;parent.append(line);
  const track=document.createElement('div');track.className='management-track';const fill=document.createElement('span');fill.style.width=Math.max(0,Math.min(100,ratio*100))+'%';track.append(fill);parent.append(track);
 }
 $('loadManagementOverview').onclick=async()=>{
@@ -1145,7 +1146,7 @@ $('loadManagementOverview').onclick=async()=>{
   const [data,goals]=await Promise.all([api('/management-overview'),api('/management-health')]);out.replaceChildren();const fmt=x=>new Intl.NumberFormat(language(),{maximumFractionDigits:2}).format(x)+' '+data.currency;
   if(!data.latest){out.textContent='Nu există vânzări înregistrate. Importă bonurile și costurile înainte de analiză.';if(goals.snapshots.length){const x=goals.snapshots[0];metricTiles(out,[[mgCopy('Perioada','Period'),x.period],[mgCopy('Atingerea țintelor','Goal attainment'),x.score+'/100']]);}return;}
   const l=data.latest;
-  metricTiles(out,[['Ultima perioadă cu date',l.period],['Vânzări înregistrate',fmt(l.revenue)],['Contribuție estimată',l.contribution===null?'Date lipsă':fmt(l.contribution)],[mgCopy('Atingerea țintelor','Goal attainment'),goals.snapshots.find(x=>x.period===l.period)?.score!=null?goals.snapshots.find(x=>x.period===l.period).score+'/100':mgCopy('Date insuficiente','Insufficient data')]]);
+  metricTiles(out,[['Ultima perioadă cu date',l.period],['Vânzări înregistrate',fmt(l.revenue)],['Contribuție estimată',l.contribution===null?tr('Date lipsă'):fmt(l.contribution)],[mgCopy('Atingerea țintelor','Goal attainment'),goals.snapshots.find(x=>x.period===l.period)?.score!=null?goals.snapshots.find(x=>x.period===l.period).score+'/100':mgCopy('Date insuficiente','Insufficient data')]]);
   const max=Math.max(1,...data.series.map(x=>Math.abs(x.revenue)));for(const m of data.series)managementBar(out,m.period,fmt(m.revenue),Math.max(0,m.revenue)/max);
   const note=document.createElement('p');note.textContent='Contribuția nu este profit net. Perioadele fără date nu sunt afișate; verifică moneda și baza TVA. '+(data.sample_limited?'Eșantion limitat la 10.000 linii. ':'')+'Scorul obiectivelor provine din datele declarate ale aceleiași luni, nu din vânzări estimate.';out.append(note);
  }catch(e){out.textContent=e.message;}finally{$('loadManagementOverview').disabled=false;}
@@ -1156,8 +1157,9 @@ $('runTeam').onclick=()=>{
  const inputs=['teamSalesA','teamHoursA','teamSalesB','teamHoursB'].map($);
  if(inputs.some(x=>!x.value.trim()||!x.checkValidity())){out.textContent='Completează toate valorile valide, inclusiv orele pozitive.';return;}
  const [salesA,hoursA,salesB,hoursB]=inputs.map(x=>Number(x.value));const a=salesA/hoursA,b=salesB/hoursB;
- const currency=savedProfile?.currency||'RON',fmt=x=>new Intl.NumberFormat(language(),{maximumFractionDigits:2}).format(x)+' '+currency+'/h';
- metricTiles(out,[['Productivitate A',fmt(a)],['Productivitate B',fmt(b)],['Variație',a>0?((b-a)/a*100).toFixed(1)+'%':'Bază zero']]);
+ if(!savedProfile){out.textContent=mgCopy('Încarcă profilul firmei înainte de calcul.','Load the business profile before calculating.');return;}
+ const currency=savedProfile.currency,fmt=x=>new Intl.NumberFormat(language(),{maximumFractionDigits:2}).format(x)+' '+currency+'/h';
+ metricTiles(out,[['Productivitate A',fmt(a)],['Productivitate B',fmt(b)],['Variație',a>0?((b-a)/a*100).toFixed(1)+'%':tr('Bază zero')]]);
  const max=Math.max(1,a,b);managementBar(out,'Perioada A',fmt(a),a/max);managementBar(out,'Perioada B',fmt(b),b/max);
  const note=document.createElement('p');note.textContent='Indicator agregat declarat. Compară aceleași responsabilități, trafic și sezonalitate; nu măsoară performanța individuală.';out.append(note);
  teamScenario={salesA,hoursA,salesB,hoursB,currency};$('discussTeam').hidden=false;
