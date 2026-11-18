@@ -4,6 +4,7 @@ import secrets
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from sqlalchemy import update
+from loial_manual_admin import AmbassadorInvite
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import declarative_base
@@ -48,6 +49,12 @@ class WalletAmbassadorLink(RecruitmentBase):
     wallet_uuid = Column(String(120), primary_key=True)
     agent_id = Column(Integer, unique=True, nullable=False)
     linked_at = Column(String(40), nullable=False)
+
+class ActivateAmbassador(BaseModel):
+    name: str = Field(min_length=2,max_length=100)
+    email: str = Field(min_length=3,max_length=100,pattern=r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+    password: str = Field(min_length=10,max_length=72)
+    accept_terms: bool = False
 
 class LinkAmbassador(BaseModel):
     email: str = Field(min_length=3,max_length=100)
@@ -107,6 +114,34 @@ def install_merchant_referrals(app, engine, factory, Agent, Business, pwd_contex
         agent=db.query(Agent).filter_by(email=req.email.strip().lower(),active=True,role="ambassador").first()
         if not agent or not pwd_context.verify(req.password,agent.password):
             raise HTTPException(401,"Datele contului de ambasador sunt incorecte")
+        return associate(db,wallet,agent)
+    @api.post("/activate")
+    def activate(req: ActivateAmbassador, request: Request, db=Depends(session)):
+        wallet=authenticated_wallet(request,db)
+        if not req.accept_terms:
+            raise HTTPException(422,"Accepta regulile programului de ambasador")
+        if not db.query(MerchantAttribution).filter_by(wallet_uuid=wallet.wallet_uuid).first():
+            raise HTTPException(409,"Recruteaza mai intai o firma")
+        if db.get(WalletAmbassadorLink,wallet.wallet_uuid):
+            raise HTTPException(409,"Portofelul este deja asociat unui ambasador")
+        email=req.email.strip().lower()
+        if not req.name.strip() or len(req.password.encode("utf-8"))>72:
+            raise HTTPException(422,"Verifica numele si parola")
+        invite=db.get(AmbassadorInvite,email)
+        if invite and not invite.used_at:
+            raise HTTPException(409,"Exista deja o invitatie individuala pentru acest cont")
+        if db.query(Agent).filter_by(email=email).first():
+            raise HTTPException(409,"Cont existent. Foloseste asocierea prin parola.")
+        agent=Agent(name=req.name.strip(),email=email,password=pwd_context.hash(req.password),
+            phone="",role="ambassador",rank="Ambasador",qr_code="LOIAL-"+secrets.token_hex(8).upper(),
+            status="active",active=True,payout_method="wise",payout_details=None,created_at=utc())
+        db.add(agent)
+        try:db.flush()
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(409,"Contul exista deja. Foloseste asocierea.")
+        return associate(db,wallet,agent)
+    def associate(db,wallet,agent):
         existing=db.get(WalletAmbassadorLink,wallet.wallet_uuid)
         if existing and existing.agent_id!=agent.id:
             raise HTTPException(409,"Portofel deja asociat")
