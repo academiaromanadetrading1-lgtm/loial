@@ -3385,7 +3385,7 @@ from loial_scans import ScanBase
 ScanBase.metadata.create_all(bind=engine)
 from loial_receipts import install_receipts
 install_receipts(app, engine, SessionLocal, BusinessAccount, Customer,
-                 AIDocument, AISale, SECRET_KEY, ALGORITHM)
+                 AIDocument, AISale, SECRET_KEY, ALGORITHM, StaffMember, limiter, business_can_enroll_new_customers)
 from loial_crm import install_crm
 install_crm(app, engine, SessionLocal, BusinessAccount, Customer, Consent, AISale, SECRET_KEY, ALGORITHM)
 

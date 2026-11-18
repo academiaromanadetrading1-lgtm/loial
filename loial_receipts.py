@@ -45,6 +45,21 @@ class Receipt(ReceiptBase):
     claimed_wallet=Column(String(120))
     __table_args__=(UniqueConstraint("business_id","receipt_ref",name="uq_loial_receipt_per_merchant"),)
 
+class SmartReservation(ReceiptBase):
+    __tablename__="loial_smart_reservations"
+    receipt_id=Column(Integer,primary_key=True)
+    business_id=Column(Integer,nullable=False,index=True)
+    wallet_uuid=Column(String(120),nullable=False)
+    approval_hash=Column(String(64),nullable=False,unique=True,index=True)
+    approval_expires=Column(String(40),nullable=False)
+    confirmed_at=Column(String(40))
+    staff_id=Column(Integer)
+
+class StaffApproval(BaseModel):
+    business_id:int
+    pin:str=Field(min_length=4,max_length=4)
+    approval_token:str=Field(min_length=32,max_length=100)
+
 class ReceiptLine(BaseModel):
     product: str = Field(min_length=1,max_length=160)
     sku: str = Field(default="",max_length=60)
@@ -57,6 +72,7 @@ class IssueReceipt(BaseModel):
     lines: List[ReceiptLine]=Field(min_length=1,max_length=100)
     currency: str=Field(default="RON",min_length=3,max_length=3)
     expires_days: int=Field(default=30,ge=1,le=60)
+    requires_payment_confirmation: bool=False
 
 class ReceiptClaim(BaseModel):
     receipt_token: str=Field(min_length=32,max_length=200)
@@ -86,7 +102,7 @@ def create_receipt_qr_png(url):
     return base64.b64encode(output.getvalue()).decode()
 
 def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISale,
-                     jwt_secret,jwt_algorithm):
+                     jwt_secret,jwt_algorithm,StaffMember=None,limiter=None,can_enroll=None):
     ReceiptBase.metadata.create_all(bind=engine)
     router=APIRouter(prefix="/api/loial-receipts",tags=["Loial verified receipt QR"])
 
@@ -161,17 +177,18 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
         data={"kind":"receipt","rows":rows,"total":str(total),
               "currency":request.currency.upper(),"receipt_ref":ref,
               "notes":["Date introduse/importate de comerciant; nu sunt obtinute automat din QR-ul fiscal."]}
+        pending=request.requires_payment_confirmation
         doc=AIDocument(business_id=biz.id,filename="bon-"+ref[:80],
-                       sha256=sha256(str(biz.id)+":"+ref),kind="receipt",
+                       sha256=sha256(str(biz.id)+":"+ref),kind="receipt_pending" if pending else "receipt",
                        data_json=json.dumps(data,ensure_ascii=False),
-                       confirmed=1,created_at=timestamp.isoformat())
+                       confirmed=0 if pending else 1,created_at=timestamp.isoformat())
         db.add(doc);db.flush()
         receipt=Receipt(business_id=biz.id,receipt_ref=ref,claim_hash=sha256(raw),
-                        status="issued",document_id=doc.id,total_minor=int(total*100),
+                        status="awaiting_payment" if pending else "issued",document_id=doc.id,total_minor=int(total*100),
                         currency=request.currency.upper(),issued_at=timestamp.isoformat(),
                         expires_at=deadline.isoformat())
         db.add(receipt)
-        for n,row in enumerate(rows):
+        for n,row in enumerate(rows if not pending else []):
             db.add(AISale(business_id=biz.id,document_id=doc.id,row_number=n,
                           sold_at=timestamp.date().isoformat(),transaction_id=ref,
                           product=row["product"],quantity=row["quantity"],
@@ -179,7 +196,7 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
                           customer_uuid=None))
         db.commit()
         url="https://loial.space/loial-receipt.html?token="+quote(raw,safe="")
-        return {"receipt_id":receipt.id,"status":"issued","claim_url":url,
+        return {"receipt_id":receipt.id,"status":receipt.status,"claim_url":url,
                 "qr_png_base64":"data:image/png;base64,"+create_receipt_qr_png(url),
                 "total":float(total),"currency":receipt.currency,
                 "expires_at":receipt.expires_at,
@@ -195,25 +212,32 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
     @router.post("/claim")
     def claim(req:ReceiptClaim,access=Depends(wallet),db:Session=Depends(database)):
         receipt=receipt_for_token(db,req.receipt_token)
+        if receipt.status in ("awaiting_payment","reserved"):
+            raise HTTPException(409,"Nota necesita confirmarea incasarii de catre angajat")
         if receipt.status!="issued":
             raise HTTPException(status_code=409,detail="Bonul a fost deja folosit sau anulat")
         if datetime.fromisoformat(receipt.expires_at)<utc_now():
             raise HTTPException(status_code=410,detail="Termenul de revendicare al bonului a expirat")
+        return finalize(receipt,access.wallet_uuid,db,'issued')
+
+    def finalize(receipt,wallet_uuid,db,expected_status):
         biz=db.query(BusinessAccount).filter(
             BusinessAccount.id==receipt.business_id).first()
         if not biz:
             raise HTTPException(status_code=404,detail="Firma nu mai exista")
         customer=db.query(Customer).filter(
             Customer.business_id==biz.id,
-            (Customer.wallet_uuid==access.wallet_uuid) |
-            (Customer.uuid==access.wallet_uuid)).first()
+            (Customer.wallet_uuid==wallet_uuid) |
+            (Customer.uuid==wallet_uuid)).first()
         if not customer:
             existing=db.query(Customer).filter(
-                (Customer.wallet_uuid==access.wallet_uuid) |
-                (Customer.uuid==access.wallet_uuid)).first()
+                (Customer.wallet_uuid==wallet_uuid) |
+                (Customer.uuid==wallet_uuid)).first()
             if not existing:
                 raise HTTPException(status_code=409,detail="Activeaza un card Loial inainte sa revendici bonul")
-            customer=Customer(uuid=str(uuid.uuid4()),wallet_uuid=access.wallet_uuid,
+            if can_enroll and not can_enroll(db,biz.id):
+                raise HTTPException(403,"LIMIT_REACHED")
+            customer=Customer(uuid=str(uuid.uuid4()),wallet_uuid=wallet_uuid,
                               name=existing.name,email=existing.email,
                               phone=existing.phone,business_id=biz.id,stamps=0,
                               last_visit=utc_now().isoformat())
@@ -222,19 +246,25 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
         if (customer.stamps or 0)>=target:
             raise HTTPException(status_code=409,detail="Revendica mai intai recompensa existenta")
         claimed=utc_now()
-        statement=(update(Receipt).where(Receipt.id==receipt.id,Receipt.status=="issued")
-                   .values(status="claimed",claimed_wallet=access.wallet_uuid,
+        statement=(update(Receipt).where(Receipt.id==receipt.id,Receipt.status==expected_status)
+                   .values(status="claimed",claimed_wallet=wallet_uuid,
                            claimed_at=claimed.isoformat()))
         if db.execute(statement).rowcount!=1:
             db.rollback()
             raise HTTPException(status_code=409,detail="Bonul a fost deja revendicat")
+        if expected_status=='reserved':
+            doc=db.query(AIDocument).filter_by(id=receipt.document_id,business_id=biz.id).one()
+            doc.kind='receipt';doc.confirmed=1
+            for n,row in enumerate(json.loads(doc.data_json)['rows']):
+                db.add(AISale(business_id=biz.id,document_id=doc.id,row_number=n,sold_at=claimed.date().isoformat(),transaction_id=receipt.receipt_ref,product=row['product'],quantity=row['quantity'],unit_price=row['unit_price'],unit_variable_cost=row.get('unit_variable_cost'),customer_uuid=wallet_uuid))
+            db.flush()
         previous=customer.last_visit
         customer.stamps=(customer.stamps or 0)+1
         customer.last_visit=claimed.isoformat()
         matching=db.query(AISale).filter(
             AISale.business_id==biz.id,AISale.document_id==receipt.document_id).all()
         for line in matching:
-            line.customer_uuid=access.wallet_uuid
+            line.customer_uuid=wallet_uuid
         away=False
         if previous:
             try:
@@ -247,16 +277,65 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
         record_award(db,biz.id,customer.id,"receipt:"+str(receipt.id),
                      "receipt",customer.stamps)
         from loial_friend_referrals import credit_after_valid_stamp
-        credit_after_valid_stamp(db,access.wallet_uuid,biz.id,
+        credit_after_valid_stamp(db,wallet_uuid,biz.id,
                                  "receipt:"+str(receipt.id))
         from loial_wallet_sync import queue_google_refresh
-        queue_google_refresh(db,biz.id,access.wallet_uuid)
+        queue_google_refresh(db,biz.id,wallet_uuid)
         from loial_apple_updates import mark_customer_pass_changed
-        mark_customer_pass_changed(db,biz.id,access.wallet_uuid)
+        mark_customer_pass_changed(db,biz.id,wallet_uuid)
         db.commit()
         return {"status":"claimed","stamps":customer.stamps,"target":target,
                 "reward_unlocked":customer.stamps>=target,
                 "linked_products":len(matching),"business":biz.name}
+
+    @router.post("/reserve")
+    def reserve(req:ReceiptClaim,access=Depends(wallet),db:Session=Depends(database)):
+        rec=receipt_for_token(db,req.receipt_token)
+        now=utc_now()
+        if rec.status not in ("awaiting_payment","reserved"): raise HTTPException(409,"Tichet indisponibil")
+        if datetime.fromisoformat(rec.expires_at)<now: raise HTTPException(410,"Tichet expirat")
+        raw=secrets.token_urlsafe(32)
+        deadline=min(now+timedelta(minutes=3),datetime.fromisoformat(rec.expires_at))
+        if rec.status=="awaiting_payment":
+            if db.execute(update(Receipt).where(Receipt.id==rec.id,Receipt.status=="awaiting_payment").values(status="reserved")).rowcount!=1:
+                db.rollback();raise HTTPException(409,"Tichet deja rezervat")
+            db.add(SmartReservation(receipt_id=rec.id,business_id=rec.business_id,wallet_uuid=access.wallet_uuid,approval_hash=sha256(raw),approval_expires=deadline.isoformat()))
+        else:
+            changed=db.execute(update(SmartReservation).where(SmartReservation.receipt_id==rec.id,SmartReservation.wallet_uuid==access.wallet_uuid,SmartReservation.confirmed_at.is_(None)).values(approval_hash=sha256(raw),approval_expires=deadline.isoformat())).rowcount
+            if changed!=1: db.rollback();raise HTTPException(409,"Tichet rezervat altui portofel sau deja confirmat")
+        db.commit()
+        url="https://loial.space/scan.html?receipt_approval="+quote(raw,safe="")
+        return {"status":"reserved","approval_qr":"data:image/png;base64,"+create_receipt_qr_png(url),"expires_at":deadline.isoformat()}
+
+    @router.post("/confirm-payment")
+    @((limiter.limit("20/minute")) if limiter else (lambda f:f))
+    def confirm_payment(request:Request,req:StaffApproval,db:Session=Depends(database)):
+        biz=db.query(BusinessAccount).filter_by(id=req.business_id).first()
+        if not biz or req.pin=="1234": raise HTTPException(401,"Terminal neautorizat")
+        staff=db.query(StaffMember).filter_by(business_id=biz.id,pin=req.pin,active=1).first() if StaffMember is not None else None
+        if not staff and not (biz.staff_pin and biz.staff_pin==req.pin): raise HTTPException(401,"Terminal neautorizat")
+        approval=db.query(SmartReservation).filter_by(business_id=biz.id,approval_hash=sha256(req.approval_token)).first()
+        if not approval: raise HTTPException(404,"Cod de confirmare necunoscut")
+        rec=db.query(Receipt).filter_by(id=approval.receipt_id,business_id=biz.id).first()
+        if not rec or rec.status!="reserved" or approval.confirmed_at: raise HTTPException(409,"Tichet deja procesat sau anulat")
+        now=utc_now()
+        if any(datetime.fromisoformat(t)<now for t in (approval.approval_expires,rec.expires_at)):
+            raise HTTPException(410,"Cod expirat; clientul poate regenera codul")
+        changed=db.execute(update(SmartReservation).where(SmartReservation.receipt_id==rec.id,SmartReservation.confirmed_at.is_(None),SmartReservation.approval_hash==sha256(req.approval_token)).values(confirmed_at=now.isoformat(),staff_id=staff.id if staff else None)).rowcount
+        if changed!=1: db.rollback();raise HTTPException(409,"Confirmare deja procesata")
+        if staff: staff.scans_count=(staff.scans_count or 0)+1
+        return finalize(rec,approval.wallet_uuid,db,"reserved")
+
+    @router.get("/payment-status")
+    def payment_status(token:str,access=Depends(wallet),db:Session=Depends(database)):
+        rec=receipt_for_token(db,token)
+        if rec.status not in ("reserved","claimed","refunded"): return {"status":rec.status}
+        reservation=db.get(SmartReservation,rec.id)
+        if not reservation or reservation.wallet_uuid!=access.wallet_uuid: raise HTTPException(404,"Tichet negasit")
+        if rec.status=="claimed":
+            customer=db.query(Customer).filter(Customer.business_id==rec.business_id,(Customer.wallet_uuid==access.wallet_uuid)|(Customer.uuid==access.wallet_uuid)).first()
+            return {"status":"claimed","stamps":customer.stamps if customer else None}
+        return {"status":rec.status}
 
     @router.post("/refund")
     def refund(req:ReceiptRefund,biz=Depends(owner),db:Session=Depends(database)):

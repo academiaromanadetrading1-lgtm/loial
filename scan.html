@@ -84,7 +84,8 @@
 <script>
   const pathParts = window.location.pathname.split('/').filter(Boolean);
   const scannedWalletUuid = new URLSearchParams(window.location.search).get('wallet_uuid') || '';
-  const isDirectScan = Boolean(scannedWalletUuid);
+  const approvalToken = new URLSearchParams(window.location.search).get('receipt_approval') || '';
+  const isDirectScan = Boolean(scannedWalletUuid || approvalToken);
 
   let bizId = (!isDirectScan && pathParts[0] === 'scan' && /^\d+$/.test(pathParts[1] || ''))
     ? pathParts[1]
@@ -110,7 +111,8 @@
       document.getElementById('readyScreen').classList.remove('hidden');
       document.getElementById('subText').textContent = 'Terminal activ pentru acordarea ștampilelor';
 
-      if (isDirectScan && scannedWalletUuid) {
+      if (approvalToken) { await confirmSmartReceipt(); }
+      else if (isDirectScan && scannedWalletUuid) {
         await grantStampDirect(scannedWalletUuid);
       }
     } else if (isDirectScan) {
@@ -131,7 +133,8 @@
     document.getElementById('pinScreen').classList.add('hidden');
     document.getElementById('readyScreen').classList.remove('hidden');
     document.getElementById('subText').textContent = 'Terminal activ pentru acordarea ștampilelor';
-    if (isDirectScan && scannedWalletUuid) {
+    if (approvalToken) { confirmSmartReceipt(); }
+    else if (isDirectScan && scannedWalletUuid) {
       grantStampDirect(scannedWalletUuid);
     }
   }
@@ -145,6 +148,15 @@
     document.getElementById('pinScreen').classList.remove('hidden');
   }
 
+  async function confirmSmartReceipt(){
+    const box=document.getElementById('resultBox');
+    box.textContent='Se confirmă încasarea...';
+    try{
+      const response=await fetch('/api/loial-receipts/confirm-payment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({business_id:Number(bizId),pin:staffPin,approval_token:approvalToken})});
+      const x=await response.json();if(!response.ok)throw Error(x.detail||'Confirmare refuzată');
+      playBeep();box.textContent='✓ Plată confirmată · '+x.stamps+'/'+x.target+' ștampile';
+    }catch(e){box.textContent='Confirmare nereușită: '+e.message;}
+  }
   function playBeep() {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
