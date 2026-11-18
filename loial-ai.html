@@ -249,7 +249,7 @@ Ex.: Revizie auto;1;220;65"></textarea>
 <button class="ghost" id="saveMetric" style="width:100%;margin-top:9px">Salvează indicatorul</button>
 </section></div></section>
 <section class="workspace-view" id="view-customers" data-view="customers" hidden><div class="tool-grid"><section class="card panel">
-<h2>Clienți și cumpărături</h2>
+<h2>Clienți și cumpărături</h2><label>Produs cumpărat</label><input id="crmProduct" maxlength="160"><label>Bonuri verificate în ultimele 90 zile (minim)</label><input id="crmMin" type="number" min="0" value="0"><label>Valoare minimă RON din bonuri verificate</label><input id="crmSpend" type="number" min="0" value="0"><button class="ghost" id="crmSearch">Filtrează istoricul verificat</button><div id="crmResults" class="report"></div>
 <button class="ghost" id="showClients" style="width:100%">Vezi clienții firmei</button>
 <div id="customerList" class="file-list" style="margin-top:10px"></div>
 </section><section class="card panel">
@@ -780,10 +780,21 @@ async function loadMessageRecipients(){
     option.value=String(c.id);option.textContent=c.name+' (card #'+c.id+')';
     select.appendChild(option);});
 }
+async function crm(path){
+  const res=await fetch('/api/loial-crm'+path,{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+  const data=await res.json();if(!res.ok)throw Error(data.detail||'Eroare CRM');return data;
+}
+$('crmSearch').onclick=async()=>{
+  try{
+    const p=new URLSearchParams({product:$('crmProduct').value,min_purchases:String(Number($('crmMin').value)||0),min_spend_minor:String(Math.round((Number($('crmSpend').value)||0)*100))});
+    const data=await crm('/customers?'+p);
+    $('crmResults').textContent=data.total+' clienți potriviți · primele '+data.items.length+' rezultate\n'+data.items.map(c=>c.name+' · '+c.verified_receipts+' bonuri · '+(c.verified_spend_minor===null?'valoare necunoscută':(c.verified_spend_minor/100).toFixed(2)+' RON')+' · '+c.products.map(p=>p.name).join(', ')).join('\n');
+  }catch(e){status(e.message,true);}
+};
 async function refreshSent(){
-  const records=await nativeInbox('/sent');
+  const records=await crm('/campaigns');
   $('sentHistory').textContent=records.length
-    ?records.map(x=>'• '+x.subject+'\n  '+x.delivered+' livrate în Loial · '+x.read+' citite').join('\n\n')
+    ?records.map(x=>'• '+x.subject+'\n  '+x.stored_in_inbox+' înregistrate în inbox · '+x.read+' citite · '+x.interested+' interesați · '+x.not_interested+' neinteresați').join('\n\n')
     :'Nu ai trimis încă mesaje.';
 }
 $('refreshSent').onclick=()=>refreshSent().catch(e=>status(e.message,true));

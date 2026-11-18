@@ -165,7 +165,21 @@ button.black{background:#111318;color:#ddc48b}
         const item=newEl('article',null,'merchant');item.style.marginTop='8px';
         item.appendChild(newEl('strong',message.subject||message.title||'Mesaj Loial'));
         item.appendChild(newEl('p',message.text||message.body||''));
-        list.appendChild(item);
+        const feedback=newEl('p','','muted');
+        if(!message.read){
+          const read=newEl('button','Marchează ca citit','button secondary');
+          read.onclick=async()=>{try{await json('/api/loial-inbox/read/'+message.delivery_id,{method:'POST'});read.remove();}catch(e){feedback.textContent=e.message;}};
+          item.appendChild(read);
+        }
+        if(message.kind==='marketing'){
+          for(const [choice,label] of [['interested','Mă interesează'],['not_interested','Nu mă interesează']]){
+            const button=newEl('button',label,'button secondary');
+            button.onclick=async()=>{try{await json('/api/loial-crm/reaction/'+message.delivery_id+'/'+choice,{method:'POST'});feedback.textContent='Răspuns salvat: '+label;}catch(e){feedback.textContent=e.message;}};
+            item.appendChild(button);
+          }
+          if(message.reaction)feedback.textContent='Răspuns salvat: '+(message.reaction==='interested'?'Mă interesează':'Nu mă interesează');
+        }
+        item.appendChild(feedback);list.appendChild(item);
       }
       if(!(data.messages||[]).length)list.textContent='Nu ai încă mesaje.';
     }catch(error){$('inboxList').textContent=error.message;}

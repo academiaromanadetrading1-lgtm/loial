@@ -348,7 +348,10 @@ def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent
                 BusinessAccount.id == delivery.business_id).first()
             if not entry or not biz:
                 continue
-            messages.append({"delivery_id": delivery.id, "business_id": biz.id,
+            from loial_crm import OfferReaction
+            reaction = db.get(OfferReaction, delivery.id)
+            messages.append({"reaction": reaction.choice if reaction else None,
+                             "delivery_id": delivery.id, "business_id": biz.id,
                 "business_name": biz.name, "subject": entry.title, "text": entry.body,
                 "kind": entry.category, "created_at": delivery.created_at,
                 "read": delivery.read_at is not None})

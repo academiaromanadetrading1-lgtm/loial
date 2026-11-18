@@ -3386,6 +3386,8 @@ ScanBase.metadata.create_all(bind=engine)
 from loial_receipts import install_receipts
 install_receipts(app, engine, SessionLocal, BusinessAccount, Customer,
                  AIDocument, AISale, SECRET_KEY, ALGORITHM)
+from loial_crm import install_crm
+install_crm(app, engine, SessionLocal, BusinessAccount, Customer, Consent, AISale, SECRET_KEY, ALGORITHM)
 
 # Cheltuieli din facturi confirmate explicit de antreprenor (nu estimari AI).
 from loial_expenses import install_expenses
