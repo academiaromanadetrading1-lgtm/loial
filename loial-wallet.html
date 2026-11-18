@@ -92,6 +92,19 @@ button.black{background:#111318;color:#ddc48b}
     <div class="actions"><button type="button" id="copyMerchantReferral">Copiază linkul</button><button type="button" id="shareMerchantReferral" class="secondary">Distribuie unei firme</button></div>
   </div>
   <p class="notice">Înscrierea gratuită nu generează comision. Veniturile depind de abonamentele eligibile achitate și de regulile programului.</p>
+  <form id="merchantAmbassadorForm" class="hidden" style="margin-top:16px">
+    <h3>Activează accesul de ambasador</h3>
+    <p>Prima firmă este deja înregistrată. Creează datele de acces sau asociază contul pe care îl ai.</p>
+    <label for="merchantAmbassadorMode">Tipul contului</label>
+    <select id="merchantAmbassadorMode"><option value="activate">Cont nou</option><option value="link">Am deja un cont</option></select>
+    <div id="merchantAmbassadorNameRow"><label for="merchantAmbassadorName">Nume</label><input id="merchantAmbassadorName" autocomplete="name" maxlength="100"></div>
+    <label for="merchantAmbassadorEmail">Email</label><input id="merchantAmbassadorEmail" type="email" autocomplete="email" required maxlength="100">
+    <label for="merchantAmbassadorPassword">Parolă</label><input id="merchantAmbassadorPassword" type="password" autocomplete="new-password" required maxlength="72" minlength="10">
+    <label style="display:flex;align-items:start;gap:8px"><input id="merchantAmbassadorTerms" type="checkbox" required> Accept regulile programului prezentate pe pagina ambasadorilor. Comisioanele provin din abonamente eligibile achitate.</label>
+    <button id="merchantAmbassadorSubmit" type="submit">Activează contul</button>
+    <p id="merchantAmbassadorResult" role="status" aria-live="polite"></p>
+  </form>
+  <a class="button hidden" id="merchantAmbassadorDashboard" href="/ambasador.html">Intră în contul de ambasador</a>
   <a class="button secondary" href="/ambasador.html">Descoperă programul și simulatorul</a>
 </section>
 <section class="panel" id="friendsSection">
@@ -260,8 +273,36 @@ button.black{background:#111318;color:#ddc48b}
         ?'Ai recomandat '+data.registered_merchants+' firme. Ești eligibil pentru activarea statutului de ambasador.'
         :'Prima ta firmă: prezintă cardul LOIAL și invită antreprenorul să se înscrie gratuit.';
       $('merchantReferralActions').classList.remove('hidden');
+      $('merchantAmbassadorForm').classList.toggle('hidden',data.status!=='eligible_for_activation');
+      $('merchantAmbassadorDashboard').classList.toggle('hidden',data.status!=='ambassador');
+      if(data.status==='ambassador')$('merchantReferralStatus').textContent='Ambasador activ · '+data.registered_merchants+' firme recomandate. Continuă cu firme noi și verifică veniturile confirmate în cont.';
     }catch(error){$('merchantReferralStatus').textContent=error.message;}
   }
+  $('merchantAmbassadorMode').onchange=()=>{
+    const existing=$('merchantAmbassadorMode').value==='link';
+    $('merchantAmbassadorNameRow').hidden=existing;
+    $('merchantAmbassadorPassword').minLength=existing?1:10;
+    $('merchantAmbassadorPassword').autocomplete=existing?'current-password':'new-password';
+    $('merchantAmbassadorSubmit').textContent=existing?'Asociază contul':'Activează contul';
+  };
+  $('merchantAmbassadorForm').onsubmit=async(event)=>{
+    event.preventDefault();
+    const submit=$('merchantAmbassadorSubmit'),result=$('merchantAmbassadorResult');
+    const mode=$('merchantAmbassadorMode').value==='link'?'link':'activate';
+    const password=$('merchantAmbassadorPassword');
+    const details={email:$('merchantAmbassadorEmail').value.trim(),password:password.value,accept_terms:$('merchantAmbassadorTerms').checked};
+    if(mode==='activate')details.name=$('merchantAmbassadorName').value.trim();
+    submit.disabled=true;result.textContent='Se verifică datele…';
+    try{
+      const data=await json('/api/loial-merchant-referrals/'+mode,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(details)});
+      if(data.status!=='ambassador')throw Error('Activarea nu a fost confirmată.');
+      $('merchantAmbassadorForm').classList.add('hidden');
+      $('merchantAmbassadorDashboard').classList.remove('hidden');
+      $('merchantReferralStatus').textContent='Contul de ambasador este activ.';
+      await loadMerchantReferral();
+    }catch(error){result.textContent=error.message;}
+    finally{password.value='';submit.disabled=false;}
+  };
   $('copyMerchantReferral').onclick=async()=>{
     try{await navigator.clipboard.writeText($('merchantReferralLink').value);$('copyMerchantReferral').textContent='✓ Copiat';}
     catch(error){$('merchantReferralLink').select();}
