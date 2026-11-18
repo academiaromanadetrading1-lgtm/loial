@@ -156,33 +156,57 @@ button.black{background:#111318;color:#ddc48b}
       $('activateWallet').classList.remove('hidden');
     }
   }
+  let inboxGeneration=0;
   async function loadInbox(){
-    if(!token){$('inboxList').textContent='Portofelul nu este activat.';return;}
+    const g=++inboxGeneration,list=$('inboxList');
+    if(!token){list.textContent='Portofelul nu este activat.';return;}
     try{
-      const data=await json('/api/loial-inbox/me');
-      const list=$('inboxList');list.replaceChildren();
-      for(const message of (data.messages||[]).slice(0,12)){
-        const item=newEl('article',null,'merchant');item.style.marginTop='8px';
-        item.appendChild(newEl('strong',message.subject||message.title||'Mesaj Loial'));
-        item.appendChild(newEl('p',message.text||message.body||''));
-        const feedback=newEl('p','','muted');
-        if(!message.read){
-          const read=newEl('button','Marchează ca citit','button secondary');
-          read.onclick=async()=>{try{await json('/api/loial-inbox/read/'+message.delivery_id,{method:'POST'});read.remove();}catch(e){feedback.textContent=e.message;}};
-          item.appendChild(read);
-        }
-        if(message.kind==='marketing'){
-          for(const [choice,label] of [['interested','Mă interesează'],['not_interested','Nu mă interesează']]){
-            const button=newEl('button',label,'button secondary');
-            button.onclick=async()=>{try{await json('/api/loial-crm/reaction/'+message.delivery_id+'/'+choice,{method:'POST'});feedback.textContent='Răspuns salvat: '+label;}catch(e){feedback.textContent=e.message;}};
-            item.appendChild(button);
-          }
-          if(message.reaction)feedback.textContent='Răspuns salvat: '+(message.reaction==='interested'?'Mă interesează':'Nu mă interesează');
-        }
-        item.appendChild(feedback);list.appendChild(item);
+      const data=await json('/api/loial-inbox/threads');
+      if(g!==inboxGeneration)return;
+      list.replaceChildren();
+      list.appendChild(newEl('p',data.unread+' mesaje necitite · Citește când dorești.','muted'));
+      for(const thread of data.threads){
+        const button=newEl('button',null,'merchant');button.style.cssText='width:100%;text-align:left;margin-top:8px;cursor:pointer';
+        button.append(newEl('strong',thread.business_name+(thread.unread?' · '+thread.unread+' noi':'')),newEl('p',thread.subject||'Mesaj Loial'),newEl('span',thread.total+' mesaje'));
+        button.onclick=()=>openThread(thread);list.appendChild(button);
       }
-      if(!(data.messages||[]).length)list.textContent='Nu ai încă mesaje.';
-    }catch(error){$('inboxList').textContent=error.message;}
+      if(!data.threads.length)list.appendChild(newEl('p','Nu ai încă mesaje.'));
+    }catch(e){if(g===inboxGeneration)list.textContent=e.message;}
+  }
+  async function openThread(thread){
+    const g=++inboxGeneration,list=$('inboxList');list.replaceChildren();
+    const back=newEl('button','← Toate afacerile','button secondary');back.onclick=loadInbox;list.appendChild(back);
+    list.appendChild(newEl('h3',thread.business_name));
+    const pref=newEl('button','Se încarcă preferințele…','button secondary');pref.disabled=true;list.appendChild(pref);
+    const feed=newEl('div');list.appendChild(feed);
+    async function page(before=0){
+      try{
+        const data=await json('/api/loial-inbox/threads/'+thread.business_id+'?before='+before);
+        if(g!==inboxGeneration)return;
+        let enabled=data.offers_enabled;
+        pref.disabled=false;pref.textContent=enabled?'Oprește ofertele acestei afaceri':'Activează ofertele acestei afaceri';
+        pref.onclick=async()=>{try{await json('/api/loial-inbox/preferences',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({business_id:thread.business_id,enabled:!enabled})});enabled=!enabled;pref.textContent=enabled?'Oprește ofertele acestei afaceri':'Activează ofertele acestei afaceri';}catch(e){pref.textContent=e.message;}};
+        for(const message of data.messages){
+          const item=newEl('details',null,'merchant');item.style.marginTop='8px';
+          const summary=newEl('summary',(message.read?'':'● ')+(message.subject||'Mesaj Loial'));summary.style.cursor='pointer';item.appendChild(summary);
+          const stamp=new Date(message.created_at);if(!isNaN(stamp.getTime()))item.appendChild(newEl('small',stamp.toLocaleString('ro-RO')));
+          item.appendChild(newEl('p',message.text||''));
+          const feedback=newEl('p','','muted');
+          item.ontoggle=async()=>{if(item.open&&!message.read){try{await json('/api/loial-inbox/read/'+message.delivery_id,{method:'POST'});message.read=true;summary.textContent=message.subject||'Mesaj Loial';}catch(e){feedback.textContent=e.message;}}};
+          if(message.kind==='marketing'){
+            for(const [choice,label] of [['interested','Mă interesează'],['not_interested','Nu mă interesează']]){
+              const button=newEl('button',label,'button secondary');
+              button.onclick=async()=>{try{await json('/api/loial-crm/reaction/'+message.delivery_id+'/'+choice,{method:'POST'});feedback.textContent='Răspuns salvat: '+label;}catch(e){feedback.textContent=e.message;}};
+              item.appendChild(button);
+            }
+            if(message.reaction)feedback.textContent='Răspuns salvat: '+(message.reaction==='interested'?'Mă interesează':'Nu mă interesează');
+          }
+          item.appendChild(feedback);feed.appendChild(item);
+        }
+        if(data.next_before){const more=newEl('button','Mesaje mai vechi','button secondary');more.onclick=()=>{more.remove();page(data.next_before);};feed.appendChild(more);}
+      }catch(e){if(g===inboxGeneration)feed.appendChild(newEl('p',e.message));}
+    }
+    await page();
   }
   async function loadFriends(){
     if(!token)return;

@@ -182,6 +182,8 @@ def audience_matches(customer, audience, reference=None):
 def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent,
                         Sale, jwt_key, jwt_algorithm):
     InboxBase.metadata.create_all(bind=engine)
+    from loial_crm import CRMBase
+    CRMBase.metadata.create_all(bind=engine)
     route = APIRouter(prefix="/api/loial-inbox", tags=["Loial native inbox"])
 
     def db_session():
@@ -358,6 +360,39 @@ def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent
             if not delivery.read_at:
                 unread += 1
         return {"messages": messages, "unread": unread, "cards": len(cards)}
+
+    @route.get("/threads")
+    def threads(wallet=Depends(client),db:Session=Depends(db_session)):
+        cards=cards_for(db,wallet.wallet_uuid)
+        allowed={c.id:c.business_id for c in cards}
+        if not allowed: return {"threads":[],"unread":0}
+        from sqlalchemy import func,case
+        rows=db.query(InboxDelivery.business_id,func.count(InboxDelivery.id),func.sum(case((InboxDelivery.read_at.is_(None),1),else_=0)),func.max(InboxDelivery.id)).filter(InboxDelivery.customer_id.in_(allowed)).group_by(InboxDelivery.business_id).order_by(func.max(InboxDelivery.id).desc()).all()
+        output=[]
+        for bid,total,unread,last_id in rows:
+            biz=db.query(BusinessAccount).filter_by(id=bid).first()
+            latest=db.query(InboxDelivery).filter_by(id=last_id,business_id=bid).first()
+            if not biz or not latest or allowed.get(latest.customer_id)!=bid: continue
+            entry=db.query(InboxEntry).filter_by(id=latest.entry_id,business_id=bid).first()
+            if not entry: continue
+            output.append({"business_id":bid,"business_name":biz.name,"total":total,"unread":int(unread or 0),"subject":entry.title,"created_at":latest.created_at})
+        return {"threads":output,"unread":sum(x["unread"] for x in output)}
+
+    @route.get("/threads/{business_id}")
+    def thread(business_id:int,before:int=0,wallet=Depends(client),db:Session=Depends(db_session)):
+        cards=[c for c in cards_for(db,wallet.wallet_uuid) if c.business_id==business_id]
+        if not cards: raise HTTPException(404,"Conversatie inexistenta")
+        from loial_crm import OfferReaction
+        q=db.query(InboxDelivery).filter(InboxDelivery.business_id==business_id,InboxDelivery.customer_id.in_([c.id for c in cards]))
+        if before>0: q=q.filter(InboxDelivery.id<before)
+        ds=q.order_by(InboxDelivery.id.desc()).limit(51).all()
+        result=[]
+        for d in ds[:50]:
+            e=db.query(InboxEntry).filter_by(id=d.entry_id,business_id=business_id).first()
+            if not e: continue
+            a=db.get(OfferReaction,d.id)
+            result.append({"delivery_id":d.id,"subject":e.title,"text":e.body,"kind":e.category,"created_at":d.created_at,"read":d.read_at is not None,"reaction":a.choice if a else None})
+        return {"messages":result,"next_before":ds[49].id if len(ds)>50 else None,"offers_enabled":latest_offer_choice(db,Consent,cards[0].id)}
 
     @route.post("/read/{delivery_id}")
     def mark_read(delivery_id: int, wallet=Depends(client), db: Session = Depends(db_session)):
