@@ -194,7 +194,13 @@ Ex.: Revizie auto;1;220;65"></textarea>
 <div id="receiptList" class="file-list"></div>
 <p class="tiny">Integrarea directă cu POS-ul sau casa fiscală necesită suportul sistemului de vânzări. Codul QR fiscal standard nu transmite automat produsele către Loial.</p>
 </section></div></section>
-<section class="workspace-view" id="view-reports" data-view="reports" hidden><div class="tool-grid"><section class="card panel" id="financeSimulator"><h2>Simulator de finanțare</h2><p>Rate lunare egale, dobândă fixă. Calcule locale, fără apel AI. Nu include comisioane sau asigurări.</p>
+<section class="workspace-view" id="view-reports" data-view="reports" hidden><div class="tool-grid"><section class="card panel" id="managementOverview"><h2>LOIAL · Business Health</h2><p>Indicatori din vânzările înregistrate. Datele lipsă nu sunt interpretate ca zero.</p><button type="button" class="ghost" id="loadManagementOverview">Actualizează indicatorii</button><div id="managementOverviewResult" aria-live="polite" data-no-translate></div></section>
+<section class="card panel" id="teamOperations"><h2>LOIAL People · Organizarea echipei</h2><p>Compară două perioade cu activitate similară, la nivel de echipă. Nu introduce nume sau date individuale.</p>
+<label for="teamSalesA">Vânzări nete – perioada A</label><input id="teamSalesA" type="number" min="0" max="100000000" step=".01">
+<label for="teamHoursA">Ore lucrate de echipă – perioada A</label><input id="teamHoursA" type="number" min=".01" max="1000000" step=".01">
+<label for="teamSalesB">Vânzări nete – perioada B</label><input id="teamSalesB" type="number" min="0" max="100000000" step=".01">
+<label for="teamHoursB">Ore lucrate de echipă – perioada B</label><input id="teamHoursB" type="number" min=".01" max="1000000" step=".01">
+<button id="runTeam" type="button" style="margin-top:12px">Compară productivitatea</button><div id="teamResult" aria-live="polite" data-no-translate></div><button id="discussTeam" hidden type="button" class="ghost">Discută organizarea echipei</button></section><section class="card panel" id="financeSimulator"><h2>Simulator de finanțare</h2><p>Rate lunare egale, dobândă fixă. Calcule locale, fără apel AI. Nu include comisioane sau asigurări.</p>
 <label for="loanPrincipal">Valoare credit (moneda profilului)</label><input id="loanPrincipal" type="number" min="1" max="100000000" step="0.01" placeholder="50000">
 <label for="loanRate">Dobândă nominală anuală (%)</label><input id="loanRate" type="number" min="0" max="100" step="0.01" placeholder="8">
 <label for="loanMonths">Durata (luni)</label><input id="loanMonths" type="number" min="1" max="600" step="1" placeholder="60">
@@ -1071,6 +1077,41 @@ $('runLoan').onclick=()=>{
 };
 for(const id of ['loanPrincipal','loanRate','loanMonths','loanCash','loanExisting'])$(id).addEventListener('input',()=>{loanScenario=null;$('loanResult').replaceChildren();$('discussLoan').hidden=true;});
 $('discussLoan').onclick=()=>{if(loanScenario)chooseManagementRole('financing','Analizează scenariul declarat de finanțare, inclusiv riscurile și stresul de lichiditate: '+JSON.stringify(loanScenario));};
+
+
+function metricTiles(parent,entries){
+ const grid=document.createElement('div');grid.className='management-metrics';
+ for(const [label,value] of entries){const tile=document.createElement('div'),title=document.createElement('small'),v=document.createElement('strong');title.textContent=label;v.textContent=value;tile.append(title,v);grid.append(tile);}parent.append(grid);
+}
+function managementBar(parent,label,value,ratio){
+ const line=document.createElement('p');line.textContent=label+' · '+value;parent.append(line);
+ const track=document.createElement('div');track.className='management-track';const fill=document.createElement('span');fill.style.width=Math.max(0,Math.min(100,ratio*100))+'%';track.append(fill);parent.append(track);
+}
+$('loadManagementOverview').onclick=async()=>{
+ const out=$('managementOverviewResult');out.textContent='Se încarcă…';$('loadManagementOverview').disabled=true;
+ try{
+  const data=await api('/management-overview');out.replaceChildren();const fmt=x=>new Intl.NumberFormat(language(),{maximumFractionDigits:2}).format(x)+' '+data.currency;
+  if(!data.latest){out.textContent='Nu există vânzări înregistrate. Importă bonurile și costurile înainte de analiză.';return;}
+  const l=data.latest;
+  metricTiles(out,[['Ultima perioadă cu date',l.period],['Vânzări înregistrate',fmt(l.revenue)],['Contribuție estimată',l.contribution===null?'Date lipsă':fmt(l.contribution)],['Scor sănătate','Date insuficiente']]);
+  const max=Math.max(1,...data.series.map(x=>Math.abs(x.revenue)));for(const m of data.series)managementBar(out,m.period,fmt(m.revenue),Math.max(0,m.revenue)/max);
+  const note=document.createElement('p');note.textContent='Contribuția nu este profit net. Perioadele fără date nu sunt afișate; verifică moneda și baza TVA. '+(data.sample_limited?'Eșantion limitat la 10.000 linii. ':'')+'Pentru scorul complet sunt necesare lichiditatea, datoriile, retenția și capacitatea operațională.';out.append(note);
+ }catch(e){out.textContent=e.message;}finally{$('loadManagementOverview').disabled=false;}
+};
+let teamScenario=null;
+$('runTeam').onclick=()=>{
+ const out=$('teamResult');out.replaceChildren();teamScenario=null;$('discussTeam').hidden=true;
+ const inputs=['teamSalesA','teamHoursA','teamSalesB','teamHoursB'].map($);
+ if(inputs.some(x=>!x.value.trim()||!x.checkValidity())){out.textContent='Completează toate valorile valide, inclusiv orele pozitive.';return;}
+ const [salesA,hoursA,salesB,hoursB]=inputs.map(x=>Number(x.value));const a=salesA/hoursA,b=salesB/hoursB;
+ const currency=savedProfile?.currency||'RON',fmt=x=>new Intl.NumberFormat(language(),{maximumFractionDigits:2}).format(x)+' '+currency+'/h';
+ metricTiles(out,[['Productivitate A',fmt(a)],['Productivitate B',fmt(b)],['Variație',a>0?((b-a)/a*100).toFixed(1)+'%':'Bază zero']]);
+ const max=Math.max(1,a,b);managementBar(out,'Perioada A',fmt(a),a/max);managementBar(out,'Perioada B',fmt(b),b/max);
+ const note=document.createElement('p');note.textContent='Indicator agregat declarat. Compară aceleași responsabilități, trafic și sezonalitate; nu măsoară performanța individuală.';out.append(note);
+ teamScenario={salesA,hoursA,salesB,hoursB,currency};$('discussTeam').hidden=false;
+};
+for(const id of ['teamSalesA','teamHoursA','teamSalesB','teamHoursB'])$(id).addEventListener('input',()=>{teamScenario=null;$('teamResult').replaceChildren();$('discussTeam').hidden=true;});
+$('discussTeam').onclick=()=>{if(teamScenario)chooseManagementRole('people','Analizează productivitatea agregată declarată a echipei și propune îmbunătățiri de proces și instruire: '+JSON.stringify(teamScenario));};
 
 init();
 </script>
