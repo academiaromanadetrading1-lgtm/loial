@@ -245,6 +245,19 @@
           </div>
         </div>
 
+        <section style="border:1px solid #b7d7c5;background:#eff8f2;border-radius:16px;padding:16px;margin:18px 0">
+          <h3>Mentorul tău comercial LOIAL</h3>
+          <p id="ambGrowthAdvice" role="status"></p>
+          <label for="ambGrowthSector">Alege domeniul firmei pe care o contactezi</label>
+          <select id="ambGrowthSector" style="width:100%;padding:10px;border-radius:8px">
+            <option value="cafe">Cafenea / patiserie</option><option value="restaurant">Restaurant / pizzerie</option><option value="beauty">Salon / frizerie</option><option value="retail">Magazin / florărie</option><option value="auto">Spălătorie / service auto</option><option value="other">Altă afacere</option>
+          </select>
+          <p id="ambGrowthPitch" style="margin:12px 0"></p>
+          <button type="button" class="btn-secondary" id="ambGrowthCopy">Copiază mesajul de prezentare</button>
+          <p id="ambGrowthStatus" role="status"></p>
+          <details style="margin-top:12px"><summary>Pașii unei prezentări</summary><p>1. Întreabă cum încurajează revenirea clienților. 2. Demonstrează cardul și ștampila. 3. Arată înscrierea gratuită prin QR. 4. Revino cu acordul antreprenorului pentru a verifica dacă a început să folosească LOIAL.</p></details>
+          <p style="font-size:12px">Ghid automat, fără apel AI. Veniturile nu sunt garantate; numai abonamentele eligibile achitate generează comisioane.</p>
+        </section>
         <div class="qr-box">
           <p style="font-size:13px;font-weight:700;margin-bottom:8px;">Codul tău QR de Ambasador (arată-l patronilor):</p>
           <img id="dashQrImg" src="" alt="QR Ambasador">
@@ -395,6 +408,25 @@
       await reloadAmbassador();
     }catch(error){fail(error.message);}
   };
+  const ambPitchBySector={
+    cafe:'Cum încurajați clienții să revină pentru următoarea cafea sau comandă? LOIAL oferă un card digital gratuit cu ștampile.',
+    restaurant:'Cum păstrați legătura cu clienții care comandă sau vin în locație? LOIAL permite un program digital de fidelitate.',
+    beauty:'Cum încurajați revenirea clienților între programări? LOIAL oferă carduri și recompense digitale.',
+    retail:'Cum încurajați a doua cumpărătură? Cu LOIAL puteți crea gratuit o recompensă pentru clienții recurenți.',
+    auto:'Cum îi ajutați pe clienți să revină pentru următoarea spălare sau vizită? LOIAL permite fidelizarea digitală.',
+    other:'Aveți un program prin care recompensați clienții care revin? LOIAL permite crearea gratuită a unui card digital.'
+  };
+  function renderAmbPitch(){
+    const sector=document.getElementById('ambGrowthSector').value;
+    const ref=document.getElementById('dashRefUrl').value;
+    document.getElementById('ambGrowthPitch').textContent=(ambPitchBySector[sector]||ambPitchBySector.other)+' Vă pot arăta gratuit cum funcționează.'+(ref?' '+ref:'');
+    document.getElementById('ambGrowthStatus').textContent='';
+  }
+  document.getElementById('ambGrowthSector').onchange=renderAmbPitch;
+  document.getElementById('ambGrowthCopy').onclick=async()=>{
+    try{await navigator.clipboard.writeText(document.getElementById('ambGrowthPitch').textContent);document.getElementById('ambGrowthStatus').textContent='Mesaj copiat. Trimite-l individual, când este relevant.';}
+    catch(e){document.getElementById('ambGrowthStatus').textContent='Selectează textul pentru copiere.';}
+  };
   function renderAmbDashboard(data,ledger){
     document.getElementById('enrollPanel').classList.add('hidden');
     document.getElementById('loginPanel').classList.add('hidden');
@@ -406,6 +438,10 @@
     document.getElementById('dashMonthlyRate').textContent=data.monthly_rate+' EUR / firmă / lună';
     document.getElementById('dashRefCode').textContent=data.ref_code;
     document.getElementById('dashRefUrl').value=data.referral_url;
+    const paid=Number(data.active_businesses);
+    const next=paid<26?26:paid<51?51:null;
+    document.getElementById('ambGrowthAdvice').textContent=!Number.isFinite(paid)||paid<0?'Verifică datele actuale din panou.':paid===0?'Obiectiv: prima firmă cu abonament eligibil achitat. Începe cu o demonstrație gratuită.':next?'Ai '+paid+' firme plătitoare verificate în perioada curentă. Mai sunt '+(next-paid)+' până la pragul următor, dacă rămân eligibile.':'Ai atins pragul superior. Ajută firmele să folosească programul de fidelitate și să păstreze abonamentul, dacă le este util.';
+    renderAmbPitch();
     document.getElementById('dashRecruitUrl').value=
       'https://loial.space/ambasador.html?ambref='+encodeURIComponent(data.ref_code);
     document.getElementById('dashQrImg').src='/api/qr-link?url='+
