@@ -276,6 +276,8 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
         if not (32<=len(token)<=200):
             raise HTTPException(status_code=422,detail="Cod de bon invalid")
         record=receipt_for_token(db,token)
+        if record.status in ('claimed','refunded'):
+            return {'merchant':'Loial','business_id':record.business_id,'receipt_ref':'','currency':record.currency,'total':0,'products':[],'status':record.status,'expires_at':record.expires_at}
         return receipt_info(db,record)
 
     @router.post("/claim")

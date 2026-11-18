@@ -435,6 +435,20 @@
     }
     return pending;
   }
+  function resumePendingReceipt(){
+    if(!localStorage.getItem('loial_wallet_inbox_token'))return false;
+    try{
+      const pending=JSON.parse(sessionStorage.getItem('loial_pending_receipt')||'null');
+      if(!pending)return false;
+      if(!Number.isFinite(pending.expires_at)||pending.expires_at<Date.now()){
+        sessionStorage.removeItem('loial_pending_receipt');return false;
+      }
+      if(pending.business_id!==bizId||typeof pending.token!=='string'||!/^[A-Za-z0-9_-]{32,200}$/.test(pending.token))return false;
+      sessionStorage.removeItem('loial_pending_receipt');
+      location.replace('/loial-receipt.html?token='+encodeURIComponent(pending.token));
+      return true;
+    }catch(e){return false;}
+  }
   async function synchronizeCard(name,email,options={}) {
     const claim=walletClaim();
     const response=await fetch('/api/enroll-sync',{
@@ -471,6 +485,7 @@
     // Un profil salvat într-o versiune anterioară poate să nu existe încă în baza de date.
     synchronizeCard(savedProfile.name, '')
       .then(() => {
+        if(resumePendingReceipt())return;
         showCardInstant(globalWalletUuid, savedProfile.name, 0);
         loadUniversalWallet();
       })
@@ -506,6 +521,7 @@
         if (result.inbox_access) localStorage.setItem('loial_wallet_inbox_token', result.inbox_access);
         savedProfile = { uuid: globalWalletUuid, name: nameVal, email: emailVal };
         localStorage.setItem('loial_universal_profile', JSON.stringify(savedProfile));
+        if(resumePendingReceipt())return;
         document.getElementById('reminderBanner').textContent =
           '💡 Codul tău QR universal funcționează la orice afacere Loial';
         showCardInstant(globalWalletUuid, nameVal, 0);

@@ -4,7 +4,7 @@
 <meta name="robots" content="noindex,nofollow"><title>Bon Loial • Activează ștampila</title>
 <style>
 :root{color-scheme:light;--green:#2d6a4f;--ink:#142c1e;--line:#dfe7e0}
-*{box-sizing:border-box}body{margin:0;background:#eef2ef;color:var(--ink);font:15px system-ui,Arial}
+[hidden]{display:none!important}*{box-sizing:border-box}body{margin:0;background:#eef2ef;color:var(--ink);font:15px system-ui,Arial}
 main{max-width:480px;margin:5vh auto;padding:16px}
 .panel{border-radius:20px;padding:24px;background:#fff;border:1px solid var(--line);box-shadow:0 12px 44px #142b1b13}
 .brand{font-size:20px;font-weight:900;letter-spacing:.15em;color:var(--green)}
@@ -20,7 +20,7 @@ button:disabled{opacity:.55;cursor:wait}.notice{font-size:12px;color:#617367}
 <body><main><section class="panel">
 <div class="brand">LOIAL <span style="font-size:10px;color:#837453">BLACK METAL</span></div>
 <h1>O ștampilă pentru cumpărătura ta</h1>
-<p>Bonul este verificat de Loial. Scanezi o singură dată, iar ștampila este adăugată cardului digital.</p>
+<p>Scanează tichetul și arată codul de confirmare angajatului după încasare. Pentru bonurile deja plătite, revendică ștampila direct.</p>
 <div id="merchant"></div>
 <div id="lines"></div>
 <strong id="total"></strong>
@@ -64,6 +64,7 @@ async function preview(){
     if(!wallet){
       state('Activează portofelul Loial pe acest dispozitiv înainte de revendicare.');
       $('join').href='/join/'+Number(data.business_id);
+      $('join').onclick=()=>{try{sessionStorage.setItem('loial_pending_receipt',JSON.stringify({token,business_id:Number(data.business_id),expires_at:Date.now()+30*60*1000}));}catch(e){state('După activare, scanează din nou tichetul.');}};
       $('join').hidden=false;
       return;
     }
@@ -72,24 +73,29 @@ async function preview(){
     else { $('claim').textContent='Asociază nota și arată codul angajatului'; await reserve(); }
   }catch(err){state(err.message,'error');}
 }
-let poll=null;
+let poll=null, reserving=false, expiryTimer=null;
 async function reserve(){
+  if(reserving)return;
+  reserving=true;$('refreshApproval').disabled=true;
   $('claim').disabled=true;
   try{
     const response=await fetch('/api/loial-receipts/reserve',{method:'POST',headers:{'Content-Type':'application/json','X-Loial-Wallet-Token':localStorage.getItem('loial_wallet_inbox_token')},body:JSON.stringify({receipt_token:token})});
     const data=await response.json();if(!response.ok)throw Error(data.detail||'Rezervare imposibilă');
     $('approvalQr').src=data.approval_qr;$('approvalQr').hidden=false;$('refreshApproval').hidden=false;$('claim').hidden=true;
-    state('Arată acest cod angajatului după plată. Cod valabil 3 minute.');
+    state('Arată acest cod angajatului după plată. Codul este valabil cel mult 3 minute.');
+    clearTimeout(expiryTimer);
+    expiryTimer=setTimeout(()=>{$('approvalQr').hidden=true;state('Codul a expirat. Apasă Regenerează codul.');},Math.max(0,Date.parse(data.expires_at)-Date.now()));
     clearInterval(poll);
     poll=setInterval(async()=>{try{
       const res=await fetch('/api/loial-receipts/payment-status?'+new URLSearchParams({token}),{cache:'no-store',headers:{'X-Loial-Wallet-Token':localStorage.getItem('loial_wallet_inbox_token')}});
       if(!res.ok)return;const x=await res.json();
       if(x.status==='claimed'||x.status==='refunded'){
-        clearInterval(poll);$('approvalQr').hidden=true;$('refreshApproval').hidden=true;
+        clearInterval(poll);clearTimeout(expiryTimer);$('approvalQr').hidden=true;$('refreshApproval').hidden=true;
         state(x.status==='claimed'?(x.stamp_granted?'✓ Plata confirmată. Ștampilă înregistrată!':'✓ Plata confirmată. Recompensa existentă este disponibilă.'):'Tichet anulat.',x.status==='claimed'?'ok':'error');
       }
     }catch(e){}},2500);
   }catch(e){state(e.message,'error');$('claim').disabled=false;}
+  finally{reserving=false;$('refreshApproval').disabled=false;}
 }
 $('refreshApproval').onclick=reserve;
 $('claim').onclick=async()=>{
