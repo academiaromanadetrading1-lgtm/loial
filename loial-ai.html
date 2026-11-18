@@ -103,7 +103,7 @@ header{padding:14px max(24px,calc((100% - 1392px)/2));flex-wrap:wrap}
 </aside>
 <section class="card" id="managementHub" style="margin-bottom:16px">
 <div class="specialist-kicker">LOIAL AI · 24/7</div><h2>Explorează echipa virtuală</h2><p>Analiză economică aplicată. Alege un specialist și discută despre situația firmei. Nu introduce parole sau date personale inutile.</p>
-<div id="managementRoles" class="management-grid" data-no-translate></div><p id="managementContext" role="status" data-no-translate></p>
+<div id="managementRoles" class="management-grid" data-no-translate></div><p id="managementContext" role="status" data-no-translate></p><div id="roleFollowups" class="specialist-actions" data-no-translate></div>
 </section>
 <div id="workspaceNotice" class="status" role="status" aria-live="polite" hidden></div>
 <section class="workspace-view active" id="view-chat" data-view="chat" ><div class="conversation-layout"><aside class="card profile-card" id="profileCard">
@@ -491,7 +491,7 @@ function bubble(role,text){
   else b.textContent=text;
   $('chat').appendChild(b);$('chat').scrollTop=$('chat').scrollHeight;
 }
-function setTopic(key,label){currentTopic=key;
+function setTopic(key,label){currentTopic=key;renderManagementRoles();
   document.querySelectorAll('.topic').forEach(x=>x.classList.toggle('active',x.dataset.topic===key));
   if(!sending&&!$('message').value.trim())$('message').value=tr(label); $('message').placeholder=tr('Scrie întrebarea ta...');
   $('message').focus();
@@ -1034,7 +1034,7 @@ function renderSpecialistGuide(key){
      const input=$('message'), existing=input.value.trim();
      if(existing&&existing!==question&&!confirm(lang==='ro'?'Înlocuiești întrebarea nestrimisă?':'Replace the unsent question?'))return;
      currentTopic=specialistTopics[i][j]||'general';document.querySelectorAll('.topic').forEach(x=>x.classList.toggle('active',x.dataset.topic===currentTopic));selectedDocument=null;$('selectedDocument').hidden=true;
-     showWorkspace('chat');input.value=question;input.focus();
+     showWorkspace('chat');renderManagementRoles();input.value=question;input.focus();
    };actions.appendChild(button);
  });
 }
@@ -1064,11 +1064,31 @@ function chooseManagementRole(key,question,initial=false){
  if(key!=='invoices'){selectedDocument=null;$('selectedDocument').hidden=true;}
  showWorkspace('chat');renderManagementRoles();input.value=draft;if(!initial)input.focus();
 }
+const roleFollowups={
+ general:[['Unde pierd bani?','Where am I losing money?'],['Care sunt cele mai importante trei acțiuni?','What are my three most important actions?'],['Ce informații îți lipsesc?','What information do you need?']],
+ performance:[['De ce am vânzări, dar nu am lichidități?','Why do I have sales but limited cash?'],['Cum calculez pragul de rentabilitate?','How do I calculate break-even?'],['Simulează o scădere a vânzărilor cu 20%.','Simulate a 20% sales decline.']],
+ invoices:[['Ce costuri pot verifica în documente?','Which costs can I review in documents?'],['Ce documente lipsesc pentru o analiză?','What documents are missing for analysis?'],['Cum separ costurile fixe de cele variabile?','How can I separate fixed and variable costs?']],
+ products:[['Ce produse au contribuția cea mai mare?','Which products have the highest contribution?'],['Cum construiesc un pachet rentabil?','How can I build a profitable bundle?'],['Cum măsor efectul unei promoții?','How do I measure the impact of a promotion?']],
+ people:[['Cum organizez mai bine turele echipei?','How can I organize team shifts better?'],['Ce indicatori agregați ar trebui să urmăresc?','Which aggregate metrics should I monitor?'],['Cum planific instruirea și verific rezultatele?','How can I plan training and measure results?']],
+ financing:[['Cum compar două oferte de credit?','How can I compare two loan offers?'],['Ce se întâmplă dacă dobânda crește?','What if the interest rate increases?'],['Cum estimez fluxul necesar pentru rambursare?','How can I estimate cash flow needed for repayment?']],
+ campaign:[['Ce ofertă pot testa cu bugetul meu?','What offer can I test within my budget?'],['Cum calculez costul unei campanii?','How do I calculate campaign cost?'],['Cum măsor rezultatele campaniei?','How can I measure campaign results?']],
+ customers:[['Cum reactivez clienții inactivi?','How can I reactivate inactive customers?'],['Cum măsor a doua cumpărătură?','How can I measure second purchases?'],['Cum cresc retenția fără reduceri inutile?','How can I improve retention without unnecessary discounts?']],
+ inventory:[['Cum calculez rotația stocurilor?','How do I calculate inventory turnover?'],['Cum reduc risipa?','How can I reduce waste?'],['Cum compar prețurile furnizorilor?','How can I compare supplier prices?']],
+ operations:[['Cum identific un proces care consumă timp?','How can I identify time-consuming processes?'],['Cum măsor capacitatea disponibilă?','How can I measure available capacity?'],['Cum verific dacă o schimbare funcționează?','How can I verify whether a change works?']],
+ risk:[['Ce fac dacă vânzările scad cu 20%?','What can I do if sales fall by 20%?'],['Care este rezerva minimă de lichiditate?','How can I estimate a liquidity buffer?'],['Cum prioritizez riscurile firmei?','How can I prioritize business risks?']],
+ mentor:[['Explică-mi diferența dintre profit și cash-flow.','Explain the difference between profit and cash flow.'],['Cum decid dacă o investiție merită?','How do I evaluate an investment?'],['Ce indicatori ar trebui să urmăresc săptămânal?','Which metrics should I monitor weekly?']]
+};
+function renderRoleFollowups(){
+ const box=$('roleFollowups');box.replaceChildren();const role=managementRoles.find(x=>x[0]===currentTopic);
+ if(!role)return;
+ for(const pair of roleFollowups[role[0]]||[]){const b=document.createElement('button');b.type='button';b.textContent=mgCopy(pair[0],pair[1]);b.onclick=()=>chooseManagementRole(role[0],mgCopy(pair[0],pair[1]));box.append(b);}
+}
 function renderManagementRoles(){
  const ro=language()==='ro',box=$('managementRoles');box.replaceChildren();
- for(const role of managementRoles){const b=document.createElement('button');b.type='button';b.textContent=ro?role[1]:role[2];b.classList.toggle('active',currentTopic===role[0]);b.setAttribute('aria-pressed',String(currentTopic===role[0]));b.onclick=()=>chooseManagementRole(role[0]);box.appendChild(b);}
+ for(const role of managementRoles){const b=document.createElement('button');b.type='button';b.textContent=mgCopy(role[1],role[2]);b.classList.toggle('active',currentTopic===role[0]);b.setAttribute('aria-pressed',String(currentTopic===role[0]));b.onclick=()=>chooseManagementRole(role[0]);box.appendChild(b);}
+ renderRoleFollowups();
  const role=managementRoles.find(x=>x[0]===currentTopic);
- $('managementContext').textContent=role?(ro?'Specialist selectat: ':'Selected specialist: ')+(ro?role[1]:role[2]):'';
+ $('managementContext').textContent=role?(ro?'Specialist selectat: ':'Selected specialist: ') +mgCopy(role[1],role[2]):'';
 }
 document.addEventListener('loial:language',renderManagementRoles);
 renderManagementRoles();
@@ -1136,7 +1156,7 @@ const healthDimensions=[
  ['retention','Retenție clienți (%)','Customer retention (%)','Compară cohorte echivalente și planifică reactivarea.','Compare equivalent cohorts and plan reactivation.'],
  ['productivity','Vânzări nete / oră echipă','Net sales / team hour','Verifică procesele, volumul și resursele la nivel agregat.','Review processes, workload and resources at team level.']
 ];
-function mgCopy(ro,en){return language()==='ro'?ro:en;}
+function mgCopy(ro,en){const translated=tr(ro);return language()==='ro'||translated!==ro?translated:en;}
 function healthFields(){
  const parent=$('healthInputs');parent.replaceChildren();
  for(const d of healthDimensions){
