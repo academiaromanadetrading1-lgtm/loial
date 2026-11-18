@@ -14,6 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 BillingBase=declarative_base()
 GRACE_DAYS=3
 PRICE_CENTS=6700
+# Explicit legacy contract until modern InvoicePayment reconciliation is validated.
+STRIPE_API_VERSION="2024-10-28.acacia"
 from loial_plans import PLANS, plan_for_amount, renewal_rate, public_catalog
 
 class LoialSubscription(BillingBase):
@@ -39,7 +41,8 @@ def now_utc():
 
 def from_unix(seconds):
     if not isinstance(seconds,int) or seconds<1:return None
-    return datetime.fromtimestamp(seconds,tz=timezone.utc)
+    try:return datetime.fromtimestamp(seconds,tz=timezone.utc)
+    except (ValueError,OverflowError,OSError):return None
 
 def utc_iso(dt):
     return dt.astimezone(timezone.utc).isoformat() if dt else None
@@ -98,8 +101,10 @@ def invoice_is_eligible(invoice,price_id,expected_cents=PRICE_CENTS):
         return False
     if invoice.get("amount_paid")!=expected_cents:
         return False
-    items=((invoice.get("lines") or {}).get("data") or [])
-    if len(items)!=1:return False
+    lines=invoice.get("lines") or {}
+    items=lines.get("data") or []
+    if lines.get("has_more") or len(items)!=1:return False
+    if items[0].get("proration") or ((items[0].get("parent") or {}).get("subscription_item_details") or {}).get("proration"):return False
     if items[0].get("quantity",1)!=1:return False
     price=items[0].get("price") or {}
     pricing=items[0].get("pricing") or {}
@@ -137,10 +142,10 @@ def process_paid_invoice(db, invoice, state, business, Agent, price_id,
     if isinstance(invoice_customer,dict):invoice_customer=invoice_customer.get("id")
     if not state.customer_id or invoice_customer!=state.customer_id:
         return {"review":"customer_mismatch"}
-    if invoice_sub and state.subscription_id and invoice_sub!=state.subscription_id:
-        return {"review":"subscription_mismatch"}
-    if not invoice_sub and not state.subscription_id:
+    if not invoice_sub or not state.subscription_id:
         return {"review":"missing_subscription"}
+    if invoice_sub!=state.subscription_id:
+        return {"review":"subscription_mismatch"}
     prior=db.query(PaidMerchantInvoice).filter(
         PaidMerchantInvoice.business_id==business.id,
         PaidMerchantInvoice.eligible==1).count()
@@ -295,14 +300,17 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
         if price and price==other:
             raise HTTPException(503,"Configuratie Stripe ambigua")
         origin=os.getenv("LOIAL_PUBLIC_ORIGIN","https://loial.space").rstrip("/")
-        if not key.startswith(("sk_test_","sk_live_")) or not price.startswith("price_"):
+        if not key.startswith(("sk_test_","sk_live_")) or not price.startswith("price_") or not os.getenv("LOIAL_STRIPE_WEBHOOK_SECRET","").startswith("whsec_"):
             raise HTTPException(status_code=503,detail="Stripe LOIAL neconfigurat")
         stripe.api_key=key
+        stripe.api_version=STRIPE_API_VERSION
         try:
             stripe_price=stripe.Price.retrieve(price)
             if stripe_price.get("unit_amount")!=expected_cents or \
                stripe_price.get("currency")!="eur" or \
-               (stripe_price.get("recurring") or {}).get("interval")!="month":
+               (stripe_price.get("recurring") or {}).get("interval")!="month" or \
+               (stripe_price.get("recurring") or {}).get("interval_count",1)!=1 or \
+               stripe_price.get("active") is not True:
                 raise HTTPException(status_code=503,detail="Pret Stripe incorect pentru LOIAL")
         except stripe.error.StripeError:
             raise HTTPException(status_code=502,detail="Configurarea pretului Stripe nu poate fi verificata")
@@ -344,6 +352,7 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
         key=os.getenv("LOIAL_STRIPE_SECRET_KEY","")
         if not key:raise HTTPException(status_code=503,detail="Stripe neconfigurat")
         stripe.api_key=key
+        stripe.api_version=STRIPE_API_VERSION
         try:
             result=stripe.billing_portal.Session.create(
                 customer=state.customer_id,
@@ -367,8 +376,11 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
             raise HTTPException(status_code=400,detail="Semnatura Stripe invalida")
         # Do not mix test receipts and live accounts. Test mode requires a test key.
         key=os.getenv("LOIAL_STRIPE_SECRET_KEY","")
-        if not key or bool(event["livemode"])!=key.startswith("sk_live_"):
+        if not key.startswith(("sk_test_","sk_live_")) or bool(event["livemode"])!=key.startswith("sk_live_"):
             return {"status":"ignored_mode_mismatch"}
+        # Event payload version is set on the Stripe webhook destination, independently of SDK requests.
+        if event.get("api_version") != STRIPE_API_VERSION:
+            raise HTTPException(503,detail="Versiunea webhook Stripe necesita reconciliere")
         eid=event["id"]
         if db.query(StripeWebhookEvent).filter(
             StripeWebhookEvent.id==eid).first():
@@ -421,7 +433,10 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
             if isinstance(sub_id,dict):sub_id=sub_id.get("id")
             if not state and sub_id:
                 stripe.api_key=key
-                sub=stripe.Subscription.retrieve(sub_id)
+                stripe.api_version=STRIPE_API_VERSION
+                try:sub=stripe.Subscription.retrieve(sub_id)
+                except stripe.error.StripeError:
+                    raise HTTPException(503,detail="Reconcilierea Stripe este temporar indisponibila")
                 identifier=(sub.get("metadata") or {}).get("loial_business_id")
                 if str(identifier or "").isdigit():
                     business=db.query(Business).filter(Business.id==int(identifier)).first()
