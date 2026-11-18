@@ -405,6 +405,7 @@
       <h2>Activitate LOIAL: conturi, recrutări și plăți confirmate</h2>
       <p style="font-size:12px;color:var(--text-muted)">Actualizată la deschiderea panoului sau prin buton; încasările Stripe apar după confirmarea automată prin webhook.</p>
       <button type="button" class="btn-secondary" onclick="loadSuperAdmin()">Actualizează activitatea</button>
+      <p id="adminOverviewStatus" role="status" style="font-size:12px;color:var(--text-muted)"></p>
       <div id="adminActivity" aria-live="polite" style="font-size:13px;line-height:1.7"></div>
     </div>
     <div class="card">
@@ -957,7 +958,7 @@
   async function loadGooglePilot() {
     const notice=document.getElementById('pilotIssuerStatus');
     try {
-      const response=await authorizedFetch('/api/admin/google-wallet-pilot');
+      const response=await adminFetch('/api/admin/google-wallet-pilot');
       const state=await response.json();
       if(!response.ok)throw Error(state.detail||'Nu pot verifica pilotul.');
       document.getElementById('pilotActive').textContent=
@@ -978,11 +979,28 @@
     }catch(error){notice.textContent=error.message;}
   }
 
+    function adminFetch(url){
+      return authorizedFetch(url,{signal:AbortSignal.timeout(12000),cache:'no-store'});
+    }
     async function loadSuperAdmin() {
-    await Promise.all([loadGooglePilot(),loadAcquisition()]);
-    const res = await authorizedFetch('/api/admin/overview');
-    if (!res.ok) return;
+      if(loadSuperAdmin.inFlight)return loadSuperAdmin.inFlight;
+      const activity=document.getElementById('adminActivity');
+      if(!activity.childElementCount&&!activity.textContent.trim())activity.textContent='Se încarcă activitatea…';
+      const overview=loadAdminOverview().catch(error=>{
+        const status=document.getElementById('adminOverviewStatus');
+        status.textContent='Datele principale nu au putut fi actualizate. Încearcă din nou.';
+        if(!activity.childElementCount)activity.textContent='Activitate indisponibilă temporar.';
+      });
+      loadSuperAdmin.inFlight=Promise.allSettled([overview,loadGooglePilot(),loadAcquisition()]);
+      try{await loadSuperAdmin.inFlight;}finally{loadSuperAdmin.inFlight=null;}
+    }
+    async function loadAdminOverview(){
+    const status=document.getElementById('adminOverviewStatus');
+    status.textContent='Se actualizează…';
+    const res = await adminFetch('/api/admin/overview');
+    if (!res.ok) throw Error('Overview HTTP '+res.status);
     const data = await res.json();
+    status.textContent='Actualizat la '+new Date().toLocaleTimeString('ro-RO');
     document.getElementById('adminMonthBadge').textContent = 'Luna: ' + data.month;
     const activityBox=document.getElementById('adminActivity');
     activityBox.replaceChildren();
@@ -1232,7 +1250,7 @@ async function loadAcquisition(){
   if(!status||!box)return;
   box.replaceChildren();
   try{
-    const response=await authorizedFetch('/api/admin/pilot-metrics');
+    const response=await adminFetch('/api/admin/pilot-metrics');
     if(!response.ok)throw Error('Date indisponibile');
     const d=await response.json();
     status.textContent=d.tracked_business_accounts+' conturi atribuite · '+d.active_accounts+' conturi cu ștampile · '+d.accounts_with_cards+' conturi cu carduri · '+d.registered_cards+' carduri · '+d.stamp_operations+' operațiuni de ștampilare';
