@@ -1848,7 +1848,7 @@ def quick_register(request: Request, req: QuickRegisterRequest, db: Session = De
     agent = db.query(SalesAgent).filter(
         SalesAgent.qr_code==clean_ref,
         SalesAgent.active.is_(True)).first() if clean_ref else None
-    from loial_merchant_referrals import resolve_code, attribute_merchant
+    from loial_merchant_referrals import resolve_code, attribute_merchant, linked_agent
     wallet_ref = resolve_code(db,clean_ref) if clean_ref.startswith("LM-") else None
     if wallet_ref:
         # A declared identical email is enough to reject obvious self-referrals,
@@ -1857,6 +1857,9 @@ def quick_register(request: Request, req: QuickRegisterRequest, db: Session = De
             ((Customer.wallet_uuid==wallet_ref.wallet_uuid)|(Customer.uuid==wallet_ref.wallet_uuid)),
             func.lower(Customer.email)==req.email.strip().lower()).first():
             raise HTTPException(422,"Nu iti poti recomanda propria firma folosind acelasi email.")
+        agent=linked_agent(db,wallet_ref.wallet_uuid,SalesAgent)
+        if agent and agent.email.lower()==req.email.strip().lower():
+            raise HTTPException(422,"Nu iti poti recomanda propria firma.")
     if clean_ref and not wallet_ref and (not agent or agent.role!="ambassador"):
         raise HTTPException(status_code=422,
             detail="Cod de recomandare invalid sau inactiv. Verifica linkul ambasadorului.")
@@ -1883,9 +1886,10 @@ def quick_register(request: Request, req: QuickRegisterRequest, db: Session = De
     db.add(business)
     db.flush()
     if wallet_ref:
-        attribute_merchant(db,business.id,wallet_ref.wallet_uuid)
+        referral=attribute_merchant(db,business.id,wallet_ref.wallet_uuid)
+        referral.agent_id=agent.id if agent else None
     from loial_acquisition import record_registration
-    record_registration(db,business.id,req.acquisition_source,has_ambassador=bool(agent))
+    record_registration(db,business.id,req.acquisition_source,has_ambassador=bool(agent or wallet_ref))
     db.commit()
     db.refresh(business)
     token = create_access_token({"sub": req.email, "role": "business", "business_id": business.id})
@@ -3421,7 +3425,7 @@ def loial_install_script():
 from loial_friend_referrals import install_friend_referrals
 install_friend_referrals(app,engine,SessionLocal)
 from loial_merchant_referrals import install_merchant_referrals
-install_merchant_referrals(app,engine,SessionLocal)
+install_merchant_referrals(app,engine,SessionLocal,SalesAgent,BusinessAccount,pwd_context)
 
 # Registrul de comisioane LOIAL: Wise Business este sursa financiara aprobata.
 # Stripe legacy se retrage; 20 EUR vanzator + 10 EUR sponsor direct doar la prima incasare.
