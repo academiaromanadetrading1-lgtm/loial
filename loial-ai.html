@@ -89,6 +89,7 @@ header{padding:14px max(24px,calc((100% - 1392px)/2));flex-wrap:wrap}
 .specialist-actions button{flex:1 1 210px;text-align:left;font-size:13px;background:#f4f8f5;color:#20573c;border:1px solid #dfeae2}
 .loial-specialist summary{cursor:pointer;color:#2d6a4f;font-weight:700}
 .wallet-message p{white-space:pre-wrap!important;overflow-wrap:anywhere}
+.management-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px}.management-grid button{font-size:12px;text-align:left;background:#f0f7f2;color:#194b35;border-color:#d0e5d7;min-height:44px}.management-grid button.active{background:#20573c;color:white}.management-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:14px 0}.management-metrics div{padding:12px;border-radius:12px;background:#eff6f0}.management-metrics strong{display:block;font-size:21px;color:#20573c;margin-top:6px}.management-track{height:20px;background:#e6eee8;border-radius:6px;overflow:hidden;margin:7px 0}.management-track span{display:block;height:100%;background:#2d805a;max-width:100%}
 </style>
 </head>
 <body>
@@ -100,6 +101,10 @@ header{padding:14px max(24px,calc((100% - 1392px)/2));flex-wrap:wrap}
   <p id="specialistValue"></p>
   <details id="specialistDetails" open><summary id="specialistSummary"></summary><div id="specialistActions" class="specialist-actions"></div><p class="tiny" id="specialistNote"></p></details>
 </aside>
+<section class="card" id="managementHub" style="margin-bottom:16px">
+<div class="specialist-kicker">LOIAL AI · 24/7</div><h2>Explorează echipa virtuală</h2><p>Analiză economică aplicată. Alege un specialist și discută despre situația firmei. Nu introduce parole sau date personale inutile.</p>
+<div id="managementRoles" class="management-grid" data-no-translate></div><p id="managementContext" role="status" data-no-translate></p>
+</section>
 <div id="workspaceNotice" class="status" role="status" aria-live="polite" hidden></div>
 <section class="workspace-view active" id="view-chat" data-view="chat" ><div class="conversation-layout"><aside class="card profile-card" id="profileCard">
 <details class="profile-details" id="profileDetails" open><summary>Consultantul afacerii tale</summary><div class="profile-content">
@@ -189,7 +194,13 @@ Ex.: Revizie auto;1;220;65"></textarea>
 <div id="receiptList" class="file-list"></div>
 <p class="tiny">Integrarea directă cu POS-ul sau casa fiscală necesită suportul sistemului de vânzări. Codul QR fiscal standard nu transmite automat produsele către Loial.</p>
 </section></div></section>
-<section class="workspace-view" id="view-reports" data-view="reports" hidden><div class="tool-grid"><section class="card panel">
+<section class="workspace-view" id="view-reports" data-view="reports" hidden><div class="tool-grid"><section class="card panel" id="financeSimulator"><h2>Simulator de finanțare</h2><p>Rate lunare egale, dobândă fixă. Calcule locale, fără apel AI. Nu include comisioane sau asigurări.</p>
+<label for="loanPrincipal">Valoare credit (moneda profilului)</label><input id="loanPrincipal" type="number" min="1" max="100000000" step="0.01" placeholder="50000">
+<label for="loanRate">Dobândă nominală anuală (%)</label><input id="loanRate" type="number" min="0" max="100" step="0.01" placeholder="8">
+<label for="loanMonths">Durata (luni)</label><input id="loanMonths" type="number" min="1" max="600" step="1" placeholder="60">
+<label for="loanCash">Flux lunar disponibil înainte de serviciul datoriei</label><input id="loanCash" type="number" min="0" max="100000000" step="0.01" placeholder="3000">
+<label for="loanExisting">Rate lunare existente</label><input id="loanExisting" type="number" min="0" max="100000000" step="0.01" placeholder="0">
+<button id="runLoan" type="button" style="margin-top:12px">Calculează scenariul</button><div id="loanResult" aria-live="polite" data-no-translate></div><button id="discussLoan" class="ghost" type="button" hidden>Discută scenariul cu LOIAL</button></section><section class="card panel">
 <h2>Raport și solicitare săptămânală</h2>
 <div class="actions">
 <button class="ghost" id="weekly">Ce date îți trebuie?</button>
@@ -1010,6 +1021,57 @@ function renderSpecialistGuide(key){
 document.addEventListener('loial:workspace',e=>renderSpecialistGuide(e.detail));
 document.addEventListener('loial:language',()=>renderSpecialistGuide());
 renderSpecialistGuide();
+
+const managementRoles=[
+['general','Manager general','Business manager','Ce priorități are firma mea?','What are my business priorities?'],
+['performance','Director financiar','Financial director','Cum îmbunătățesc lichiditatea și profitul?','How can I improve liquidity and profit?'],
+['invoices','Asistent financiar-contabil','Finance assistant','Cum verific facturile și costurile?','How can I review invoices and costs?'],
+['products','Analist de vânzări','Sales analyst','Cum cresc bonul mediu și marja?','How can I improve average transaction value and margin?'],
+['people','Organizarea echipei','Team operations','Cum măsor productivitatea agregată și îmbunătățesc instruirea echipei?','How can I measure aggregate team productivity and improve training?'],
+['financing','Analist de finanțare','Financing analyst','Cum verific dacă firma poate susține un credit?','How can I assess debt affordability?'],
+['campaign','Director marketing','Marketing director','Ce campanie pot testa și măsura?','What campaign can I test and measure?'],
+['customers','Specialist fidelizare','Retention specialist','Cum cresc revenirea clienților?','How can I improve repeat purchases?'],
+['inventory','Stocuri și aprovizionare','Inventory and procurement','Cum reduc pierderile și optimizez stocurile?','How can I reduce waste and optimize inventory?'],
+['operations','Manager operațional','Operations manager','Unde apar blocaje în procese?','Where are my operational bottlenecks?'],
+['risk','Analist de risc','Risk analyst','Ce riscuri economice ar trebui să urmăresc?','Which business risks should I monitor?'],
+['mentor','Mentor antreprenoriat','Entrepreneurship mentor','Explică-mi un concept economic aplicat firmei mele.','Explain an economic concept using my business.']
+];
+function chooseManagementRole(key,question,initial=false){
+ const role=managementRoles.find(x=>x[0]===key);if(!role||sending)return;
+ const input=$('message'),ro=language()==='ro',draft=question||(ro?role[3]:role[4]);
+ if(input.value.trim()&&input.value.trim()!==draft&&!initial&&!confirm(ro?'Înlocuiești întrebarea nestrimisă?':'Replace the unsent question?'))return;
+ currentTopic=key;document.querySelectorAll('.topic').forEach(x=>x.classList.toggle('active',x.dataset.topic===key));
+ if(key!=='invoices'){selectedDocument=null;$('selectedDocument').hidden=true;}
+ showWorkspace('chat');renderManagementRoles();input.value=draft;if(!initial)input.focus();
+}
+function renderManagementRoles(){
+ const ro=language()==='ro',box=$('managementRoles');box.replaceChildren();
+ for(const role of managementRoles){const b=document.createElement('button');b.type='button';b.textContent=ro?role[1]:role[2];b.classList.toggle('active',currentTopic===role[0]);b.setAttribute('aria-pressed',String(currentTopic===role[0]));b.onclick=()=>chooseManagementRole(role[0]);box.appendChild(b);}
+ const role=managementRoles.find(x=>x[0]===currentTopic);
+ $('managementContext').textContent=role?(ro?'Specialist selectat: ':'Selected specialist: ')+(ro?role[1]:role[2]):'';
+}
+document.addEventListener('loial:language',renderManagementRoles);
+renderManagementRoles();
+const requestedRole=new URLSearchParams(location.search).get('specialist');
+if(managementRoles.some(x=>x[0]===requestedRole))chooseManagementRole(requestedRole,null,true);
+let loanScenario=null;
+$('runLoan').onclick=()=>{
+ const ids=['loanPrincipal','loanRate','loanMonths','loanCash','loanExisting'], inputs=ids.map($), vals=inputs.map(x=>Number(x.value));
+ const out=$('loanResult');out.replaceChildren();loanScenario=null;$('discussLoan').hidden=true;
+ if(inputs.some(x=>x.value.trim()===''||!x.checkValidity())||vals.some(x=>!Number.isFinite(x))||!Number.isInteger(vals[2])){out.textContent='Completează toate cele cinci valori valide; introdu 0 dacă nu există rate anterioare.';return;}
+ const [principal,annual,months,cash,existing]=vals,r=annual/1200;
+ const installment=r===0?principal/months:principal*r/(-Math.expm1(-months*Math.log1p(r)));
+ const debt=installment+existing,interest=installment*months-principal,available=cash-debt,dscr=cash/debt;
+ const currency=savedProfile?.currency||'RON',fmt=x=>new Intl.NumberFormat(language(),{maximumFractionDigits:2}).format(x)+' '+currency;
+ const grid=document.createElement('div');grid.className='management-metrics';
+ for(const [label,value] of [['Rată nouă / lună',fmt(installment)],['Dobândă totală',fmt(interest)],['Disponibil după toate ratele',fmt(available)],['DSCR estimat',dscr.toFixed(2)+'×'],['DSCR la flux −20%',(cash*.8/debt).toFixed(2)+'×']]){const tile=document.createElement('div'),title=document.createElement('small'),v=document.createElement('strong');title.textContent=label;v.textContent=value;tile.append(title,v);grid.append(tile);}
+ out.append(grid);const bar=document.createElement('div');bar.className='management-track';const fill=document.createElement('span');fill.style.width=Math.min(100,debt/Math.max(cash,.01)*100)+'%';bar.append(fill);out.append(bar);
+ const note=document.createElement('p');note.textContent='Pondere rate în flux: '+(cash>0?(debt/cash*100).toFixed(1)+'%':'flux zero')+'. Scenariu declarat, nu recomandare de credit.';out.append(note);
+ loanScenario={principal,annual,months,cash,existing,installment,interest,available,dscr,currency};$('discussLoan').hidden=false;
+};
+for(const id of ['loanPrincipal','loanRate','loanMonths','loanCash','loanExisting'])$(id).addEventListener('input',()=>{loanScenario=null;$('loanResult').replaceChildren();$('discussLoan').hidden=true;});
+$('discussLoan').onclick=()=>{if(loanScenario)chooseManagementRole('financing','Analizează scenariul declarat de finanțare, inclusiv riscurile și stresul de lichiditate: '+JSON.stringify(loanScenario));};
+
 init();
 </script>
 </body>
