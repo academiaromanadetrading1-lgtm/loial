@@ -803,7 +803,7 @@ function crmFilters(){
 }
 $('crmToCampaign').onclick=async()=>{try{
   const segment=crmFilters();
-  const result=await nativeInbox('/crm-audience',{method:'POST',body:JSON.stringify(segment)});
+  const result=await nativeInbox('/crm-audience',{method:'POST',body:JSON.stringify({segment})});
   activeCrmSegment=segment;$('audience').value='all';$('singleRecipient').value='';
   $('crmCampaignLabel').hidden=false;$('crmClear').hidden=false;
   $('crmCampaignLabel').textContent='Filtru CRM activ · '+result.eligible+' clienți eligibili la verificare. Destinatarii se reverifică la trimitere.';
@@ -827,7 +827,7 @@ $('refreshSent').onclick=()=>refreshSent().catch(e=>status(e.message,true));
 $('previewAudience').onclick=async()=>{
   try{
     const params=new URLSearchParams({audience:$('audience').value,product:$('productFilter').value});
-    const data=activeCrmSegment?await nativeInbox('/crm-audience',{method:'POST',body:JSON.stringify(activeCrmSegment)}):await nativeInbox('/audience?'+params.toString());
+    const data=activeCrmSegment?await nativeInbox('/crm-audience',{method:'POST',body:JSON.stringify({segment:activeCrmSegment,audience:$('audience').value,product:$('productFilter').value,customer_ids:$('singleRecipient').value?[Number($('singleRecipient').value)]:null})}):await nativeInbox('/audience?'+params.toString());
     $('campaignPreview').textContent='Clienți eligibili: '+data.eligible+
       ($('singleRecipient').value?' (filtrarea finală va păstra doar clientul ales)':'')+
       '. Mesajele nu se trimit pe email sau SMS.';

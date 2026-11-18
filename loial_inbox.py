@@ -270,10 +270,19 @@ def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent
         from loial_business_ai import AISale
         return {r["id"] for r in select_crm(db,biz.id,Customer,Consent,AISale,**segment.model_dump()) if r["offers_enabled"]}
 
+    class CRMPreview(BaseModel):
+        segment: CRMSegment
+        audience: str = "all"
+        product: str = ""
+        customer_ids: Optional[List[int]] = None
+
     @route.post("/crm-audience")
-    def preview_crm(segment:CRMSegment,biz=Depends(owner),db:Session=Depends(db_session)):
-        ids=selected_crm_ids(db,biz,segment)
-        return {"eligible":len(ids),"channel":"loial"}
+    def preview_crm(req:CRMPreview,biz=Depends(owner),db:Session=Depends(db_session)):
+        ids=selected_crm_ids(db,biz,req.segment)
+        if req.customer_ids is not None:
+            ids &= set(req.customer_ids)
+        recipients=business_audience(db,biz,req.audience,req.product,ids)
+        return {"eligible":len(recipients),"channel":"loial"}
 
     @route.post("/send")
     def send_direct(req: DirectMessage, biz=Depends(owner), db: Session = Depends(db_session)):

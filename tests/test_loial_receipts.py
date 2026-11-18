@@ -308,3 +308,20 @@ def test_print_integration_scoped_reprint_and_revocation(setup_receipts):
     assert client.post(p+"integration/revoke",headers=owner()).status_code==200
     assert client.post(p+"integration/issue",headers=headers,json=payload).status_code==401
     assert client.post(p+"integration/issue",headers={"X-Loial-Receipt-Key":other_key},json=payload).status_code==200
+
+def test_crm_receipt_source_excludes_refunded_transaction(setup_receipts):
+    from loial_business_ai import AISale
+    client,factory,Receipt,a,b,owner,wallet=setup_receipts
+    # Inspect mapped models through the fixture's SQLAlchemy registry is not needed:
+    # reuse the existing receipt API and verify CRM purchase history.
+    p="/api/loial-receipts/"
+    issued=client.post(p+"issue",headers=owner(),json=receipt_payload("CRM-TEST"))
+    assert issued.status_code==200,issued.text
+    key=issued.json()["claim_url"].split("token=")[1]
+    assert client.post(p+"claim",headers=wallet(a),json={"receipt_token":key}).status_code==200
+    with factory() as db:
+        assert db.query(AISale).filter_by(customer_uuid="wallet-1").count()==2
+        assert db.query(AISale).filter_by(customer_uuid="wallet-2").count()==0
+    assert client.post(p+"refund",headers=owner(),json={"receipt_ref":"CRM-TEST","reason":"Returnare totala"}).status_code==200
+    with factory() as db:
+        assert db.query(Receipt).filter_by(status="claimed").count()==0

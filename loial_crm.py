@@ -96,6 +96,7 @@ def install_crm(app,engine,factory,BusinessAccount,Customer,Consent,AISale,jwt_k
                   product:str=Query("",max_length=160),currency:str=Query("RON",pattern="^(RON|EUR|USD|GBP)$"),
                   max_inactive_days:int=Query(36500,ge=0,le=36500),min_inactive_days:int=Query(0,ge=0,le=36500),offset:int=Query(0,ge=0),
                   limit:int=Query(100,ge=1,le=500),biz=Depends(owner),db=Depends(session)):
+        if min_inactive_days>max_inactive_days: raise HTTPException(422,"Interval de inactivitate invalid")
         output=select_crm(db,biz.id,Customer,Consent,AISale,min_purchases,min_spend_minor,product,currency,max_inactive_days,min_inactive_days)
         return {"total":len(output),"items":output[offset:offset+limit],"source":"verified_receipts_and_loyalty_events"}
     @r.post("/reaction/{delivery_id}/{choice}")
