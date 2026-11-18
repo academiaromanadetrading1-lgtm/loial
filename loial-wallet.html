@@ -81,6 +81,19 @@ button.black{background:#111318;color:#ddc48b}
   <div id="inboxList" class="muted">Activează portofelul ca să vezi mesajele.</div>
   <button type="button" class="secondary" id="inboxReload">Actualizează mesajele</button>
 </section>
+<section class="panel" id="merchantReferralSection">
+  <h2>Recomandă LOIAL unei firme</h2>
+  <p>Arată unui antreprenor cum funcționează cardul gratuit. Prima firmă înscrisă prin codul tău îți deschide accesul la statutul de ambasador.</p>
+  <p id="merchantReferralStatus" role="status">Activează portofelul pentru a primi codul personal.</p>
+  <div id="merchantReferralActions" class="hidden">
+    <img id="merchantReferralQr" width="180" height="180" alt="QR personal pentru înscrierea firmelor" style="display:block;margin:12px auto;max-width:100%">
+    <label for="merchantReferralLink">Link pentru firme, diferit de invitația pentru prieteni</label>
+    <input id="merchantReferralLink" readonly style="width:100%;padding:10px;border:1px solid #bac8bb;border-radius:10px">
+    <div class="actions"><button type="button" id="copyMerchantReferral">Copiază linkul</button><button type="button" id="shareMerchantReferral" class="secondary">Distribuie unei firme</button></div>
+  </div>
+  <p class="notice">Înscrierea gratuită nu generează comision. Veniturile depind de abonamentele eligibile achitate și de regulile programului.</p>
+  <a class="button secondary" href="/ambasador.html">Descoperă programul și simulatorul</a>
+</section>
 <section class="panel" id="friendsSection">
   <h2>Recomandă Loial unui prieten</h2>
   <p>Nu trebuie să devii ambasador. Trimite linkul tău personal. Punctele se înregistrează numai după ce prietenul activează Loial și primește prima ștampilă verificată.</p>
@@ -235,7 +248,31 @@ button.black{background:#111318;color:#ddc48b}
       catch(error){}
     }else $('copyFriendLink').click();
   };
-  loadCards();loadInbox();loadFriends();
+  async function loadMerchantReferral(){
+    if(!token)return;
+    try{
+      const data=await json('/api/loial-merchant-referrals/me');
+      const url=new URL(data.share_url);
+      if(url.origin!==location.origin || url.pathname!=='/register.html' || !/^LM-[a-f0-9]{32}$/.test(url.searchParams.get('ref')||''))throw Error('Linkul nu este disponibil în acest mediu.');
+      $('merchantReferralLink').value=url.href;
+      $('merchantReferralQr').src='/api/qr-link?url='+encodeURIComponent(url.href)+'&color=%232d6a4f&initial=L';
+      $('merchantReferralStatus').textContent=data.registered_merchants>0
+        ?'Ai recomandat '+data.registered_merchants+' firme. Ești eligibil pentru activarea statutului de ambasador.'
+        :'Prima ta firmă: prezintă cardul LOIAL și invită antreprenorul să se înscrie gratuit.';
+      $('merchantReferralActions').classList.remove('hidden');
+    }catch(error){$('merchantReferralStatus').textContent=error.message;}
+  }
+  $('copyMerchantReferral').onclick=async()=>{
+    try{await navigator.clipboard.writeText($('merchantReferralLink').value);$('copyMerchantReferral').textContent='✓ Copiat';}
+    catch(error){$('merchantReferralLink').select();}
+  };
+  $('shareMerchantReferral').onclick=async()=>{
+    const url=$('merchantReferralLink').value;
+    if(!url)return;
+    if(navigator.share){try{await navigator.share({title:'LOIAL pentru afacerea ta',text:'Descoperă cardul gratuit de fidelitate.',url});}catch(error){}}
+    else $('copyMerchantReferral').click();
+  };
+  loadCards();loadInbox();loadFriends();loadMerchantReferral();
 })();
 </script><script src="/loial-i18n.js"></script>
 <div style="text-align:center;padding:18px;font-size:13px"><a href="/register.html?utm_source=card" rel="noreferrer" style="color:inherit">Ai o afacere? Încearcă LOIAL gratuit.</a></div>
