@@ -22,4 +22,6 @@ jobs:
       - name: Compile acceptance runner
         run: python -m py_compile scripts/staging_acceptance.py
       - name: Run isolated synthetic acceptance
+        env:
+          LOIAL_QA_ADMIN_PASSWORD: ${{ secrets.LOIAL_QA_ADMIN_PASSWORD }}
         run: python scripts/staging_acceptance.py --create-test-data
