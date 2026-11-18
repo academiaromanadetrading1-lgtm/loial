@@ -796,6 +796,25 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                     "warning":"Sume cu TVA/fara TVA si valute diferite nu se aduna; cheltuielile pot fi incomplete."},
                 "summary": {k: sales[k] for k in ("total_revenue", "total_contribution", "missing", "sector_metrics")},
                 "products": sales["products"][:15], "customers": customer_segments(clients)}
+        if req.topic in ("general", "performance", "margin", "financing", "operations", "risk", "weekly", "mentor"):
+            snapshot = db.query(ManagementSnapshot).filter(ManagementSnapshot.business_id == biz.id).order_by(
+                ManagementSnapshot.period.desc(), ManagementSnapshot.id.desc()).first()
+            if snapshot:
+                declared = json.loads(snapshot.data_json)
+                data = {"management_goals": {"period": declared.get("period"),
+                          "score": declared.get("score"), "method": "goal_attainment_v1",
+                          "source": "administrator_declared_not_verified",
+                          "dimensions": declared.get("dimensions", {}),
+                          "currency": declared.get("currency"),
+                          "priorities": declared.get("priorities", [])}, **data}
+            decisions = db.query(ManagementDecision).filter(
+                ManagementDecision.business_id == biz.id).order_by(ManagementDecision.id.desc()).limit(5).all()
+            if decisions:
+                # No free-text decision titles are sent to the model automatically.
+                data["management_followup"] = {"count_recent": len(decisions),
+                    "reviewed": sum(x.reviewed_at is not None for x in decisions),
+                    "overdue_unreviewed": sum(x.reviewed_at is None and x.due < date.today().isoformat()
+                                              for x in decisions)}
         if req.document_id:
             selected=db.query(AIDocument).filter(AIDocument.business_id==biz.id,AIDocument.id==req.document_id).first()
             if not selected:raise HTTPException(404,"Document negasit")
@@ -819,6 +838,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                   "Pentru resurse umane discuta numai procese, instruire si indicatori agregati ai echipei; nu evalua, clasifica, puncta sau recomanda decizii de angajare, concediere ori remunerare pentru persoane individuale. Nu deduce personalitate, emotii sau caracteristici sensibile. "
                   "Pentru stocuri explica rotatia, pierderile si perioada comparabila; pentru operatiuni analizeaza capacitatea si blocajele; pentru risc separa probabilitate, impact si masuri; pentru mentorat preda prin exemplele firmei. "
                   "Nu solicita identificatori personali ai angajatilor, parole sau date bancare complete. Nu promite confidentialitate absoluta. "
+                  "Daca exista management_goals, explica luna si natura declarata a datelor; scorul reflecta atingerea tintelor, nu risc absolut sau creditworthiness. Daca exista management_followup, propune sa verifice deciziile restante in jurnal, fara a pretinde acces la continutul lor. "
                   "Identifica obiectivul real al administratorului si rolul relevant. Raspunde direct, propune o solutie aplicabila si alternative numai cand ajuta. "
                   "Daca observi o oportunitate sustinuta de date, sugereaza urmatorul pas concret si indica sectiunea Loial unde poate fi realizat. "
                   "Pentru marketing, alege segmentul, beneficiul real, mesajul, canalul Loial si indicatorul de urmarit; nu inventa rezultate sau reduceri. "
