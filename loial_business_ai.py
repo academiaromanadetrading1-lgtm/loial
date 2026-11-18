@@ -452,6 +452,35 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
                 "automated_delivery": automated,
                 "last_weekly_request_at": cycle.created_at if cycle else None,
                 "channel": "loial_ai_chat", "external_messages": 0}
+    @r.get("/management-overview")
+    def management_overview(biz=Depends(owner), db: Session = Depends(db_session)):
+        p = account_profile(db, biz)
+        records = rows(db, biz)
+        # Never treat missing costs as zero or combine months into a current KPI.
+        months = sorted({str(x.get("sold_at") or "")[:7] for x in records
+                         if len(str(x.get("sold_at") or "")) >= 10})
+        series = []
+        for period in months[-12:]:
+            group = [x for x in records if str(x.get("sold_at") or "").startswith(period)]
+            revenue = sum(x["quantity"] * x["unit_price"] for x in group)
+            complete = all(x["unit_variable_cost"] is not None for x in group)
+            contribution = sum(x["quantity"] * (x["unit_price"] - x["unit_variable_cost"])
+                               for x in group) if complete else None
+            series.append({"period": period, "revenue": round(revenue, 2),
+                           "contribution": round(contribution, 2) if contribution is not None else None,
+                           "lines": len(group)})
+        # A coverage indicator is not a health rating or a profitability estimate.
+        latest = series[-1] if series else None
+        return {"currency": p.currency, "series": series, "latest": latest,
+                "sample_limited": len(records) >= 10000,
+                "source": "recorded_sales_excluding_refunds", "ai_calls": 0,
+                "health_score": None,
+                "missing_for_health": ["comparable_net_sales_and_costs",
+                    "cash_and_current_liabilities", "debt_service", "retention_cohorts",
+                    "operating_capacity"],
+                "limitations": ["Recorded sales may be incomplete.",
+                    "Contribution is not net profit; currency and VAT consistency must be checked.",
+                    "Periods with no records are not shown as zero sales."]}
     @r.get("/report")
     def report(biz=Depends(owner), db: Session = Depends(db_session)):
         p = account_profile(db, biz)
