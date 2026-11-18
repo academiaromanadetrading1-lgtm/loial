@@ -91,7 +91,7 @@ header{padding:14px max(24px,calc((100% - 1392px)/2));flex-wrap:wrap}
 .wallet-message p{white-space:pre-wrap!important;overflow-wrap:anywhere}
 .management-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px}.management-grid button{font-size:12px;text-align:left;background:#f0f7f2;color:#194b35;border-color:#d0e5d7;min-height:44px}.management-grid button.active{background:#20573c;color:white}.management-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:14px 0}.management-metrics div{padding:12px;border-radius:12px;background:#eff6f0}.management-metrics strong{display:block;font-size:21px;color:#20573c;margin-top:6px}.management-track{height:20px;background:#e6eee8;border-radius:6px;overflow:hidden;margin:7px 0}.management-track span{display:block;height:100%;background:#2d805a;max-width:100%}
 #managementHub{margin:0 0 14px;padding:14px 18px}#workspaceColumns{display:grid;grid-template-columns:minmax(240px,300px) minmax(0,1fr);gap:16px;align-items:start}#workspaceContent{min-width:0}.conversation-layout{display:block}.question-sidebar{position:sticky;top:12px;max-height:calc(100dvh - 24px);overflow:auto}.question-sidebar .specialist-actions{display:flex;flex-direction:column;gap:7px}.question-sidebar .specialist-actions button{flex:0 0 auto;width:100%;line-height:1.4}.question-sidebar #managementContext{font-size:16px;font-weight:800;color:var(--green)}#specialistGuide[hidden],#questionHeading[hidden],#roleFollowups[hidden],#roleTools[hidden],#managementContext[hidden]{display:none!important}.question-sidebar #specialistGuide{border:0;box-shadow:none;padding:0}.chat-card{height:calc(100dvh - 250px);min-height:450px}@media(max-width:1050px){#workspaceColumns{grid-template-columns:235px minmax(0,1fr)}.tool-grid{grid-template-columns:minmax(0,1fr)}}@media(max-width:760px){#workspaceColumns{display:block}.question-sidebar{position:static;max-height:none;margin-bottom:10px}.question-sidebar .specialist-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.management-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.management-grid button{min-width:0;overflow-wrap:anywhere;padding:7px;font-size:11px}.chat-card{height:70dvh;min-height:400px}}
-</style>
+#chatSelection[hidden],#chatImagePreview[hidden],#chatImageInput[hidden]{display:none!important}#chatImagePreview{display:flex;align-items:center;gap:10px;padding:8px}#chatImageThumb,.chat-picture{max-width:220px;max-height:180px;object-fit:contain;border-radius:8px}.chat-picture{display:block;margin:6px 0;cursor:zoom-in}.message-controls{display:flex;justify-content:flex-end;margin-top:5px;gap:5px}.message-controls button{font-size:11px;padding:4px 7px}.bubble.selected{outline:2px solid #2d6a4f}#chatSelection{padding:8px 0}</style>
 </head>
 <body>
 <header><a class="brand" href="/platform.html">◉ LOIAL • AI BUSINESS</a><a class="back" href="/platform.html">← Panou firmă</a></header>
@@ -108,10 +108,10 @@ header{padding:14px max(24px,calc((100% - 1392px)/2));flex-wrap:wrap}
 <section class="workspace-view active" id="view-chat" data-view="chat"><div class="conversation-layout"><section class="card chat-card">
 <h1>Loial AI</h1>
 <div class="chat-top"><p id="headline">Consultant managerial, prin conversații exclusiv text</p><span id="aiMode" class="mode-label" role="status"></span></div>
-<div class="chat" id="chat" aria-live="polite"></div>
+<div class="chat" id="chat" aria-live="polite"></div><div class="row" id="chatSelection" hidden><button type="button" class="ghost" id="deleteSelected">Șterge mesajele selectate</button><button type="button" class="ghost" id="cancelSelection">Anulează</button></div>
 <div id="selectedDocument" class="status" hidden><span id="selectedDocumentName"></span> <button class="ghost" id="clearDocument" type="button" style="padding:4px 8px">×</button></div>
 <div id="chatFeedback" class="status" role="status" aria-live="polite" hidden></div>
-<div class="compose">
+<div id="chatImagePreview" hidden><img id="chatImageThumb" alt="Imagine atașată"><button type="button" class="ghost" id="removeChatImage">Elimină imaginea</button></div><input id="chatImageInput" type="file" accept="image/png,image/jpeg,image/webp" hidden><div class="compose"><button id="attachChatImage" type="button" class="ghost" aria-label="Atașează imagine" title="Atașează imagine">📎</button>
 <textarea id="message" aria-label="Mesaj către Loial AI" placeholder="Scrie întrebarea ta..."></textarea>
 <button id="openAttachments" type="button" class="ghost" title="Documente și facturi" aria-label="Documente și facturi">＋</button><button id="send">Trimite</button>
 </div>
@@ -350,7 +350,7 @@ function renderMetricChoices(){
 function status(message,error=false){$('connection').textContent=message;$('connection').classList.toggle('error',error);const n=$('workspaceNotice');if(n){n.hidden=!error&&!document.querySelector('.workspace-view:not([hidden]):not(#view-chat)');n.textContent=message;n.classList.toggle('error',error);}}
 function setAIStatus(value){aiStatus=value;const mode=$('aiMode');mode.textContent=tr(value==='configured'?'AI configurat':value==='budget_exhausted'?'Buget AI epuizat':value==='provider_unavailable'?'AI temporar indisponibil':'AI neconectat');mode.classList.toggle('online',value==='configured');}
 function chatFeedback(message,error=false){const b=$('chatFeedback');b.textContent=message;b.hidden=!message;b.classList.toggle('error',error);}
-function chooseDocument(id,name){selectedDocument=id;$('selectedDocumentName').textContent=tr('Document selectat')+': '+name;$('selectedDocument').hidden=false;showWorkspace('chat');$('message').focus();}
+function chooseDocument(id,name){if(sending)return;clearChatImage();selectedDocument=id;$('selectedDocumentName').textContent=tr('Document selectat')+': '+name;$('selectedDocument').hidden=false;showWorkspace('chat');$('message').focus();}
 $('clearDocument').onclick=()=>{selectedDocument=null;$('selectedDocument').hidden=true;};
 async function api(path,opts={}){
   const res=await fetch(API+path,{...opts,headers:{'Authorization':'Bearer '+token,...(opts.body instanceof FormData?{}:{'Content-Type':'application/json'}),...(opts.headers||{})}});
@@ -467,10 +467,38 @@ function renderRich(parent,text){
     const p=document.createElement('p');richInline(p,line);parent.append(p);i++;
   }
 }
-function bubble(role,text){
+let pendingImage=null, imageReading=false, deleting=false;
+const selectedMessages=new Set();
+function clearChatImage(){pendingImage=null;$('chatImageInput').value='';$('chatImageThumb').removeAttribute('src');$('chatImagePreview').hidden=true;}
+async function stageChatImage(file){
+ if(!file||sending||imageReading)return;
+ if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>4*1024*1024){chatFeedback(mgCopy('Imagine PNG, JPEG sau WEBP, maximum 4 MB.','PNG, JPEG or WEBP, maximum 4 MB.'),true);return;}
+ imageReading=true;
+ try{const url=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);});
+ pendingImage=url.split(',')[1];$('chatImageThumb').src=url;$('chatImagePreview').hidden=false;selectedDocument=null;$('selectedDocument').hidden=true;chatFeedback('');}
+ catch(e){chatFeedback(mgCopy('Imaginea nu a putut fi citită.','Could not read image.'),true);}
+ finally{imageReading=false;}
+}
+$('chatImageInput').onchange=e=>stageChatImage(e.target.files[0]);
+$('attachChatImage').onclick=()=>{if(!sending&&!imageReading)$('chatImageInput').click();};
+$('removeChatImage').onclick=()=>{if(!sending)clearChatImage();};
+$('message').addEventListener('paste',e=>{const item=Array.from(e.clipboardData?.items||[]).find(x=>x.kind==='file'&&x.type.startsWith('image/'));if(item){e.preventDefault();stageChatImage(item.getAsFile());}});
+function updateSelection(){$('chatSelection').hidden=!selectedMessages.size;$('deleteSelected').disabled=deleting;}
+$('cancelSelection').onclick=()=>{if(deleting)return;selectedMessages.clear();document.querySelectorAll('.bubble.selected').forEach(x=>x.classList.remove('selected'));updateSelection();};
+$('deleteSelected').onclick=async()=>{
+ if(sending||deleting||!selectedMessages.size)return;
+ if(!confirm(mgCopy('Ștergi definitiv mesajele selectate și imaginile lor din istoricul activ?','Delete selected messages and their images from active history?')))return;
+ deleting=true;updateSelection();const ids=[...selectedMessages];
+ try{await api('/history/delete',{method:'POST',body:JSON.stringify({ids})});for(const id of ids){const node=document.querySelector('.bubble[data-message-id="'+id+'"]');if(node){for(const img of node.querySelectorAll('img'))if(img.src.startsWith('blob:'))URL.revokeObjectURL(img.src);node.remove();}}selectedMessages.clear();chatFeedback('');}catch(e){chatFeedback(e.message,true);}finally{deleting=false;updateSelection();}
+};
+async function viewChatImage(id,img){
+ try{const res=await fetch(API+'/history/'+id+'/image',{headers:{Authorization:'Bearer '+token},cache:'no-store'});if(!res.ok)return;const blob=await res.blob();if(!img.isConnected)return;img.src=URL.createObjectURL(blob);img.hidden=false;}catch(e){}
+}
+function bubble(role,text,id=null,hasImage=false){
   const b=document.createElement('div');b.className='bubble '+(['assistant','user','meta'].includes(role)?role:'meta');
   if(role==='assistant'){b.classList.add('rich-answer');renderRich(b,text);}
   else b.textContent=text;
+  if(Number.isSafeInteger(id)){b.dataset.messageId=id;if(hasImage){const img=document.createElement('img');img.className='chat-picture';img.alt=mgCopy('Imagine atașată','Attached image');img.hidden=true;img.addEventListener('click',()=>{if(img.src){const dialog=document.createElement('dialog'),full=document.createElement('img'),close=document.createElement('button');full.src=img.src;full.style.cssText='max-width:85vw;max-height:78vh;object-fit:contain';close.textContent='×';close.onclick=()=>dialog.close();dialog.append(close,full);document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();}});b.append(img);viewChatImage(id,img);}const controls=document.createElement('div');controls.className='message-controls';const select=document.createElement('button');select.type='button';select.className='ghost';select.textContent=mgCopy('Selectează','Select');select.onclick=()=>{if(sending||deleting)return;if(selectedMessages.has(id))selectedMessages.delete(id);else selectedMessages.add(id);b.classList.toggle('selected',selectedMessages.has(id));updateSelection();};controls.append(select);b.append(controls);}
   $('chat').appendChild(b);$('chat').scrollTop=$('chat').scrollHeight;
 }
 function setTopic(key,label){if(sending)return;currentTopic=key;renderManagementRoles();
@@ -494,7 +522,7 @@ async function init(){
     c.topics.filter(t=>!managementRoles.some(x=>x[0]===t.key)).forEach(t=>{const b=document.createElement('button');b.type='button';b.className='topic';b.dataset.topic=t.key;b.textContent=t.label;
       b.addEventListener('click',()=>setTopic(t.key,t.label));$('topics').appendChild(b);});
     if(window.LoialLang)LoialLang.apply();
-    const h=await api('/history');if(h.length){h.forEach(x=>bubble(x.role,x.text));}else{bubble('assistant',tr('Bun venit! Spune-mi ce tip de activitate ai sau alege o temă din stânga. Te voi întreba doar ce date sunt necesare pentru analiză.'));}
+    const h=await api('/history');if(h.length){h.forEach(x=>bubble(x.role,x.text,x.id,x.has_image));}else{bubble('assistant',tr('Bun venit! Spune-mi ce tip de activitate ai sau alege o temă din stânga. Te voi întreba doar ce date sunt necesare pentru analiză.'));}
     await loadFiles();
     await loadMessageRecipients();
     await refreshSent();
@@ -512,15 +540,15 @@ async function init(){
   }catch(e){status(e.message,true);}
 }
 async function send(){
-  if(!canUse||sending)return;
-  const text=$('message').value.trim();if(!text)return;
+  if(!canUse||sending||deleting||imageReading)return;
+  const text=$('message').value.trim()||(pendingImage?mgCopy('Analizează imaginea atașată.','Analyze the attached image.'):'');if(!text)return;
   if(aiStatus==='not_configured'||aiStatus==='budget_exhausted'){
     chatFeedback(tr(aiStatus==='not_configured'?'AI neconectat. Întrebarea ta a fost păstrată. Instrumentele de analiză rămân disponibile.':'Buget AI epuizat'),true);return;
   }
   sending=true;$('send').disabled=true;$('message').readOnly=true;
   chatFeedback(tr('Loial analizează întrebarea…'));
-  try{const r=await api('/chat',{method:'POST',body:JSON.stringify({text,topic:currentTopic,language:language(),document_id:selectedDocument})});
-    bubble('user',text);bubble('assistant',r.answer);$('message').value='';chatFeedback('');setAIStatus('configured');}
+  try{const r=await api('/chat',{method:'POST',body:JSON.stringify({text,topic:currentTopic,language:language(),document_id:selectedDocument,image_b64:pendingImage})});
+    bubble('user',text,r.user_id,r.has_image);bubble('assistant',r.answer,r.assistant_id);clearChatImage();$('message').value='';chatFeedback('');setAIStatus('configured');}
   catch(e){if(e.code)setAIStatus(e.code);chatFeedback(e.message,true);}
   finally{sending=false;$('send').disabled=false;$('message').readOnly=false;}
 }
