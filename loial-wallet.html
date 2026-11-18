@@ -64,6 +64,12 @@ button.black{background:#111318;color:#ddc48b}
       <div><strong>Arată acest QR la casă</strong><p class="muted">Același QR la toate firmele participante.</p>
         <span class="pill" id="walletSummary">–</span></div>
     </div>
+    <section id="customerValueGuide" style="padding:14px;margin:16px 0;background:#eff8f2;border:1px solid #b7d7c5;border-radius:14px">
+      <h3>Ghidul tău LOIAL</h3>
+      <p id="customerValueAdvice" role="status">Se verifică progresul cardurilor…</p>
+      <a id="customerValueAction" class="button secondary" href="#merchantReferralSection">Descoperă recomandările</a>
+      <p class="notice">Recompensele depind de condițiile fiecărei firme. Nu trebuie să cumperi suplimentar doar pentru a obține o ștampilă.</p>
+    </section>
     <div id="merchantCards" class="grid"></div>
   </div>
   <div id="activateWallet">
@@ -153,6 +159,24 @@ button.black{background:#111318;color:#ddc48b}
     if(className)node.className=className;
     return node;
   }
+  function renderCustomerValue(data){
+    const cards=Array.isArray(data.cards)?data.cards:[];
+    const valid=cards.map(c=>({id:Number(c.business_id),name:c.business_name||'Firma parteneră',stamps:Number(c.stamps),target:Number(c.target)})).filter(c=>Number.isSafeInteger(c.id)&&c.id>0&&Number.isFinite(c.stamps)&&c.stamps>=0&&Number.isFinite(c.target)&&c.target>0);
+    const ready=valid.filter(c=>c.stamps>=c.target);
+    const nearly=valid.filter(c=>c.stamps>0&&c.stamps<c.target).sort((a,b)=>(a.target-a.stamps)-(b.target-b.stamps));
+    const advice=$('customerValueAdvice'), action=$('customerValueAction');
+    if(ready.length){
+      advice.textContent='Ai '+ready.length+' '+(ready.length===1?'card cu recompensă disponibilă.':'carduri cu recompense disponibile.')+' Verifică oferta '+ready[0].name+' înainte de următoarea vizită.';
+      action.href='/join/'+ready[0].id;action.textContent='Vezi recompensa';
+    }else if(nearly.length){
+      const c=nearly[0],remaining=c.target-c.stamps;
+      advice.textContent='La '+c.name+' mai ai nevoie de '+remaining+' '+(remaining===1?'ștampilă':'ștampile')+' pentru recompensa afișată. Folosește cardul când ai oricum nevoie de o cumpărătură.';
+      action.href='/join/'+c.id;action.textContent='Vezi progresul cardului';
+    }else{
+      advice.textContent='Arată codul universal la firmele participante pentru a înregistra vizitele. Poți recomanda LOIAL unei afaceri și descoperi programul de ambasador.';
+      action.href='#merchantReferralSection';action.textContent='Descoperă programul de ambasador';
+    }
+  }
   async function loadCards(){
     if(!token||!walletId){$('state').textContent='Activează mai întâi portofelul Loial.';return;}
     try{
@@ -165,6 +189,7 @@ button.black{background:#111318;color:#ddc48b}
       $('verifiedWallet').classList.remove('hidden');
       $('activateWallet').classList.add('hidden');
       $('state').textContent='';
+      renderCustomerValue(data);
       const container=$('merchantCards');container.replaceChildren();
       for(const c of (data.cards||[])){
         const card=newEl('article',null,'merchant');
