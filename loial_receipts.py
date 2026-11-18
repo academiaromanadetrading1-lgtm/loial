@@ -329,9 +329,9 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
             db.flush()
         previous=customer.last_visit
         # A paid purchase must remain in CRM even when the reward is already available.
-        stamp_granted=(customer.stamps or 0)<target
-        if stamp_granted:
-            customer.stamps=(customer.stamps or 0)+1
+        from sqlalchemy import func
+        stamp_granted=db.execute(update(Customer).where(Customer.id==customer.id,func.coalesce(Customer.stamps,0)<target).values(stamps=func.coalesce(Customer.stamps,0)+1)).rowcount==1
+        db.refresh(customer)
         customer.last_visit=claimed.isoformat()
         matching=db.query(AISale).filter(
             AISale.business_id==biz.id,AISale.document_id==receipt.document_id).all()

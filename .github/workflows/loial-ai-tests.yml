@@ -27,7 +27,7 @@ jobs:
       - name: Install test and application dependencies
         run: python -m pip install --disable-pip-version-check -r requirements.txt
       - name: Compile Loial modules
-        run: python -m py_compile loial_financial_simulation.py loial_inbox.py loial_business_ai.py loial_analytics.py loial_industries.py loial_marketing.py loial_knowledge.py loial_identity.py loial_premium_wallet.py loial_weekly_jobs.py loial_receipts.py loial_wallet_sync.py loial_google_issuer.py loial_google_pilot.py loial_preflight.py loial_expenses.py loial_wallet_recovery.py loial_apple_updates.py loial_pwa.py loial_friend_referrals.py loial_revenue_commissions.py loial_stripe_billing.py loial_backup.py loial_plans.py loial_growth.py loial_seo_locales.py loial_local_seo.py loial_multilocation.py loial_acquisition.py main.py
+        run: python -m py_compile loial_financial_simulation.py loial_crm.py loial_inbox.py loial_business_ai.py loial_analytics.py loial_industries.py loial_marketing.py loial_knowledge.py loial_identity.py loial_premium_wallet.py loial_weekly_jobs.py loial_receipts.py loial_wallet_sync.py loial_google_issuer.py loial_google_pilot.py loial_preflight.py loial_expenses.py loial_wallet_recovery.py loial_apple_updates.py loial_pwa.py loial_friend_referrals.py loial_revenue_commissions.py loial_stripe_billing.py loial_backup.py loial_plans.py loial_growth.py loial_seo_locales.py loial_local_seo.py loial_multilocation.py loial_acquisition.py main.py
       - name: Verify inline JavaScript syntax without browser or external calls
         run: |
           node - <<'NODE'

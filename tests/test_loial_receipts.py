@@ -66,6 +66,10 @@ def setup_receipts():
     factory=sessionmaker(bind=engine)
     app=FastAPI()
     from loial_business_ai import AIDocument, AISale
+    from loial_crm import install_crm
+    from loial_inbox import install_loial_inbox, record_offer_choice
+    install_crm(app,engine,factory,Business,Customer,Consent,AISale,"secure-only-for-tests","HS256")
+    install_loial_inbox(app,engine,factory,Business,Customer,Consent,AISale,"secure-only-for-tests","HS256")
     install_receipts(app,engine,factory,Business,Customer,AIDocument,AISale,
                      "secure-only-for-tests","HS256")
     install_loial_ai(app,engine,factory,Business,Customer,Consent,
@@ -88,6 +92,8 @@ def setup_receipts():
                      wallet_uuid="wallet-2",name="Client B",
                      email=None,phone=None,stamps=0,last_visit="2026-11-10")])
         db.commit()
+        record_offer_choice(db,Consent,1,True,"test")
+        record_offer_choice(db,Consent,2,True,"test")
         token_a=issue_wallet_access(db,"wallet-1",True)
         token_b=issue_wallet_access(db,"wallet-2",True)
         db.commit()
@@ -325,3 +331,34 @@ def test_crm_receipt_source_excludes_refunded_transaction(setup_receipts):
     assert client.post(p+"refund",headers=owner(),json={"receipt_ref":"CRM-TEST","reason":"Returnare totala"}).status_code==200
     with factory() as db:
         assert db.query(Receipt).filter_by(status="claimed").count()==0
+
+def test_crm_campaign_full_flow_and_optout(setup_receipts):
+    client,_,_,a,b,owner,wallet=setup_receipts
+    p="/api/loial-receipts/"
+    q="/api/loial-inbox/"
+    issued=client.post(p+"issue",headers=owner(),json=receipt_payload("CRM-E2E"))
+    assert issued.status_code==200,issued.text
+    token=issued.json()["claim_url"].split("token=")[1]
+    assert client.post(p+"claim",headers=wallet(a),json={"receipt_token":token}).status_code==200
+    segment={"product":"Revizie auto","min_purchases":1,"min_spend_minor":20000}
+    result=client.post(q+"crm-audience",headers=owner(),json={"segment":segment})
+    assert result.status_code==200,result.text
+    assert result.json()["eligible"]==1
+    assert client.post(q+"crm-audience",headers=owner(),json={"segment":segment,"customer_ids":[2]}).json()["eligible"]==0
+    assert client.post(q+"crm-audience",headers=owner("owner2@test.invalid"),json={"segment":segment}).json()["eligible"]==0
+    data=client.get("/api/loial-crm/customers",headers=owner(),params=segment).json()
+    assert data["total"]==1 and data["items"][0]["id"]==1
+    payload={"subject":"Oferta pentru revizie","text":"Te asteptam la atelier.","audience":"all","crm_segment":segment}
+    send=client.post(q+"send",headers=owner(),json=payload)
+    assert send.status_code==200,send.text
+    assert send.json()["sent"]==1
+    messages=client.get(q+"threads/1",headers=wallet(a)).json()["messages"]
+    did=next(m["delivery_id"] for m in messages if m["kind"]=="marketing")
+    assert client.post("/api/loial-crm/reaction/"+str(did)+"/interested",headers=wallet(b)).status_code==404
+    assert client.post("/api/loial-crm/reaction/"+str(did)+"/interested",headers=wallet(a)).status_code==200
+    stats=client.get("/api/loial-crm/campaigns",headers=owner()).json()
+    assert stats[0]["interested"]==1 and stats[0]["read"]==1
+    assert client.get(q+"threads/1",headers=wallet(b)).json()["messages"]==[]
+    assert client.post(q+"preferences",headers=wallet(a),json={"business_id":1,"enabled":False}).status_code==200
+    assert client.post(q+"send",headers=owner(),json=payload).json()["sent"]==0
+    assert client.post(q+"crm-audience",headers=owner(),json={"segment":{"min_inactive_days":30,"max_inactive_days":10}}).status_code==422
