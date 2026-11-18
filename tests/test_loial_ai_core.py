@@ -594,3 +594,69 @@ def test_management_overview_no_fake_zero(app_client):
     assert r.status_code==200
     assert r.json()["latest"] is None and r.json()["series"]==[]
     assert r.json()["health_score"] is None and r.json()["ai_calls"]==0
+
+
+def test_chat_image_ownership_deletion_and_context(app_client,monkeypatch):
+    import base64
+    from PIL import Image
+    import loial_business_ai as ai
+    client,auth=app_client
+    a,b=auth("owner1@test.invalid"),auth("owner2@test.invalid")
+    monkeypatch.setattr(ai,"provider_status",lambda usage:"configured")
+    calls=[]
+    async def model(system,question,usage,db,**kwargs):
+        calls.append((question,kwargs))
+        return "Imagine analizata: 42."
+    monkeypatch.setattr(ai,"ask_model",model)
+    buf=io.BytesIO()
+    Image.new("RGB",(40,30),"white").save(buf,format="PNG")
+    encoded=base64.b64encode(buf.getvalue()).decode()
+    path="/api/loial-ai"
+    response=client.post(path+"/chat",headers=a,json={"text":"secret marker 42","image_b64":encoded})
+    assert response.status_code==200,response.text
+    data=response.json()
+    assert data["has_image"] and calls[0][1]["picture"][0]=="image/jpeg"
+    uid,aid=data["user_id"],data["assistant_id"]
+    history=client.get(path+"/history",headers=a).json()
+    assert history[0]["id"]==uid and history[0]["has_image"]
+    imageurl=path+f"/history/{uid}/image"
+    assert client.get(imageurl,headers=a).headers["content-type"]=="image/jpeg"
+    assert client.get(imageurl,headers=b).status_code==404
+    assert client.get(imageurl).status_code==401
+    delete=path+"/history/delete"
+    assert client.post(delete,headers=b,json={"ids":[uid]}).status_code==404
+    assert client.post(delete,headers=a,json={"ids":[uid,999999]}).status_code==404
+    assert len(client.get(path+"/history",headers=a).json())==2
+    assert client.post(delete,headers=a,json={"ids":[uid,aid]}).json()=={"deleted":2}
+    assert client.get(imageurl,headers=a).status_code==404
+    assert client.get(path+"/history",headers=a).json()==[]
+    assert client.post(path+"/chat",headers=a,json={"text":"Continuam"}).status_code==200
+    assert "secret marker 42" not in calls[-1][0]
+
+
+def test_chat_rejects_invalid_image_without_provider_call(app_client,monkeypatch):
+    import loial_business_ai as ai
+    client,auth=app_client
+    monkeypatch.setattr(ai,"provider_status",lambda usage:"configured")
+    async def unexpected(*args,**kwargs):
+        pytest.fail("provider called for invalid image")
+    monkeypatch.setattr(ai,"ask_model",unexpected)
+    h=auth("owner1@test.invalid")
+    assert client.post("/api/loial-ai/chat",headers=h,json={"text":"Read","image_b64":"bm90IGFuIGltYWdl"}).status_code==422
+    assert client.get("/api/loial-ai/history",headers=h).json()==[]
+
+
+def test_deleted_messages_do_not_reset_daily_limit(app_client,monkeypatch):
+    import loial_business_ai as ai
+    client,auth=app_client
+    monkeypatch.setattr(ai,"provider_status",lambda usage:"configured")
+    async def model(*args,**kwargs):return "OK"
+    monkeypatch.setattr(ai,"ask_model",model)
+    h=auth("owner1@test.invalid")
+    path="/api/loial-ai"
+    for i in range(100):
+        res=client.post(path+"/chat",headers=h,json={"text":"test"})
+        assert res.status_code==200
+        data=res.json()
+        assert client.post(path+"/history/delete",headers=h,json={"ids":[data["user_id"],data["assistant_id"]]}).status_code==200
+    assert client.post(path+"/chat",headers=h,json={"text":"test"}).status_code==429
