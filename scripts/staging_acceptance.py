@@ -2,7 +2,7 @@
 Run: python -m pip install opencv-python-headless
      python scripts/staging_acceptance.py --create-test-data
 """
-import argparse, base64, json, secrets, uuid
+import argparse, base64, json, secrets, uuid, os, getpass
 from urllib.request import Request, build_opener, HTTPRedirectHandler
 from urllib.error import HTTPError
 from urllib.parse import urlparse, parse_qs
@@ -14,10 +14,10 @@ class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, *args, **kwargs):
         return None
 opener = build_opener(NoRedirect())
-def call(path, body=None, headers=None, expected=200):
+def call(path, body=None, headers=None, expected=200, method=None):
     req = Request(ORIGIN + path, data=None if body is None else json.dumps(body).encode(),
                   headers={"Content-Type":"application/json", **(headers or {})},
-                  method="GET" if body is None else "POST")
+                  method=method or ("GET" if body is None else "POST"))
     try:
         with opener.open(req, timeout=25) as res:
             status, raw = res.status, res.read()
@@ -98,6 +98,21 @@ def run():
     # Explicitly exercise marketing permission, reactions and tenant boundaries.
     segment={"min_purchases":1,"product":"QA coffee","min_spend_minor":2500}
     inbox="/api/loial-inbox"
+    call(inbox+"/crm-audience",{"segment":segment},owner,403)
+    check(True,"FREE cannot access Business campaigns")
+    admin_email=os.environ.get("LOIAL_QA_ADMIN_EMAIL") or "ciprianpop@academiadetrading.llc"
+    admin_password=os.environ.get("LOIAL_QA_ADMIN_PASSWORD")
+    if not admin_password:
+        if not os.isatty(0):
+            raise RuntimeError("Missing staging-only admin credential; configure runner secret or use local interactive execution")
+        admin_password=getpass.getpass("STAGING admin password: ")
+    admin_login=call("/auth/login",{"email":admin_email,"password":admin_password})
+    check(admin_login["user"]["role"]=="admin","superadministrator login")
+    admin={"Authorization":"Bearer "+admin_login["access_token"]}
+    call("/api/admin/overview",headers=admin)
+    grant_path="/api/admin/business/"+str(bid)+"/manual-plan"
+    grant=call(grant_path,{"active":True,"reason":"Synthetic staging acceptance"},admin,method="PUT")
+    check(grant["plan"]=="probusiness","manual Business grant without billing")
     check(call(inbox+"/crm-audience",{"segment":segment},owner)["eligible"]==1,"CRM audience preview")
     message={"subject":"QA synthetic offer","text":"Synthetic acceptance only","crm_segment":segment,"idempotency_key":"qa-"+tag}
     sent=call(inbox+"/send",message,owner)
@@ -121,6 +136,9 @@ def run():
     call("/api/loial-crm/customers",headers=amb,expected=403)
     call(prefix+"/refund",{"receipt_ref":payload["receipt_ref"],"reason":"Synthetic acceptance cleanup"},owner)
     check(call(crm,headers=owner)["total"]==0,"refunded purchase removed from verified CRM")
+    revoked=call(grant_path,{"active":False,"reason":"Synthetic staging acceptance complete"},admin,method="PUT")
+    check(revoked["plan"]=="free","manual Business grant revoked")
+    call(inbox+"/crm-audience",{"segment":segment},owner,403)
     print("PASS API acceptance; synthetic accounts remain in staging. Physical printer and mobile UI not tested.")
 if __name__=="__main__":
     p=argparse.ArgumentParser(description=__doc__)
