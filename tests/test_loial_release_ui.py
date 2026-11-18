@@ -73,7 +73,7 @@ def test_ai_workspace_has_six_distinct_views_and_preserves_all_tools():
     assert "@media(max-width:1050px)" in html
     assert "@media(max-width:760px)" in html
     assert '<aside class="right">' not in html
-    for element in ("saveProfile","chat","send","attachment","upload","documentPreview",
+    for element in ("chat","send","attachment","upload","documentPreview",
                     "expenseSave","issueReceipt","reportBtn","runBreakEven","showClients",
                     "sendCampaign","exportFeedback","chatFeedback","aiMode"):
         assert html.count('id="'+element+'"')==1
@@ -135,3 +135,19 @@ def test_management_question_dictionary_covers_all_roles_and_starters():
     for label,question in starts:
         assert label in dictionary and question in dictionary
     assert all(q in dictionary for q in questions)
+
+
+def test_chat_profile_is_in_dashboard_and_attachment_controls_exist():
+    html=source("loial-ai.html")
+    dashboard=source("platform.html")
+    assert 'id="aiBusinessProfile"' in dashboard
+    assert 'id="aiProfileSave"' in dashboard
+    assert '/platform.html#aiBusinessProfile' in html
+    assert 'id="profileCard"' not in html
+    assert html.index('id="managementRoles"') < html.index('id="questionSidebar"') < html.index('id="chat"')
+    for element in ("attachChatImage","chatImageInput","chatImagePreview",
+                    "deleteSelected","cancelSelection"):
+        assert html.count('id="'+element+'"')==1
+    assert "image_b64:pendingImage" in html
+    assert "api('/history/delete'" in html
+    assert "addEventListener('paste'" in html
