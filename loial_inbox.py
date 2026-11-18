@@ -54,6 +54,14 @@ class InboxDelivery(InboxBase):
     __table_args__ = (UniqueConstraint("entry_id", "customer_id",
                                       name="uq_loial_delivery_customer"),)
 
+class CRMSegment(BaseModel):
+    min_purchases: int = Field(default=0,ge=0,le=100000)
+    min_spend_minor: int = Field(default=0,ge=0,le=100000000000)
+    product: str = Field(default="",max_length=160)
+    currency: str = Field(default="RON",pattern="^(RON|EUR|USD|GBP)$")
+    min_inactive_days: int = Field(default=0,ge=0,le=36500)
+    max_inactive_days: int = Field(default=36500,ge=0,le=36500)
+
 class DirectMessage(BaseModel):
     subject: str = Field(min_length=2, max_length=120)
     text: str = Field(min_length=2, max_length=2000)
@@ -64,6 +72,7 @@ class DirectMessage(BaseModel):
     deadline_time: str = Field(default="", max_length=5)
     terms: str = Field(default="", max_length=300)
     customer_ids: Optional[List[int]] = None
+    crm_segment: Optional[CRMSegment] = None
     idempotency_key: Optional[str] = Field(default=None, min_length=8, max_length=120)
 
 class OfferChoice(BaseModel):
@@ -254,6 +263,18 @@ def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent
             result.append(c)
         return result
 
+    def selected_crm_ids(db,biz,segment):
+        if segment.min_inactive_days>segment.max_inactive_days:
+            raise HTTPException(422,"Interval de inactivitate invalid")
+        from loial_crm import select_crm
+        from loial_business_ai import AISale
+        return {r["id"] for r in select_crm(db,biz.id,Customer,Consent,AISale,**segment.model_dump()) if r["offers_enabled"]}
+
+    @route.post("/crm-audience")
+    def preview_crm(segment:CRMSegment,biz=Depends(owner),db:Session=Depends(db_session)):
+        ids=selected_crm_ids(db,biz,segment)
+        return {"eligible":len(ids),"channel":"loial"}
+
     @route.post("/send")
     def send_direct(req: DirectMessage, biz=Depends(owner), db: Session = Depends(db_session)):
         from loial_marketing import campaign_message, validate_promotion_deadline, validate_offer_terms, validate_expiry_time, campaign_base, campaign_has_temporal
@@ -283,6 +304,9 @@ def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent
         if req.customer_ids is not None and len(req.customer_ids) > 10000:
             raise HTTPException(status_code=422, detail="Selectie prea mare; foloseste segmentul toti")
         ids = set(req.customer_ids) if req.customer_ids is not None else None
+        if req.crm_segment is not None:
+            selected=selected_crm_ids(db,biz,req.crm_segment)
+            ids=selected if ids is None else ids & selected
         eligible = business_audience(db, biz, req.audience, req.product, ids)
         if not eligible:
             return {"sent": 0, "visible_to_wallets": 0, "status": "no_eligible_clients",

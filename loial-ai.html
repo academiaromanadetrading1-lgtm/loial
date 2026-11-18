@@ -259,7 +259,7 @@ Ex.: Revizie auto;1;220;65"></textarea>
 <button class="ghost" id="saveMetric" style="width:100%;margin-top:9px">Salvează indicatorul</button>
 </section></div></section>
 <section class="workspace-view" id="view-customers" data-view="customers" hidden><div class="tool-grid"><section class="card panel">
-<h2>Clienți și cumpărături</h2><label>Produs cumpărat</label><input id="crmProduct" maxlength="160"><label>Bonuri verificate în ultimele 90 zile (minim)</label><input id="crmMin" type="number" min="0" value="0"><label>Valoare minimă RON din bonuri verificate</label><input id="crmSpend" type="number" min="0" value="0"><button class="ghost" id="crmSearch">Filtrează istoricul verificat</button><div id="crmResults" class="report"></div>
+<h2>Clienți și cumpărături</h2><label>Produs cumpărat</label><input id="crmProduct" maxlength="160"><label>Bonuri verificate în ultimele 90 zile (minim)</label><input id="crmMin" type="number" min="0" value="0"><label>Valoare minimă RON din bonuri verificate</label><input id="crmSpend" type="number" min="0" value="0"><label>Inactivitate minimă (zile)</label><input id="crmInactiveMin" type="number" min="0" value="0"><label>Inactivitate maximă (zile)</label><input id="crmInactiveMax" type="number" min="0" value="36500"><button class="ghost" id="crmToCampaign">Folosește filtrele în campanie</button><button class="ghost" id="crmSearch">Filtrează istoricul verificat</button><div id="crmResults" class="report"></div>
 <button class="ghost" id="showClients" style="width:100%">Vezi clienții firmei</button>
 <div id="customerList" class="file-list" style="margin-top:10px"></div>
 </section><section class="card panel">
@@ -289,7 +289,7 @@ Ex.: Revizie auto;1;220;65"></textarea>
 <option value="all">Toți clienții care acceptă ofertele Loial</option>
 <option value="product_buyers">Cumpărători ai unui produs/serviciu</option>
 </select>
-<label for="singleRecipient">Client individual (opțional)</label>
+<p id="crmCampaignLabel" role="status" hidden></p><button type="button" id="crmClear" class="ghost" hidden>Elimină filtrul CRM</button><label for="singleRecipient">Client individual (opțional)</label>
 <select id="singleRecipient"><option value="">Toți cei din segmentul ales</option></select>
 <label for="productFilter">Produs sau serviciu (opțional)</label>
 <input id="productFilter" maxlength="200" placeholder="Ex.: croissant / revizie auto / spălare">
@@ -794,9 +794,25 @@ async function crm(path){
   const res=await fetch('/api/loial-crm'+path,{headers:{Authorization:'Bearer '+token},cache:'no-store'});
   const data=await res.json();if(!res.ok)throw Error(data.detail||'Eroare CRM');return data;
 }
+let activeCrmSegment=null;
+function crmFilters(){
+  const n=id=>Number($(id).value);
+  const segment={product:$('crmProduct').value.trim(),min_purchases:n('crmMin'),min_spend_minor:Math.round(n('crmSpend')*100),currency:'RON',min_inactive_days:n('crmInactiveMin'),max_inactive_days:n('crmInactiveMax')};
+  if(Object.values(segment).some(x=>typeof x==='number'&&(!Number.isFinite(x)||x<0))||segment.min_inactive_days>segment.max_inactive_days)throw Error('Verifică filtrele CRM.');
+  return segment;
+}
+$('crmToCampaign').onclick=async()=>{try{
+  const segment=crmFilters();
+  const result=await nativeInbox('/crm-audience',{method:'POST',body:JSON.stringify(segment)});
+  activeCrmSegment=segment;$('audience').value='all';$('singleRecipient').value='';
+  $('crmCampaignLabel').hidden=false;$('crmClear').hidden=false;
+  $('crmCampaignLabel').textContent='Filtru CRM activ · '+result.eligible+' clienți eligibili la verificare. Destinatarii se reverifică la trimitere.';
+  status('Filtrele au fost transferate. Deschide secțiunea Mesaje pentru campanie.');
+}catch(e){status(e.message,true);}};
+$('crmClear').onclick=()=>{activeCrmSegment=null;$('crmCampaignLabel').hidden=true;$('crmClear').hidden=true;};
 $('crmSearch').onclick=async()=>{
   try{
-    const p=new URLSearchParams({product:$('crmProduct').value,min_purchases:String(Number($('crmMin').value)||0),min_spend_minor:String(Math.round((Number($('crmSpend').value)||0)*100))});
+    const p=new URLSearchParams(crmFilters());
     const data=await crm('/customers?'+p);
     $('crmResults').textContent=data.total+' clienți potriviți · primele '+data.items.length+' rezultate\n'+data.items.map(c=>c.name+' · '+c.verified_receipts+' bonuri · '+(c.verified_spend_minor===null?'valoare necunoscută':(c.verified_spend_minor/100).toFixed(2)+' RON')+' · '+c.products.map(p=>p.name).join(', ')).join('\n');
   }catch(e){status(e.message,true);}
@@ -811,7 +827,7 @@ $('refreshSent').onclick=()=>refreshSent().catch(e=>status(e.message,true));
 $('previewAudience').onclick=async()=>{
   try{
     const params=new URLSearchParams({audience:$('audience').value,product:$('productFilter').value});
-    const data=await nativeInbox('/audience?'+params.toString());
+    const data=activeCrmSegment?await nativeInbox('/crm-audience',{method:'POST',body:JSON.stringify(activeCrmSegment)}):await nativeInbox('/audience?'+params.toString());
     $('campaignPreview').textContent='Clienți eligibili: '+data.eligible+
       ($('singleRecipient').value?' (filtrarea finală va păstra doar clientul ales)':'')+
       '. Mesajele nu se trimit pe email sau SMS.';
@@ -847,6 +863,8 @@ $('sendCampaign').onclick=async()=>{
     const payload={subject,text:message,audience:$('audience').value,
       ...promotionFields()};
     if($('singleRecipient').value)payload.customer_ids=[Number($('singleRecipient').value)];
+    if(activeCrmSegment)payload.crm_segment=activeCrmSegment;
+    if(activeCrmSegment&&!confirm('Trimiți exclusiv clienților care îndeplinesc filtrele CRM și au acceptat ofertele?'))return;
     const signature=JSON.stringify(payload);
     if(signature!==pendingMessageFingerprint){
       pendingMessageFingerprint=signature;

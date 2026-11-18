@@ -42,6 +42,33 @@ def metrics(receipts,awards,products,now,currency="RON"):
             "average_receipt_minor":int((Decimal(total)/len(money)).quantize(Decimal("1"),rounding=ROUND_HALF_UP)) if money else None,
             "products":[{"name":k,"quantity":float(v)} for k,v in products.most_common(20)]}
 
+def select_crm(db,business_id,Customer,Consent,AISale,min_purchases=0,min_spend_minor=0,product="",currency="RON",max_inactive_days=36500,min_inactive_days=0):
+    now=datetime.now(timezone.utc)
+    receipts=db.query(Receipt).filter_by(business_id=business_id,status="claimed").all()
+    by_wallet=defaultdict(list); awards=defaultdict(list); products=defaultdict(Counter)
+    documents={}
+    for rec in receipts:
+        if not rec.claimed_wallet: continue
+        by_wallet[rec.claimed_wallet].append(rec)
+        documents[rec.document_id]=rec.claimed_wallet
+    for a in db.query(StampAward).filter_by(business_id=business_id).all(): awards[a.customer_id].append(a)
+    for sale in db.query(AISale).filter_by(business_id=business_id).all():
+        w=documents.get(sale.document_id)
+        if w and sale.customer_uuid==w:
+            products[w][sale.product.strip().casefold()]+=Decimal(str(sale.quantity))
+    output=[]
+    for c in db.query(Customer).filter_by(business_id=business_id).order_by(Customer.id).all():
+        w=c.wallet_uuid or c.uuid
+        p=products[w]
+        m=metrics(by_wallet[w],awards[c.id],p,now,currency)
+        if m["verified_receipts_90d"]<min_purchases: continue
+        if min_spend_minor and (m["verified_spend_minor"] is None or m["verified_spend_minor"]<min_spend_minor): continue
+        if product.strip() and product.strip().casefold() not in p: continue
+        if min_inactive_days and (m["days_since_activity"] is None or m["days_since_activity"]<min_inactive_days): continue
+        if max_inactive_days<36500 and (m["days_since_activity"] is None or m["days_since_activity"]>max_inactive_days): continue
+        output.append({"id":c.id,"name":c.name,"offers_enabled":latest_offer_choice(db,Consent,c.id),**m})
+    return output
+
 def install_crm(app,engine,factory,BusinessAccount,Customer,Consent,AISale,jwt_key,algorithm):
     CRMBase.metadata.create_all(bind=engine)
     r=APIRouter(prefix="/api/loial-crm",tags=["Verified customer CRM"])
@@ -67,31 +94,9 @@ def install_crm(app,engine,factory,BusinessAccount,Customer,Consent,AISale,jwt_k
     @r.get("/customers")
     def customers(min_purchases:int=Query(0,ge=0),min_spend_minor:int=Query(0,ge=0),
                   product:str=Query("",max_length=160),currency:str=Query("RON",pattern="^(RON|EUR|USD|GBP)$"),
-                  max_inactive_days:int=Query(36500,ge=0,le=36500),offset:int=Query(0,ge=0),
+                  max_inactive_days:int=Query(36500,ge=0,le=36500),min_inactive_days:int=Query(0,ge=0,le=36500),offset:int=Query(0,ge=0),
                   limit:int=Query(100,ge=1,le=500),biz=Depends(owner),db=Depends(session)):
-        now=datetime.now(timezone.utc)
-        receipts=db.query(Receipt).filter_by(business_id=biz.id,status="claimed").all()
-        by_wallet=defaultdict(list); awards=defaultdict(list); products=defaultdict(Counter)
-        documents={}
-        for rec in receipts:
-            if not rec.claimed_wallet: continue
-            by_wallet[rec.claimed_wallet].append(rec)
-            documents[rec.document_id]=rec.claimed_wallet
-        for a in db.query(StampAward).filter_by(business_id=biz.id).all(): awards[a.customer_id].append(a)
-        for sale in db.query(AISale).filter_by(business_id=biz.id).all():
-            w=documents.get(sale.document_id)
-            if w and sale.customer_uuid==w:
-                products[w][sale.product.strip().casefold()]+=Decimal(str(sale.quantity))
-        output=[]
-        for c in db.query(Customer).filter_by(business_id=biz.id).order_by(Customer.id).all():
-            w=c.wallet_uuid or c.uuid
-            p=products[w]
-            m=metrics(by_wallet[w],awards[c.id],p,now,currency)
-            if m["verified_receipts_90d"]<min_purchases: continue
-            if min_spend_minor and (m["verified_spend_minor"] is None or m["verified_spend_minor"]<min_spend_minor): continue
-            if product.strip() and product.strip().casefold() not in p: continue
-            if max_inactive_days<36500 and (m["days_since_activity"] is None or m["days_since_activity"]>max_inactive_days): continue
-            output.append({"id":c.id,"name":c.name,"offers_enabled":latest_offer_choice(db,Consent,c.id),**m})
+        output=select_crm(db,biz.id,Customer,Consent,AISale,min_purchases,min_spend_minor,product,currency,max_inactive_days,min_inactive_days)
         return {"total":len(output),"items":output[offset:offset+limit],"source":"verified_receipts_and_loyalty_events"}
     @r.post("/reaction/{delivery_id}/{choice}")
     def react(delivery_id:int,choice:str,w=Depends(wallet),db=Depends(session)):
