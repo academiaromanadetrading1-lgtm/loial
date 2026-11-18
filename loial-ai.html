@@ -195,6 +195,20 @@ Ex.: Revizie auto;1;220;65"></textarea>
 <p class="tiny">Integrarea directă cu POS-ul sau casa fiscală necesită suportul sistemului de vânzări. Codul QR fiscal standard nu transmite automat produsele către Loial.</p>
 </section></div></section>
 <section class="workspace-view" id="view-reports" data-view="reports" hidden><div class="tool-grid"><section class="card panel" id="managementOverview"><h2>LOIAL · Business Health</h2><p>Indicatori din vânzările înregistrate. Datele lipsă nu sunt interpretate ca zero.</p><button type="button" class="ghost" id="loadManagementOverview">Actualizează indicatorii</button><div id="managementOverviewResult" aria-live="polite" data-no-translate></div></section>
+<section class="card panel" id="healthGoals"><h2>LOIAL Business Health · Obiective</h2><p>Scor de atingere a țintelor proprii, nu rating de credit. Folosește date comparabile din aceeași lună, în aceeași monedă și fără TVA acolo unde este cazul.</p>
+<label for="healthPeriod">Luna evaluată</label><input id="healthPeriod" type="month" required>
+<div id="healthInputs"></div>
+<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="healthNoDebt" style="width:auto">Firma nu are datorii cu serviciu de rambursare în perioada evaluată</label>
+<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="healthComparable" style="width:auto">Confirm că datele și țintele sunt comparabile</label>
+<div class="actions"><button type="button" id="saveHealth">Calculează și salvează</button><button type="button" class="ghost" id="loadHealth">Istoric lunar</button></div>
+<div id="healthResult" aria-live="polite" data-no-translate></div><button type="button" id="discussHealth" class="ghost" hidden>Discută prioritățile cu LOIAL</button></section>
+<section class="card panel" id="decisionJournal"><h2>Jurnalul deciziilor</h2><p>Stabilește o acțiune, măsoară rezultatul și compară-l cu ținta. Introdu numai indicatori ai afacerii, nu informații despre persoane.</p>
+<label for="decisionTitle">Acțiune</label><input id="decisionTitle" maxlength="180" placeholder="Ex.: testez un pachet de produse">
+<label for="decisionMetric">Indicator și unitate</label><input id="decisionMetric" maxlength="80" placeholder="Ex.: bon mediu RON">
+<label for="decisionBaseline">Valoarea inițială</label><input id="decisionBaseline" type="number" step="any">
+<label for="decisionTarget">Țintă</label><input id="decisionTarget" type="number" step="any">
+<label for="decisionDue">Termen de verificare</label><input id="decisionDue" type="date">
+<div class="actions"><button type="button" id="saveDecision">Salvează decizia</button><button type="button" class="ghost" id="loadDecisions">Vezi deciziile</button></div><div id="decisionStatus" role="status"></div><div id="decisionResults" data-no-translate></div></section>
 <section class="card panel" id="teamOperations"><h2>LOIAL People · Organizarea echipei</h2><p>Compară două perioade cu activitate similară, la nivel de echipă. Nu introduce nume sau date individuale.</p>
 <label for="teamSalesA">Vânzări nete – perioada A</label><input id="teamSalesA" type="number" min="0" max="100000000" step=".01">
 <label for="teamHoursA">Ore lucrate de echipă – perioada A</label><input id="teamHoursA" type="number" min=".01" max="1000000" step=".01">
@@ -1112,6 +1126,70 @@ $('runTeam').onclick=()=>{
 };
 for(const id of ['teamSalesA','teamHoursA','teamSalesB','teamHoursB'])$(id).addEventListener('input',()=>{teamScenario=null;$('teamResult').replaceChildren();$('discussTeam').hidden=true;});
 $('discussTeam').onclick=()=>{if(teamScenario)chooseManagementRole('people','Analizează productivitatea agregată declarată a echipei și propune îmbunătățiri de proces și instruire: '+JSON.stringify(teamScenario));};
+
+
+const healthDimensions=[
+ ['sales','Vânzări nete (monedă)','Net sales (currency)','Verifică mixul de produse, volumul și prețul.','Review product mix, volume and price.'],
+ ['margin','Marjă operațională (%)','Operating margin (%)','Verifică prețurile, costurile și pierderile.','Review prices, costs and waste.'],
+ ['liquidity','Lichiditate curentă (x)','Current ratio (x)','Compară activele curente și obligațiile scadente.','Compare current assets and liabilities.'],
+ ['debt_coverage','DSCR (x)','DSCR (x)','Verifică fluxul disponibil înaintea ratelor și totalul ratelor.','Review cash available for debt service and all debt payments.'],
+ ['retention','Retenție clienți (%)','Customer retention (%)','Compară cohorte echivalente și planifică reactivarea.','Compare equivalent cohorts and plan reactivation.'],
+ ['productivity','Vânzări nete / oră echipă','Net sales / team hour','Verifică procesele, volumul și resursele la nivel agregat.','Review processes, workload and resources at team level.']
+];
+function mgCopy(ro,en){return language()==='ro'?ro:en;}
+function healthFields(){
+ const parent=$('healthInputs');parent.replaceChildren();
+ for(const d of healthDimensions){
+  const row=document.createElement('div');row.dataset.dimension=d[0];const label=document.createElement('label');label.textContent=mgCopy(d[1],d[2]);row.append(label);
+  const pair=document.createElement('div');pair.className='actions';
+  for(const k of ['actual','target']){const input=document.createElement('input');input.type='number';input.step='any';input.id='health_'+d[0]+'_'+k;input.placeholder=mgCopy(k==='actual'?'Valoare reală':'Țintă',k==='actual'?'Actual':'Target');input.setAttribute('aria-label',label.textContent+' – '+input.placeholder);pair.append(input);}
+  row.append(pair);parent.append(row);
+ }
+}
+healthFields();
+document.addEventListener('loial:language',()=>{for(const d of healthDimensions){const a=$('health_'+d[0]+'_actual'),t=$('health_'+d[0]+'_target'),label=a.parentElement.previousElementSibling;label.textContent=mgCopy(d[1],d[2]);a.placeholder=mgCopy('Valoare reală','Actual');t.placeholder=mgCopy('Țintă','Target');a.setAttribute('aria-label',label.textContent+' '+a.placeholder);t.setAttribute('aria-label',label.textContent+' '+t.placeholder);}});
+$('healthNoDebt').onchange=()=>{for(const k of ['actual','target'])$('health_debt_coverage_'+k).disabled=$('healthNoDebt').checked;};
+let lastHealth=null;
+function renderHealth(result){
+ lastHealth=result;const out=$('healthResult');out.replaceChildren();const no=result.score===null;
+ metricTiles(out,[[mgCopy('Perioada','Period'),result.period],[mgCopy('Atingerea țintelor','Goal attainment'),no?mgCopy('Date insuficiente','Insufficient data'):result.score+'/100']]);
+ for(const d of healthDimensions){const v=result.dimensions[d[0]];if(v)managementBar(out,mgCopy(d[1],d[2]),v.score+' / 100 ('+v.actual+' / '+v.target+')',v.score/100);}
+ const note=document.createElement('p');note.textContent=mgCopy('Medie egal ponderată a valorilor actual / țintă, limitate la 0–100. Date declarate; nu este o evaluare externă.','Equal-weight mean of actual/target capped at 0–100. Declared data; not an external rating.');out.append(note);
+ for(const key of result.priorities.slice(0,3)){const d=healthDimensions.find(x=>x[0]===key);if(!d)continue;const p=document.createElement('p');p.textContent=mgCopy(d[1]+': '+d[3],d[2]+': '+d[4]);out.append(p);}
+ if(no){const p=document.createElement('p');p.textContent=mgCopy('Lipsesc: ','Missing: ')+result.missing.map(k=>{const d=healthDimensions.find(x=>x[0]===k);return d?mgCopy(d[1],d[2]):k;}).join(', ');out.append(p);}
+ $('discussHealth').hidden=false;
+}
+$('saveHealth').onclick=async()=>{
+ const b=$('saveHealth'),out=$('healthResult');b.disabled=true;$('discussHealth').hidden=true;lastHealth=null;out.textContent='';
+ try{
+ const period=$('healthPeriod').value,comparable=$('healthComparable').checked,no_debt=$('healthNoDebt').checked,metrics={};
+ if(!period||!comparable)throw Error(mgCopy('Selectează luna și confirmă comparabilitatea.','Choose the month and confirm comparability.'));
+ for(const d of healthDimensions){if(no_debt&&d[0]==='debt_coverage')continue;const a=$('health_'+d[0]+'_actual').value,t=$('health_'+d[0]+'_target').value;if(a===''&&t==='')continue;if(a===''||t==='')throw Error(mgCopy('Completează valoarea și ținta pentru fiecare indicator introdus.','Enter actual and target for each included metric.'));metrics[d[0]]={actual:Number(a),target:Number(t)};}
+ renderHealth(await api('/management-health',{method:'POST',body:JSON.stringify({period,comparable,no_debt,metrics})}));
+ }catch(e){out.textContent=e.message;}finally{b.disabled=false;}
+};
+$('loadHealth').onclick=async()=>{
+ const b=$('loadHealth'),out=$('healthResult');b.disabled=true;$('discussHealth').hidden=true;lastHealth=null;
+ try{const data=await api('/management-health');out.replaceChildren();if(!data.snapshots.length){out.textContent=mgCopy('Nu există evaluări complete salvate.','No completed assessments saved.');return;}
+ renderHealth(data.snapshots[0]);const h=document.createElement('h3');h.textContent=mgCopy('Istoric scor','Score history');out.append(h);for(const x of data.snapshots)managementBar(out,x.period,x.score+'/100',x.score/100);
+ }catch(e){out.textContent=e.message;}finally{b.disabled=false;}
+};
+$('discussHealth').onclick=()=>{if(lastHealth)chooseManagementRole('performance',mgCopy('Interpretează indicatorii declarați, explică limitele și propune priorități măsurabile: ','Interpret the declared metrics, explain limitations and suggest measurable priorities: ')+JSON.stringify(lastHealth));};
+async function renderDecisions(){
+ const box=$('decisionResults');box.replaceChildren();const data=await api('/management-decisions');
+ if(!data.length){box.textContent=mgCopy('Nu există decizii salvate.','No saved decisions.');return;}
+ for(const d of data){const panel=document.createElement('div');panel.className='status';const title=document.createElement('strong');title.textContent=d.title;panel.append(title);
+ const p=document.createElement('p');p.textContent=d.metric+' · '+d.baseline+' → '+d.target+' · '+d.due;panel.append(p);
+ if(d.observed!==null){const result=document.createElement('p');result.textContent=mgCopy('Observat: ','Observed: ')+d.observed+' · '+mgCopy('Variație: ','Change: ')+d.delta+' · '+(d.reached?mgCopy('Țintă atinsă','Target reached'):mgCopy('Țintă neatinsă','Target not reached'));panel.append(result);}
+ else if(d.due<new Date().toISOString().slice(0,10)){const n=document.createElement('p');n.textContent=mgCopy('Verificare scadentă','Review overdue');panel.append(n);}
+ const input=document.createElement('input');input.type='number';input.step='any';input.placeholder=mgCopy('Rezultat măsurat','Observed result');input.setAttribute('aria-label',input.placeholder);const btn=document.createElement('button');btn.type='button';btn.textContent=mgCopy('Înregistrează rezultat','Record result');btn.onclick=async()=>{if(input.value.trim()===''||!input.checkValidity())return;btn.disabled=true;try{await api('/management-decisions/'+d.id+'/review',{method:'POST',body:JSON.stringify({observed:Number(input.value)})});await renderDecisions();}catch(e){$('decisionStatus').textContent=e.message;}finally{btn.disabled=false;}};panel.append(input,btn);box.append(panel);
+ }
+}
+$('loadDecisions').onclick=async()=>{try{await renderDecisions();}catch(e){$('decisionStatus').textContent=e.message;}};
+$('saveDecision').onclick=async()=>{
+ const b=$('saveDecision');b.disabled=true;
+ try{const vals=['decisionTitle','decisionMetric','decisionBaseline','decisionTarget','decisionDue'].map(x=>$(x).value.trim());if(vals.some(x=>x===''))throw Error(mgCopy('Completează toate câmpurile.','Complete all fields.'));await api('/management-decisions',{method:'POST',body:JSON.stringify({title:vals[0],metric:vals[1],baseline:Number(vals[2]),target:Number(vals[3]),due:vals[4]})});$('decisionStatus').textContent=mgCopy('Decizie salvată.','Decision saved.');await renderDecisions();}catch(e){$('decisionStatus').textContent=e.message;}finally{b.disabled=false;}
+};
 
 init();
 </script>
