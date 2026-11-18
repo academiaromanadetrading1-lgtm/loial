@@ -95,6 +95,30 @@ def run():
     check(call(crm,headers=other_owner)["total"]==0,"other merchant CRM isolated")
     threads=call("/api/loial-inbox/threads",headers=wallet)["threads"]
     check(any(x["business_id"]==bid for x in threads),"stamp inbox grouped by merchant")
+    # Explicitly exercise marketing permission, reactions and tenant boundaries.
+    segment={"min_purchases":1,"product":"QA coffee","min_spend_minor":2500}
+    inbox="/api/loial-inbox"
+    check(call(inbox+"/crm-audience",{"segment":segment},owner)["eligible"]==1,"CRM audience preview")
+    message={"subject":"QA synthetic offer","text":"Synthetic acceptance only","crm_segment":segment,"idempotency_key":"qa-"+tag}
+    sent=call(inbox+"/send",message,owner)
+    check(sent["sent"]==1 and sent["external_messages"]==0,"targeted native offer only")
+    check(call(inbox+"/send",message,owner)["status"]=="already_delivered","campaign retry idempotent")
+    thread=call(inbox+"/threads/"+str(bid),headers=wallet)["messages"]
+    delivery=next(m["delivery_id"] for m in thread if m["subject"]==message["subject"])
+    call("/api/loial-crm/reaction/"+str(delivery)+"/interested",{},rival,404)
+    check(call("/api/loial-crm/reaction/"+str(delivery)+"/interested",{},wallet)["choice"]=="interested","customer offer reaction")
+    call(inbox+"/preferences",{"business_id":bid,"enabled":False},wallet)
+    check(call(inbox+"/crm-audience",{"segment":segment},owner)["eligible"]==0,"opt-out excludes customer")
+    check(call(inbox+"/send",{**message,"idempotency_key":"qa-optout-"+tag},owner)["sent"]==0,"no campaign after opt-out")
+    call("/api/admin/overview",headers=owner,expected=(401,403))
+    email=f"qa-amb-{tag}@example.invalid"
+    password=secrets.token_urlsafe(24)
+    call("/api/ambassador/join",{"email":email,"name":"QA ambassador","password":password})
+    logged=call("/auth/login",{"email":email,"password":password})
+    check(logged["user"]["role"]=="ambassador","ambassador role")
+    amb={"Authorization":"Bearer "+call("/api/ambassador/login",{"email":email,"password":password})["access_token"]}
+    call("/api/admin/overview",headers=amb,expected=(401,403))
+    call("/api/loial-crm/customers",headers=amb,expected=403)
     call(prefix+"/refund",{"receipt_ref":payload["receipt_ref"],"reason":"Synthetic acceptance cleanup"},owner)
     check(call(crm,headers=owner)["total"]==0,"refunded purchase removed from verified CRM")
     print("PASS API acceptance; synthetic accounts remain in staging. Physical printer and mobile UI not tested.")
