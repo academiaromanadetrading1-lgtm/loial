@@ -34,3 +34,20 @@ def test_backup_does_not_overwrite_or_touch_source(tmp_path):
     assert target.read_bytes()==b"leave unchanged"
     with pytest.raises(ValueError,match="new file"):
         backup_database(source,source)
+
+
+def test_verified_restore_required_tables_and_escaped_paths(tmp_path):
+    from loial_backup import verify_restore
+    source=tmp_path/"snapshot #1?.db"
+    with sqlite3.connect(source) as db:
+        db.execute("CREATE TABLE loial_management_snapshots (id INTEGER PRIMARY KEY)")
+        db.execute("INSERT INTO loial_management_snapshots VALUES (1)")
+        db.commit()
+    target=tmp_path/"isolated restore.db"
+    result=verify_restore(source,target,("loial_management_snapshots",))
+    assert result["row_counts_match"] and result["required_tables_present"]
+    assert result["table_count"]==1
+    bad=tmp_path/"failed.db"
+    with pytest.raises(RuntimeError,match="schema or row count mismatch"):
+        verify_restore(source,bad,("missing_table",))
+    assert not bad.exists() and source.exists()
