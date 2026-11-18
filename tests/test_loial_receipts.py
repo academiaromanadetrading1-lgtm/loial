@@ -18,7 +18,9 @@ from loial_scans import ScanBase
 from loial_friend_referrals import ReferralBase
 
 @pytest.fixture
-def setup_receipts():
+def setup_receipts(monkeypatch):
+    # Deterministic origin regardless of the runner environment.
+    monkeypatch.setenv("LOIAL_PUBLIC_ORIGIN","https://loial.space")
     Base=declarative_base()
     class Business(Base):
         __tablename__="business_accounts"

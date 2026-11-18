@@ -113,6 +113,7 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
                      jwt_secret,jwt_algorithm,StaffMember=None,limiter=None,can_enroll=None):
     ReceiptBase.metadata.create_all(bind=engine)
     router=APIRouter(prefix="/api/loial-receipts",tags=["Loial verified receipt QR"])
+    public_origin=os.getenv("LOIAL_PUBLIC_ORIGIN","https://loial.space").rstrip("/")
 
     def database():
         db=factory()
@@ -172,7 +173,7 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
     def integration_status(biz=Depends(owner),db:Session=Depends(database)):
         row=db.get(ReceiptIntegration,biz.id)
         return {"active":bool(row),"updated_at":row.updated_at if row else None,
-                "endpoint":"https://loial.space/api/loial-receipts/integration/issue"}
+                "endpoint":public_origin+"/api/loial-receipts/integration/issue"}
 
     @router.post("/integration/rotate")
     def integration_rotate(biz=Depends(owner),db:Session=Depends(database)):
@@ -264,7 +265,7 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
         return issue_result(receipt,raw)
 
     def issue_result(receipt,raw):
-        url="https://loial.space/loial-receipt.html?token="+quote(raw,safe="")
+        url=public_origin+"/loial-receipt.html?token="+quote(raw,safe="")
         return {"receipt_id":receipt.id,"status":receipt.status,"claim_url":url,
                 "qr_png_base64":"data:image/png;base64,"+create_receipt_qr_png(url),
                 "total":receipt.total_minor/100,"currency":receipt.currency,
@@ -379,7 +380,7 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
             changed=db.execute(update(SmartReservation).where(SmartReservation.receipt_id==rec.id,SmartReservation.wallet_uuid==access.wallet_uuid,SmartReservation.confirmed_at.is_(None)).values(approval_hash=sha256(raw),approval_expires=deadline.isoformat())).rowcount
             if changed!=1: db.rollback();raise HTTPException(409,"Tichet rezervat altui portofel sau deja confirmat")
         db.commit()
-        url="https://loial.space/scan.html?receipt_approval="+quote(raw,safe="")
+        url=public_origin+"/scan.html?receipt_approval="+quote(raw,safe="")
         return {"status":"reserved","approval_qr":"data:image/png;base64,"+create_receipt_qr_png(url),"expires_at":deadline.isoformat()}
 
     @router.post("/confirm-payment")
