@@ -114,6 +114,16 @@
     <div class="plan-badge" id="planBadge">Plan Start: 0 / 50 clienți</div>
   </div>
 
+  <section class="card" id="aiBusinessProfile" hidden>
+    <h2>Profilul firmei pentru LOIAL AI</h2>
+    <p>Completează datele o singură dată. Le poți actualiza aici oricând.</p>
+    <details id="aiProfileDetails"><summary id="aiProfileSummary">Editează profilul firmei</summary>
+    <label for="aiProfileSector">Tip de activitate</label><select id="aiProfileSector" style="width:100%;padding:10px"></select>
+    <label for="aiProfileCurrency">Moneda rapoartelor</label><select id="aiProfileCurrency" style="width:100%;padding:10px"><option>RON</option><option>EUR</option><option>USD</option><option>GBP</option></select>
+    <label for="aiProfileDescription">Cum funcționează afacerea ta?</label><textarea id="aiProfileDescription" maxlength="1200" rows="5" style="width:100%;resize:vertical;padding:10px;font:inherit"></textarea>
+    <button class="btn-primary" type="button" id="aiProfileSave">Salvează profilul</button>
+    <p id="aiProfileFeedback" role="status" aria-live="polite"></p></details>
+  </section>
   <div class="card" id="wiseBillingCard">
     <span class="step-tag">ABONAMENT LOIAL BUSINESS</span>
     <h2>67 EUR / lună, fără TVA adăugat</h2>
@@ -1178,6 +1188,28 @@ async function loadAcquisition(){
     if(!d.tracked_business_accounts)box.textContent='Nu există încă înscrieri atribuite.';
   }catch(e){status.textContent='Indicatorii nu au putut fi încărcați.';}
 }
+</script>
+<script>
+(async function(){
+const panel=document.getElementById('aiBusinessProfile'), q=id=>document.getElementById(id), tr=x=>window.LoialLang?LoialLang.t(x):x;
+if(!localStorage.getItem('token')||document.getElementById('businessOwnerSection').style.display==='none')return;
+const api=async(path,opts={})=>{const res=await fetch('/api/loial-ai'+path,{...opts,cache:'no-store',headers:{Authorization:'Bearer '+localStorage.getItem('token'),'Content-Type':'application/json'}});if(!res.ok)throw Error('HTTP '+res.status);return res.json();};
+const fields=['aiProfileSector','aiProfileCurrency','aiProfileDescription'].map(q);
+let saving=false;
+try{
+ const c=await api('/context');
+ for(const sector of c.sectors){const option=document.createElement('option');option.value=sector.key;option.textContent=sector.label;q('aiProfileSector').append(option);}
+ q('aiProfileSector').value=c.industry.key;q('aiProfileCurrency').value=c.currency;q('aiProfileDescription').value=c.description||'';
+ panel.hidden=false;q('aiProfileDetails').open=!c.description||location.hash==='#aiBusinessProfile';if(location.hash==='#aiBusinessProfile')panel.scrollIntoView({block:'start'});
+ if(window.LoialLang)LoialLang.apply();
+}catch(e){if(e.message!=='HTTP 401'&&e.message!=='HTTP 403'){panel.hidden=false;q('aiProfileDetails').open=true;q('aiProfileFeedback').textContent=tr('Profilul nu poate fi încărcat. Reîncarcă pagina.');q('aiProfileSave').disabled=true;}return;}
+q('aiProfileSave').onclick=async()=>{
+ if(saving)return;saving=true;fields.forEach(x=>x.disabled=true);q('aiProfileSave').disabled=true;q('aiProfileFeedback').textContent=tr('Se salvează…');
+ try{const payload={sector:fields[0].value,currency:fields[1].value,description:fields[2].value.trim()};const result=await api('/profile',{method:'PUT',body:JSON.stringify(payload)});if(result.status!=='saved')throw Error('save');const verified=await api('/context');if(verified.industry.key!==payload.sector||verified.currency!==payload.currency||verified.description!==payload.description)throw Error('verification');fields[2].value=verified.description;q('aiProfileFeedback').textContent=tr('Profil salvat');}
+ catch(e){q('aiProfileFeedback').textContent=tr('Salvarea a eșuat');}
+ finally{saving=false;fields.forEach(x=>x.disabled=false);q('aiProfileSave').disabled=false;}
+};
+})();
 </script>
 </body>
 </html>
