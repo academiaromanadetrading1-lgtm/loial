@@ -41,9 +41,11 @@ button.black{background:#111318;color:#ddc48b}
 @media(max-width:380px){main{padding:12px 10px 40px}.metal{padding:18px 19px;min-height:205px}}
 </style>
 <script src="/loial-pwa-install.js" defer></script>
+<link rel="stylesheet" href="/loial-premium.css">
 </head><body>
-<header><strong>LOIAL</strong><small>BLACK METAL<br>PORTOFEL PERSONAL</small></header>
+<header><a class="loial-wordmark" href="/">loial.space<span class="loial-tagline">Spațiul tău loial</span></a><small>PORTOFEL PERSONAL</small></header>
 <main>
+<nav class="loial-nav" aria-label="Navigare rapidă"><a href="#cardsSection">Carduri</a><a href="#inboxSection">Mesaje</a><a href="#merchantReferralSection">Recomandă</a><a href="#friendsSection">Prieteni</a></nav>
 <div class="metal" aria-label="Cardul universal de fidelitate Loial">
   <div><div class="brand">LOIAL</div><div class="edition">BLACK METAL · LOYALTY</div></div>
   <div><div class="owner-label">TITULAR</div><div class="owner" id="walletHolder">Portofelul meu Loial</div>
@@ -88,7 +90,7 @@ button.black{background:#111318;color:#ddc48b}
   <button type="button" class="secondary" id="inboxReload">Actualizează mesajele</button>
 </section>
 <section class="panel" id="merchantReferralSection">
-  <h2>Recomandă LOIAL unei firme</h2>
+  <h2>Recomandă LOIAL unei firme</h2><p><strong>Câștigă bani pentru fiecare firmă recomandată care achită un abonament eligibil, după activarea statutului de ambasador.</strong></p>
   <p>Arată unui antreprenor cum funcționează cardul gratuit. Prima firmă înscrisă prin codul tău îți deschide accesul la statutul de ambasador.</p>
   <p id="merchantReferralStatus" role="status">Activează portofelul pentru a primi codul personal.</p>
   <div id="merchantReferralActions" class="hidden">
