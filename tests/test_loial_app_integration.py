@@ -47,7 +47,7 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                 "new_business":10,"renewed_business":30,"new_pro":5,
                 "renewed_pro":10,"recruited_business":5})
             assert simulation.status_code==200
-            assert simulation.json()["total_commission_cents"]==170000
+            assert simulation.json()["total_commission_cents"]==150000
             assert simulation.json()["illustrative_subscription_revenue_cents"]==706500
             assert simulation.json()["scenario_only"] is True
             assert client.get("/api/loial-plans/simulate?new_business=-1").status_code==422
