@@ -15,3 +15,11 @@ body{background:var(--loial-paper);color:var(--loial-ink)}
 .loial-ai-callout{background:var(--loial-mint);padding:19px;border-radius:18px;margin:16px 0}.loial-ai-callout a{color:var(--loial-forest);font-weight:700}
 @media(max-width:680px){.loial-role-grid{grid-template-columns:1fr}.loial-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.loial-entry{padding:0 16px}.loial-role{padding:16px}.loial-nav{position:sticky;top:0;z-index:10;gap:3px}.loial-nav a{font-size:12px;padding:9px 4px;min-width:0}.loial-quick{padding:13px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+.loial-tagline{display:block;font-size:11px;letter-spacing:.02em;font-weight:500;line-height:1.35;color:inherit}
+.loial-wordmark{display:inline-block;line-height:1.1}
+header .loial-wordmark{color:inherit}
+.loial-quick small{color:#536b5c}
+.loial-quick-grid .loial-quick{scroll-margin-top:90px}
+#loialCustomers,#openScanLink,#rewardInput,#loialAiEntry,#loialRolesSection,#cardsSection,#inboxSection,#merchantReferralSection,#friendsSection,#dashWelcome,#dashRefUrl,#dashAmounts,#ambWiseForm{scroll-margin-top:100px}
+@media(max-width:680px){.loial-wordmark{font-size:21px}.loial-tagline{font-size:10px}.loial-nav a{min-height:40px;display:flex;align-items:center;justify-content:center}}
