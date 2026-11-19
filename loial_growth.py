@@ -39,10 +39,10 @@ def install_growth(app, industries):
         except ValueError:
             raise HTTPException(422,"Portofoliu invalid")
 
-    @app.get("/indexnow/{filename}")
+    @app.get("/{filename}.txt")
     def indexnow_key(filename: str):
         key=os.environ.get("LOIAL_INDEXNOW_KEY","")
-        if not re.fullmatch(r"[A-Za-z0-9-]{8,128}",key) or filename!=key+".txt":
+        if not re.fullmatch(r"[A-Za-z0-9-]{8,128}",key) or filename!=key:
             raise HTTPException(404,"Not found")
         return Response(key,media_type="text/plain",headers={"X-Robots-Tag":"noindex"})
 
