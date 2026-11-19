@@ -156,6 +156,7 @@ async function changePassword(e) {
   btn.disabled = false;
 }
 </script>
+<script>if(new URLSearchParams(location.search).get('tab')==='password')showTab('password');</script>
 <script src="/loial-i18n.js"></script>
 </body>
 </html>
