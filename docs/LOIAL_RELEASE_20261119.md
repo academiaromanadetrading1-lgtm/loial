@@ -19,3 +19,7 @@ Production is not changed by this record.
 4. After approved deploy, verify health, public landing, admin access and existing merchant data without synthetic mutations in production. Roll back if integrity or access fails. Stripe payment activation requires separate validation and authorization; initial release is a free pilot.
 
 No live billing, real customer data, paid AI calls or production changes are authorized by this record. Founders are allocated by verified approval order; fictitious demonstration tiles are explicitly identified, never represented as genuine members.
+
+## Owner confirmation and production preflight
+
+Owner confirmed the demo account works on 2026-11-19; premium entitlement and commission status were not independently rechecked for that account. Production preflight: live web service, current commit `e35fc310a7c44a8d4a5970794ee9393aac10778c`, existing `/data` volume 500 MB, no staged changes; last three hours 102 HTTP requests, zero 5xx. No production changes performed. Physical checks, administrator credential rotation, fresh verified backup/restore and explicit deployment authorization remain open.
