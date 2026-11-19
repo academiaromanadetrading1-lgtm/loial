@@ -7,6 +7,7 @@ on:
       - chatgpt/loial-pilot-hardening-20261117
       - chatgpt/loial-crm-receipt-engagement-20261118
       - chatgpt/loial-growth-strategy-20261118
+      - chatgpt/loial-discovery-20261119
     paths:
       - '.github/workflows/loial-ai-tests.yml'
 
@@ -131,3 +132,5 @@ jobs:
 # Owner approved one ten-minute founders, homepage and admin regression run on 2026-11-19.
 
 # Owner approved one ten-minute account menu and language regression run, 2026-11-19.
+
+# Owner approved one ten-minute discovery SEO AEO GEO regression on 2026-11-19.
