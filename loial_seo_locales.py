@@ -32,8 +32,57 @@ def alternate_tags():
 
 BILLING_LABEL={"ro":"EUR / lună","en":"EUR / month","de":"EUR / Monat","fr":"EUR / mois","it":"EUR / mese","es":"EUR / mes","nl":"EUR / maand","pl":"EUR / miesiąc","hu":"EUR / hó"}
 
+DISCOVERY={
+  "ro": [
+    "Fidelizare și management pentru afaceri locale",
+    "LOIAL reunește carduri digitale QR, CRM și campanii de retenție. Consultanții virtuali LOIAL AI asistă analiza vânzărilor, cheltuielilor, stocurilor și lichidității, în funcție de plan și datele disponibile.",
+    "Clienții gestionează recompensele; ambasadorii pot primi comisioane numai pentru abonamente eligibile achitate. Pilotul este gratuit; abonamentele plătite depind de activarea plăților."
+  ],
+  "en": [
+    "Customer loyalty and business management for local businesses",
+    "LOIAL brings together digital QR loyalty cards, CRM and retention campaigns. LOIAL AI virtual consultants assist with sales, expense, inventory and cash-flow analysis, subject to plan access and available data.",
+    "Customers manage rewards; ambassadors may earn commissions only on eligible paid subscriptions. The pilot is free; paid plans depend on payment activation."
+  ],
+  "de": [
+    "Kundenbindung und Geschäftsmanagement für lokale Unternehmen",
+    "LOIAL verbindet digitale QR-Treuekarten, CRM und Kundenbindungskampagnen. Virtuelle LOIAL AI-Berater unterstützen die Analyse von Umsatz, Ausgaben, Lagerbestand und Liquidität, abhängig vom Tarif und den verfügbaren Daten.",
+    "Kunden verwalten Prämien; Botschafter können Provisionen nur für berechtigte bezahlte Abonnements erhalten. Die Pilotphase ist kostenlos; kostenpflichtige Tarife setzen die Zahlungsaktivierung voraus."
+  ],
+  "fr": [
+    "Fidélisation et gestion des commerces locaux",
+    "LOIAL réunit cartes de fidélité numériques QR, CRM et campagnes de rétention. Les consultants virtuels LOIAL AI aident à analyser les ventes, dépenses, stocks et liquidités selon la formule et les données disponibles.",
+    "Les clients gèrent leurs récompenses ; les ambassadeurs peuvent toucher des commissions uniquement sur les abonnements payés éligibles. Le pilote est gratuit ; les offres payantes dépendent de l’activation des paiements."
+  ],
+  "it": [
+    "Fidelizzazione e gestione delle attività locali",
+    "LOIAL integra carte fedeltà digitali QR, CRM e campagne di fidelizzazione. I consulenti virtuali LOIAL AI assistono nell’analisi di vendite, spese, scorte e liquidità secondo il piano e i dati disponibili.",
+    "I clienti gestiscono i premi; gli ambasciatori possono ricevere commissioni solo sugli abbonamenti idonei pagati. Il progetto pilota è gratuito; i piani a pagamento dipendono dall’attivazione dei pagamenti."
+  ],
+  "es": [
+    "Fidelización y gestión de negocios locales",
+    "LOIAL reúne tarjetas de fidelización digitales QR, CRM y campañas de retención. Los consultores virtuales LOIAL AI ayudan a analizar ventas, gastos, inventario y liquidez según el plan y los datos disponibles.",
+    "Los clientes gestionan sus recompensas y los embajadores pueden recibir comisiones únicamente por suscripciones elegibles pagadas. El piloto es gratuito; los planes de pago dependen de la activación de los cobros."
+  ],
+  "nl": [
+    "Klantloyaliteit en bedrijfsbeheer voor lokale ondernemers",
+    "LOIAL combineert digitale QR-spaarkaarten, CRM en retentiecampagnes. Virtuele LOIAL AI-adviseurs ondersteunen analyses van omzet, uitgaven, voorraad en liquiditeit, afhankelijk van het abonnement en beschikbare gegevens.",
+    "Klanten beheren beloningen; ambassadeurs kunnen uitsluitend commissies ontvangen op in aanmerking komende betaalde abonnementen. De pilot is gratis; betaalde abonnementen vereisen activering van betalingen."
+  ],
+  "pl": [
+    "Lojalność klientów i zarządzanie lokalną firmą",
+    "LOIAL łączy cyfrowe karty lojalnościowe QR, CRM i kampanie utrzymania klientów. Wirtualni konsultanci LOIAL AI wspierają analizę sprzedaży, wydatków, zapasów i płynności zależnie od planu i dostępnych danych.",
+    "Klienci zarządzają nagrodami; ambasadorzy mogą otrzymywać prowizje wyłącznie za kwalifikujące się opłacone abonamenty. Pilotaż jest bezpłatny; płatne plany zależą od aktywacji płatności."
+  ],
+  "hu": [
+    "Ügyfélhűség és üzletvezetés helyi vállalkozásoknak",
+    "A LOIAL egyesíti a digitális QR-hűségkártyákat, a CRM-et és az ügyfélmegtartási kampányokat. A LOIAL AI virtuális tanácsadói a csomagtól és az elérhető adatoktól függően segítik az értékesítés, a kiadások, a készletek és a likviditás elemzését.",
+    "Az ügyfelek kezelik jutalmaikat; a nagykövetek csak jogosult, kifizetett előfizetések után kaphatnak jutalékot. A pilot ingyenes; a fizetős csomagok a fizetés aktiválásától függenek."
+  ]
+}
+
 def landing(lang):
     title, intro, pwa, steps, cta, pricing, ambassador, name=COPY[lang]
     cap,one,five,quote,note=DETAIL[lang]
+    overview,features,roles=DISCOVERY[lang]
     nav=" · ".join(f'<a lang="{key}" href="{path_for(key)}">{escape(row[-1])}</a>' for key,row in COPY.items())
-    return f"""<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{escape(title)} | LOIAL</title><meta name="description" content="{escape(intro,quote=True)}"><link rel="canonical" href="{ORIGIN+path_for(lang)}">{alternate_tags()}<style>body{{font-family:system-ui,sans-serif;background:#f6f9f7;color:#17392a;max-width:850px;margin:40px auto;padding:20px;line-height:1.6}}a{{color:#246449}}.price{{display:inline-block;padding:20px;background:white;border:1px solid #dce6e0;border-radius:12px;margin:6px}}.cta{{display:inline-block;color:white;background:#246449;padding:12px 20px;border-radius:9px;text-decoration:none}}</style></head><body><header><strong>LOIAL</strong><nav>{nav}</nav></header><main><h1>{escape(title)}</h1><p>{escape(intro)}</p><p>{escape(pwa)}</p><p>{escape(steps)}</p><a class="cta" href="/register.html?utm_source=industry">{escape(cta)}</a><h2>{escape(pricing)} ({BILLING_LABEL[lang]})</h2><div class="price">Start · 0 EUR<br>{escape(cap)}</div><div class="price">Business · 67 EUR<br>{escape(one)}</div><div class="price">ProBusiness* · 270 EUR<br>{escape(five)}</div><p>{escape(quote)}</p><p>{escape(note)}</p><a href="/ambasadori">{escape(ambassador)}</a></main></body></html>"""
+    return f"""<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{escape(overview)} | LOIAL</title><meta name="description" content="{escape(features,quote=True)}"><link rel="canonical" href="{ORIGIN+path_for(lang)}">{alternate_tags()}<style>body{{font-family:system-ui,sans-serif;background:#f6f9f7;color:#17392a;max-width:850px;margin:40px auto;padding:20px;line-height:1.6}}a{{color:#246449}}.price{{display:inline-block;padding:20px;background:white;border:1px solid #dce6e0;border-radius:12px;margin:6px}}.cta{{display:inline-block;color:white;background:#246449;padding:12px 20px;border-radius:9px;text-decoration:none}}</style></head><body><header><strong>LOIAL</strong><nav>{nav}</nav></header><main><h1>{escape(overview)}</h1><p>{escape(features)}</p><p>{escape(roles)}</p><h2>{escape(title)}</h2><p>{escape(intro)}</p><p>{escape(pwa)}</p><p>{escape(steps)}</p><a class="cta" href="/register.html?utm_source=industry">{escape(cta)}</a><h2>{escape(pricing)} ({BILLING_LABEL[lang]})</h2><div class="price">Start · 0 EUR<br>{escape(cap)}</div><div class="price">Business · 67 EUR<br>{escape(one)}</div><div class="price">ProBusiness* · 270 EUR<br>{escape(five)}</div><p>{escape(quote)}</p><p>{escape(note)}</p><a href="/ambasadori">{escape(ambassador)}</a></main></body></html>"""
