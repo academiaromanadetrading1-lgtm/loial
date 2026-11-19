@@ -10,7 +10,7 @@ from xml.etree import ElementTree
 ORIGIN = "https://loial.space"
 HOST = "loial.space"
 ENDPOINT = "https://api.indexnow.org/indexnow"
-PUBLIC_FIXED = {"/","/despre-loial","/comparatie-fidelizare","/fondatori","/ambasadori","/demo"}
+PUBLIC_FIXED = {"/","/despre-loial","/comparatie-fidelizare","/fondatori","/ambasadori","/demo","/pentru-clienti","/pentru-firme"}
 LOCALES = {"en","de","fr","it","es","nl","pl","hu"}
 
 def public_url(url):
