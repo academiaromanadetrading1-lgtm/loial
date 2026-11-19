@@ -27,12 +27,14 @@ def page(title, body, path):
     links = "".join('<a href="' + href + '"' + (' aria-current="page"' if href == path else '') + '>' + label + '</a>' for href,label in menu)
     role = {"/pentru-clienti": "client", "/pentru-firme": "business", "/ambasadori": "ambassador"}.get(path)
     css_class = "loial-public" + (" loial-public-role" if role else "")
+    login_href = {"client": "/wallet", "ambassador": "/ambasador.html#contAmbasador"}.get(role, "/login.html")
+    login_label = "Portofelul meu" if role == "client" else "Intră în cont"
     if role:
         body = role_landing(role, title, body)
         heading = ""
     else:
         heading = "<h1>" + title + "</h1>"
-    return HTMLResponse(f"""<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} | LOIAL</title><link rel="stylesheet" href="/loial-premium.css"><link rel="canonical" href="{canonical}"></head><body class="{css_class}"><header class="loial-public-header"><div class="loial-public-nav"><a class="loial-wordmark" href="/">loial.space<span class="loial-tagline">Spațiul tău loial</span></a><nav aria-label="Navigare principală">{links}</nav><a class="loial-public-button outline" href="/login.html">Intră în cont</a></div></header><main class="loial-public-main">{heading}{body}</main><footer class="loial-public-footer"><a href="/gdpr/privacy">Confidențialitate</a> · <a href="/despre-loial">Despre LOIAL</a></footer></body></html>""")
+    return HTMLResponse(f"""<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} | LOIAL</title><link rel="stylesheet" href="/loial-premium.css"><link rel="canonical" href="{canonical}"></head><body class="{css_class}"><header class="loial-public-header"><div class="loial-public-nav"><a class="loial-wordmark" href="/">loial.space<span class="loial-tagline">Spațiul tău loial</span></a><nav aria-label="Navigare principală">{links}</nav><a class="loial-public-button outline" href="{login_href}">{login_label}</a></div></header><main class="loial-public-main">{heading}{body}</main><footer class="loial-public-footer"><a href="/gdpr/privacy">Confidențialitate</a> · <a href="/despre-loial">Despre LOIAL</a></footer></body></html>""")
 
 def role_landing(role, title, body):
     config = {
@@ -42,6 +44,13 @@ def role_landing(role, title, body):
     }
     kicker, headline, desc, href, action, a, b, c = config[role]
     hero = f"""<section class="loial-hero"><div><span class="loial-kicker">{kicker}</span><h1>{headline}</h1><p>{desc}</p><div class="loial-hero-actions"><a class="loial-public-button gold" href="{href}">{action}</a><a class="loial-public-button light" href="/demo">Vezi demonstrația</a></div></div><div class="loial-hero-art" aria-hidden="true"><div class="loial-device"><div class="loial-device-brand">L · LOIAL</div><div class="loial-device-card">loial.space<small>Spațiul tău loial</small></div><div class="loial-device-row"><span>✓</span>{a}</div><div class="loial-device-row"><span>✓</span>{b}</div><div class="loial-device-row"><span>✓</span>{c}</div></div><div class="loial-art-orbit"></div></div></section>"""
+    features = {
+        "client": [("Cardul tău digital", "Accesează cardurile direct pe telefon, fără aplicație din magazin."), ("Ștampile și recompense", "Urmărește progresul fiecărui card în funcție de regulile firmei."), ("Mesaje și recomandări", "Consultă ofertele primite și recomandă LOIAL prietenilor sau firmelor.")],
+        "business": [("Program de fidelizare", "Personalizează recompensa și numărul de ștampile."), ("Clienți și activitate", "Urmărește vizitele și cumpărăturile înregistrate."), ("Campanii și LOIAL AI", "Analizează activitatea și comunică cu clienții eligibili în planurile disponibile.")]
+    }
+    if role in features:
+        cards = "".join(f'<article class="loial-tier"><span class="loial-feature-mark" aria-hidden="true">✓</span><h3>{name}</h3><p>{detail}</p></article>' for name,detail in features[role])
+        hero += '<section class="loial-tiers" aria-label="Beneficii">' + cards + '</section>'
     if role == "ambassador":
         tiers = "".join(f'<article class="loial-tier"><small>{band} firme plătitoare active</small><h3>{name}</h3><strong>20 EUR + {rate} EUR/lună</strong><p>20 EUR la prima plată eligibilă; {rate} EUR la fiecare reînnoire eligibilă, per firmă Business.</p></article>' for band,name,rate in [("1–25","Ambasador LOIAL",5),("26–50","Ambasador Manager",10),("51+","Ambasador Senior",15)])
         hero += '<section class="loial-tiers" aria-label="Niveluri Business">' + tiers + '</section>'
