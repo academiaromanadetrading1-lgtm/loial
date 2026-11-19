@@ -28,7 +28,7 @@ with sync_playwright() as p:
             }""",role)
             page.reload()
             menu.locator("summary").click()
-            page.once("dialog",lambda d:d.accept())
+            if role=="customer":page.once("dialog",lambda d:d.accept())
             menu.get_by_text("Ieșire din cont",exact=True).click()
             page.wait_for_url(ORIGIN+"/")
             expect(menu.locator("summary")).to_be_visible()
