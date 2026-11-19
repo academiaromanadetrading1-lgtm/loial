@@ -30,14 +30,42 @@ function apply(){
 }
 function set(lang){if(!langs.includes(lang))return;locale=lang;try{localStorage.setItem('loial_language',lang);}catch(e){}apply();document.dispatchEvent(new CustomEvent('loial:language',{detail:lang}));}
 window.LoialLang={t,get:()=>locale,set,apply};
+const menuOrder=['en','de','fr','it','es','ro','nl','pl','hu'];
+function accountMenu(){
+ if(document.getElementById('loialAccountMenu'))return;
+ const labels={ro:['Cont','Autentificare','Creează cont firmă','Schimbă parola','Cardul meu','Ambasador','Panou cont','Ieșire din cont'],en:['Account','Sign in','Create business account','Change password','My card','Ambassador','Dashboard','Sign out'],de:['Konto','Anmelden','Firmenkonto erstellen','Passwort ändern','Meine Karte','Botschafter','Kontoübersicht','Abmelden'],fr:['Compte','Connexion','Créer un compte entreprise','Modifier le mot de passe','Ma carte','Ambassadeur','Tableau de bord','Déconnexion'],it:['Account','Accedi','Crea account aziendale','Cambia password','La mia carta','Ambasciatore','Pannello','Esci'],es:['Cuenta','Iniciar sesión','Crear cuenta de empresa','Cambiar contraseña','Mi tarjeta','Embajador','Panel de cuenta','Cerrar sesión'],nl:['Account','Inloggen','Bedrijfsaccount maken','Wachtwoord wijzigen','Mijn kaart','Ambassadeur','Dashboard','Uitloggen'],pl:['Konto','Zaloguj się','Utwórz konto firmowe','Zmień hasło','Moja karta','Ambasador','Panel konta','Wyloguj się'],hu:['Fiók','Bejelentkezés','Céges fiók létrehozása','Jelszó módosítása','Kártyám','Nagykövet','Fiókkezelő','Kijelentkezés']};
+ const box=document.createElement('details');box.id='loialAccountMenu';box.dataset.noTranslate='1';
+ box.style.cssText='position:fixed;top:46px;right:12px;z-index:1001;font:14px system-ui;color:#245b43';
+ const summary=document.createElement('summary');summary.style.cssText='cursor:pointer;background:white;border:1px solid #d0dfd5;border-radius:9px;padding:8px 12px;list-style:none;font-weight:600;box-shadow:0 2px 8px #0001';
+ const panel=document.createElement('div');panel.style.cssText='position:absolute;right:0;top:100%;margin-top:6px;width:220px;max-width:calc(100vw - 24px);padding:6px;background:white;border:1px solid #d0dfd5;border-radius:10px;box-shadow:0 6px 24px #0002';
+ box.append(summary,panel);document.body.append(box);
+ function render(){
+  const a=labels[locale]||labels.en;summary.textContent='◉ '+a[0];
+  panel.replaceChildren();
+  const primary=!!localStorage.getItem('token'),amb=!!sessionStorage.getItem('loial_ambassador_token'),wallet=!!localStorage.getItem('loial_wallet_inbox_token');
+  function item(label,href,action){const el=document.createElement(action?'button':'a');el.textContent=label;el.style.cssText='display:block;width:100%;box-sizing:border-box;text-align:left;padding:10px;border:0;border-radius:6px;background:white;color:#245b43;text-decoration:none;font:inherit;cursor:pointer';if(action){el.type='button';el.addEventListener('click',action);}else el.href=href;panel.append(el);}
+  if(primary)item(a[6],'/platform.html');else{item(a[1],'/login.html');item(a[2],'/register.html');}
+  item(a[3],'/login.html?tab=password');
+  if(wallet)item(a[4],'/wallet');else if(!primary)item(a[4],'/wallet-recovery.html');
+  item(a[5],'/ambasador.html');
+  if(primary||amb||wallet)item(a[7],null,async()=>{
+   if(wallet&&!confirm(({ro:'Ai o metodă de recuperare a cardului? Ieșirea elimină accesul local de pe acest dispozitiv.',en:'Do you have a card recovery method? Signing out removes local access on this device.',es:'¿Tienes un método de recuperación? Se eliminará el acceso local de este dispositivo.'})[locale]||'Signing out removes local card access. Continue?'))return;
+   for(const key of Object.keys(localStorage))if(['token','user','biz_id','loial_universal_uuid','loial_universal_profile','loial_wallet_inbox_token','loial_friend_invite'].includes(key)||key.startsWith('loial_admin_cache_')||key.startsWith('loial_card_')||key.startsWith('loial_wallet_claim_pending_'))localStorage.removeItem(key);
+   sessionStorage.removeItem('loial_ambassador_token');sessionStorage.removeItem('loial_pending_receipt');
+   try{await fetch('/auth/logout',{method:'POST',signal:AbortSignal.timeout(4000)});}catch(e){}
+   location.replace('/');
+  });
+ }
+ render();box.addEventListener('toggle',()=>{if(box.open)render();});document.addEventListener('loial:language',render);document.addEventListener('click',e=>{if(!box.contains(e.target))box.open=false;});
+}
 function init(){
  let select=document.getElementById('langSelect');
  if(!select){
   const host=document.querySelector('header nav,header,.header,.topbar,.nav')||document.body;
-  if(host){select=document.createElement('select');select.style.cssText='width:auto;max-width:100px;padding:6px;border:1px solid #cedcd1;border-radius:8px;font:inherit;background:white;color:#254d39';for(const l of langs){const o=document.createElement('option');o.value=l;o.textContent=l.toUpperCase();select.appendChild(o);}if(host===document.body){select.style.cssText+=';position:fixed;top:8px;right:8px;z-index:1000';}host.appendChild(select);}
+  if(host){select=document.createElement('select');select.style.cssText='width:auto;max-width:100px;padding:6px;border:1px solid #cedcd1;border-radius:8px;font:inherit;background:white;color:#254d39';for(const l of menuOrder){const o=document.createElement('option');o.value=l;o.textContent=l.toUpperCase();select.appendChild(o);}if(host===document.body){select.style.cssText+=';position:fixed;top:8px;right:8px;z-index:1000';}host.appendChild(select);}
  }
- if(select){select.setAttribute('aria-label','Language');select.dataset.loialLanguage='1';select.value=locale;select.addEventListener('change',()=>set(select.value));}
- apply();
+ if(select){for(const lang of menuOrder){const option=Array.from(select.options).find(o=>o.value===lang);if(option)select.append(option);}select.setAttribute('aria-label','Language');select.dataset.loialLanguage='1';select.value=locale;select.addEventListener('change',()=>set(select.value));}
+ apply();accountMenu();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 window.addEventListener('storage',e=>{if(e.key==='loial_language'&&langs.includes(e.newValue)){locale=e.newValue;apply();document.dispatchEvent(new CustomEvent('loial:language',{detail:locale}));}});
