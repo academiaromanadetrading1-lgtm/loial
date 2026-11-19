@@ -18,16 +18,16 @@ def test_payload():
     assert sitemap_urls(xml)==[BASE+"/"]
     p=submission(KEY,[BASE+"/",BASE+"/"])
     assert p["urlList"]==[BASE+"/"]
-    assert p["keyLocation"]==BASE+"/indexnow/"+KEY+".txt"
+    assert p["keyLocation"]==BASE+"/"+KEY+".txt"
     with pytest.raises(ValueError): submission("bad",[BASE+"/"])
 def test_key_route(monkeypatch):
     app=FastAPI()
     install_growth(app,{})
     client=TestClient(app)
     monkeypatch.delenv("LOIAL_INDEXNOW_KEY",raising=False)
-    assert client.get("/indexnow/"+KEY+".txt").status_code==404
+    assert client.get("/"+KEY+".txt").status_code==404
     monkeypatch.setenv("LOIAL_INDEXNOW_KEY",KEY)
-    r=client.get("/indexnow/"+KEY+".txt")
+    r=client.get("/"+KEY+".txt")
     assert r.status_code==200 and r.text==KEY
     assert r.headers["content-type"].startswith("text/plain")
-    assert client.get("/indexnow/wrong-key.txt").status_code==404
+    assert client.get("/wrong-key.txt").status_code==404
