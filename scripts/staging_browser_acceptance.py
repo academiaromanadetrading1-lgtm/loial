@@ -14,6 +14,12 @@ with sync_playwright() as p:
     page.wait_for_url("**/platform.html")
     expect(page.locator("#superAdminSection")).to_be_visible(timeout=20000)
     print("PASS superadmin browser login and visible dashboard",flush=True)
+    expect(page.locator("#adminOverviewStatus")).to_contain_text("Actualizat la",timeout=20000)
+    expect(page.locator("#foundersAdmin")).to_be_visible()
+    page.evaluate("logout()")
+    page.wait_for_url(ORIGIN+"/")
+    expect(page.locator("#walletCard")).to_be_visible()
+    print("PASS administrator overview, founder management and logout to homepage",flush=True)
     desktop.close()
     api=browser.new_context()
     tag=uuid.uuid4().hex[:12]
@@ -21,6 +27,25 @@ with sync_playwright() as p:
     assert r.ok
     bid=r.json()["business_id"]
     api.close()
+    for device in ["Desktop","Pixel 7","iPhone 13"]:
+        viewport={"viewport":{"width":1440,"height":900}} if device=="Desktop" else p.devices[device]
+        context=browser.new_context(**viewport,reduced_motion="reduce")
+        page=context.new_page()
+        page.goto(ORIGIN+"/")
+        expect(page.locator("h1")).to_contain_text("Afacerile cresc")
+        expect(page.locator("#walletCard")).to_be_visible()
+        page.locator("#bizName").fill("QA Card")
+        expect(page.locator("#previewName")).to_have_text("QA Card")
+        page.locator("#addStamp").click()
+        expect(page.locator("#stampCount")).to_have_text("6/6")
+        expect(page.locator("[data-founder-count]")).to_contain_text("500",timeout=20000)
+        expect(page.locator("#pentru-cine")).to_be_visible()
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 2"),device
+        page.goto(ORIGIN+"/fondatori")
+        expect(page.locator("[data-founder-count]")).to_contain_text("500",timeout=20000)
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 2"),device
+        print("PASS homepage, interactive simulator, gallery and width:",device,flush=True)
+        context.close()
     for device in ["Pixel 7","iPhone 13"]:
         context=browser.new_context(**p.devices[device])
         page=context.new_page()
