@@ -161,3 +161,24 @@ assert.equal(numeric('portfolioRenewal'),1500);
     result = subprocess.run([node, "-e", harness], input=json.dumps({"script": scripts[0], "cases": cases}),
                             text=True, capture_output=True, timeout=15)
     assert result.returncode == 0, result.stderr
+
+
+def test_approved_ambassador_final_cta_and_probusiness_amount():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from loial_plans import simulate_portfolio
+    from loial_growth import install_growth
+    app = FastAPI()
+    install_growth(app, {})
+    with TestClient(app) as client:
+        response = client.get("/ambasadori")
+    assert response.status_code == 200
+    source = response.text
+    bottom = source.split('class="loial-bottom-actions">', 1)[1].split("</div>", 1)[0]
+    assert "Devino ambasador" in bottom
+    assert 'href="/ambasador.html#contAmbasador"' in bottom
+    assert "Vezi demonstrația" not in bottom
+    assert "Comisioane pentru firme aduse de ambasadorii recrutați de către tine" in source
+    assert simulate_portfolio(new_pro=1)["activation_cents"] == 4000
+    assert simulate_portfolio(renewed_pro=1)["recurring_cents"] == 2000
+    assert simulate_portfolio(recruited_pro=1)["sponsor_cents"] == 4000
