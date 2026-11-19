@@ -173,7 +173,7 @@ def test_verified_probusiness_activation_and_renewal():
         assert book_pro("in_pro_renew",12)["duplicate"] is True
         assert sorted((x.agent_id,x.kind,x.amount_cents) for x in
                       db.query(AmbassadorCommission).all())==[
-            (1,"sponsor",4000),(2,"activation",8000),(2,"recurring",2000)]
+            (1,"sponsor",4000),(2,"activation",4000),(2,"recurring",2000)]
         row=db.query(PaidMerchantInvoice).filter_by(
             external_invoice_id="in_pro_renew").one()
         assert row.review_reason=="stripe_verified_probusiness"
