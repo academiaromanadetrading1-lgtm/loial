@@ -39,13 +39,6 @@ def install_growth(app, industries):
         except ValueError:
             raise HTTPException(422,"Portofoliu invalid")
 
-    @app.get("/{filename}.txt")
-    def indexnow_key(filename: str):
-        key=os.environ.get("LOIAL_INDEXNOW_KEY","")
-        if not re.fullmatch(r"[A-Za-z0-9-]{8,128}",key) or filename!=key:
-            raise HTTPException(404,"Not found")
-        return Response(key,media_type="text/plain",headers={"X-Robots-Tag":"noindex"})
-
     @app.get("/robots.txt")
     def robots():
         return Response("User-agent: *\nDisallow: /api/\nDisallow: /platform.html\nDisallow: /join/\nDisallow: /scan/\nDisallow: /review/\nSitemap: https://loial.space/sitemap.xml\n",media_type="text/plain")
@@ -116,3 +109,10 @@ The free pilot is active. Start includes up to 50 customers at EUR 0; catalog pr
         app.add_api_route(path_for(lang),make_page(lang),methods=["GET"],name="loial_landing_"+lang)
 
     install_local_seo(app,page)
+
+    @app.get("/{filename}.txt")
+    def indexnow_key(filename: str):
+        key=os.environ.get("LOIAL_INDEXNOW_KEY","")
+        if not re.fullmatch(r"[A-Za-z0-9-]{8,128}",key) or filename!=key:
+            raise HTTPException(404,"Not found")
+        return Response(key,media_type="text/plain",headers={"X-Robots-Tag":"noindex"})
