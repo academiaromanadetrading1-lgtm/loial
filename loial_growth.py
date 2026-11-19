@@ -23,7 +23,7 @@ def sitemap_xml(paths):
 def page(title, body, path):
     title=escape(title)
     canonical=escape(ORIGIN+path,quote=True)
-    return HTMLResponse(f"""<!doctype html><html lang="ro"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} | LOIAL</title><link rel="canonical" href="{canonical}"><style>body{{font-family:system-ui,sans-serif;background:#f6f9f7;color:#17392a;max-width:760px;margin:40px auto;padding:20px;line-height:1.6}}a{{color:#246449}}input{{padding:10px;max-width:100%;box-sizing:border-box}}.card{{padding:25px;border-radius:18px;background:#153c2b;color:white}}button{{padding:10px;cursor:pointer}}</style><header><a href="/">LOIAL</a></header><main><h1>{title}</h1>{body}</main><footer><a href="/gdpr/privacy">Confidențialitate</a></footer></html>""")
+    return HTMLResponse(f"""<!doctype html><html lang="ro"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} | LOIAL</title><link rel="stylesheet" href="/loial-premium.css"><link rel="canonical" href="{canonical}"><style>body{{font-family:system-ui,sans-serif;background:#f6f9f7;color:#17392a;max-width:760px;margin:40px auto;padding:20px;line-height:1.6}}a{{color:#246449}}input{{padding:10px;max-width:100%;box-sizing:border-box}}.card{{padding:25px;border-radius:18px;background:#153c2b;color:white}}button{{padding:10px;cursor:pointer}}</style><header><a href="/">LOIAL</a></header><main><h1>{title}</h1>{body}</main><footer><a href="/gdpr/privacy">Confidențialitate</a></footer></html>""")
 
 def install_growth(app, industries):
     @app.get("/api/loial-plans")
@@ -46,8 +46,26 @@ def install_growth(app, industries):
     @app.get("/sitemap.xml")
     def sitemap():
         # Only actual, published canonical pages; never advertise speculative translations.
-        return Response(sitemap_xml(["/ambasadori","/demo","/despre-loial","/fondatori","/comparatie-fidelizare"]+[path_for(lang) for lang in COPY]+
+        return Response(sitemap_xml(["/pentru-clienti","/pentru-firme","/ambasadori","/demo","/despre-loial","/fondatori","/comparatie-fidelizare"]+[path_for(lang) for lang in COPY]+
             ["/solutii/"+x for x in industries]+local_paths()),media_type="application/xml")
+
+    @app.get("/pentru-clienti")
+    def for_clients():
+        return page("LOIAL pentru clienți", """<p>Cardurile de fidelitate ale firmelor participante, într-un singur portofel digital gratuit.</p>
+        <h2>Ce poți face?</h2><p>Prezintă codul QR la casă, urmărește ștampilele și recompensele fiecărei firme, consultă ofertele disponibile și recomandă LOIAL prietenilor sau firmelor.</p>
+        <h2>Cum începi?</h2><p>Activează cardul la o firmă participantă, apoi adaugă portofelul LOIAL pe ecranul telefonului. Nu ai nevoie de Apple Wallet sau Google Wallet.</p>
+        <h2>Cât costă?</h2><p>Portofelul clientului este gratuit. Recompensele depind de condițiile fiecărei firme.</p>
+        <p><a href="/wallet">Deschide portofelul</a> · <a href="/wallet-recovery.html">Recuperează cardul</a> · <a href="/demo">Vezi demonstrația</a></p>
+        <h2>Întrebări frecvente</h2><p>QR-ul LOIAL nu este un card bancar. Ofertele comerciale depind de acordul tău și de regulile fiecărei firme.</p>""", "/pentru-clienti")
+
+    @app.get("/pentru-firme")
+    def for_businesses():
+        return page("LOIAL pentru firme", """<p>Configurează un program de fidelizare și gestionează relațiile cu clienții din același panou.</p>
+        <h2>Fidelizare și CRM</h2><p>Creează recompense, emite carduri digitale, scanează coduri QR și analizează vizitele și cumpărăturile înregistrate. Trimite campanii către clienții eligibili care au acceptat comunicările.</p>
+        <h2>LOIAL AI</h2><p>Specialiști virtuali pentru analiza vânzărilor, cheltuielilor, stocurilor și deciziilor de management, în planurile eligibile. Rezultatele depind de datele disponibile.</p>
+        <h2>Tarife</h2><p>Start: 0 EUR, până la 50 de clienți. Business: 67 EUR/lună. ProBusiness: 270 EUR/lună, maximum cinci locații. Pilotul este gratuit; planurile plătite depind de activarea plăților.</p>
+        <h2>Cum începi?</h2><p>Creezi contul firmei, configurezi recompensa și afișezi codul QR. Integrarea cu echipamentele POS se validează separat.</p>
+        <p><a href="/register.html">Creează cont de firmă</a> · <a href="/login.html">Autentificare</a> · <a href="/demo">Testează demonstrația</a></p>""", "/pentru-firme")
 
     @app.get("/despre-loial")
     def about_loial():
