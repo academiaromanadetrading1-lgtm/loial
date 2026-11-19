@@ -24,4 +24,4 @@ jobs:
       - name: Run isolated synthetic acceptance
         env:
           LOIAL_QA_ADMIN_PASSWORD: ${{ secrets.LOIAL_QA_ADMIN_PASSWORD }}
-        run: python scripts/staging_founders_acceptance.py
+        run: python scripts/staging_discovery_acceptance.py
