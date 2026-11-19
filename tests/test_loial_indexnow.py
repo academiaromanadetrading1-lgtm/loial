@@ -6,7 +6,7 @@ from loial_indexnow import public_url, sitemap_urls, submission
 
 KEY="test-key-123456789"
 BASE="https://loial.space"
-@pytest.mark.parametrize("path",["/","/despre-loial","/en/","/solutii/cafenele","/local/timisoara/cafenele"])
+@pytest.mark.parametrize("path",["/","/despre-loial","/pentru-clienti","/pentru-firme","/en/","/solutii/cafenele","/local/timisoara/cafenele"])
 def test_public(path):
     assert public_url(BASE+path)
 @pytest.mark.parametrize("url",[BASE+"/api/customers",BASE+"/platform.html",BASE+"/wallet",BASE+"/join/secret",BASE+"/?token=private",BASE+"/#token",BASE+"/local/../secret","https://other.example/","http://loial.space/","https://loial.space.evil.example/"])
