@@ -438,7 +438,7 @@
     document.getElementById('dashMonthlyRate').textContent=data.monthly_rate+' EUR / firmă / lună';
     document.getElementById('dashRefCode').textContent=data.ref_code;
     document.getElementById('dashRefUrl').value=data.referral_url;
-    const paid=Number(data.active_businesses);
+    const paid=Number(ledger.direct_paid_businesses);
     const next=paid<26?26:paid<51?51:null;
     document.getElementById('ambGrowthAdvice').textContent=!Number.isFinite(paid)||paid<0?'Verifică datele actuale din panou.':paid===0?'Obiectiv: prima firmă cu abonament eligibil achitat. Începe cu o demonstrație gratuită.':next?'Ai '+paid+' firme plătitoare verificate în perioada curentă. Mai sunt '+(next-paid)+' până la pragul următor, dacă rămân eligibile.':'Ai atins pragul superior. Ajută firmele să folosească programul de fidelitate și să păstreze abonamentul, dacă le este util.';
     renderAmbPitch();
@@ -504,13 +504,13 @@
   };
     function copyRefUrl(){navigator.clipboard.writeText(document.getElementById('dashRefUrl').value);}
   function copyInvite(){navigator.clipboard.writeText(document.getElementById('dashRecruitUrl').value);}
-  function logoutAmb(){
+  function logoutAmb(redirectHome=true){
     ambassadorToken='';
     sessionStorage.removeItem('loial_ambassador_token');
     document.getElementById('dashboardPanel').classList.add('hidden');
     document.getElementById('enrollPanel').classList.remove('hidden');
     document.getElementById('loginPanel').classList.remove('hidden');
-    if(arguments[0]!==false)location.replace('/');
+    if(redirectHome)location.replace('/');
   }
 </script>
 <script src="/loial-i18n.js"></script>
