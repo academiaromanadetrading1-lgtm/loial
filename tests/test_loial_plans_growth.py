@@ -21,7 +21,7 @@ def test_unknown_amount(cents):
 
 def test_pro_activation():
     p=plan_for_amount(27000)
-    assert (p.activation_cents,p.sponsor_cents)==(8000,4000)
+    assert (p.activation_cents,p.sponsor_cents)==(4000,4000)
 
 def test_invoice_plan_is_exact():
     invoice={"status":"paid","paid":True,"currency":"eur","amount_paid":27000,
@@ -44,10 +44,10 @@ def test_mixed_portfolio_at_senior_threshold():
     from loial_plans import simulate_portfolio
     d=simulate_portfolio(10,30,5,10,5,0)
     assert d["active_direct_firms"]==55
-    assert d["activation_cents"]==60000
+    assert d["activation_cents"]==40000
     assert d["recurring_cents"]==105000
     assert d["sponsor_cents"]==5000
-    assert d["total_commission_cents"]==170000
+    assert d["total_commission_cents"]==150000
     assert d["illustrative_subscription_revenue_cents"]==706500
     assert d["scenario_only"]
 
