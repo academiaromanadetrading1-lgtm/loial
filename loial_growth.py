@@ -23,7 +23,29 @@ def sitemap_xml(paths):
 def page(title, body, path):
     title=escape(title)
     canonical=escape(ORIGIN+path,quote=True)
-    return HTMLResponse(f"""<!doctype html><html lang="ro"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} | LOIAL</title><link rel="stylesheet" href="/loial-premium.css"><link rel="canonical" href="{canonical}"><style>body{{font-family:system-ui,sans-serif;background:#f6f9f7;color:#17392a;max-width:760px;margin:40px auto;padding:20px;line-height:1.6}}a{{color:#246449}}input{{padding:10px;max-width:100%;box-sizing:border-box}}.card{{padding:25px;border-radius:18px;background:#153c2b;color:white}}button{{padding:10px;cursor:pointer}}</style><header><a class="loial-wordmark" href="/">loial.space<span class="loial-tagline">Spațiul tău loial</span></a></header><main><h1>{title}</h1>{body}</main><footer><a href="/gdpr/privacy">Confidențialitate</a></footer></html>""")
+    menu = [["/","Acasă"],["/#cum-functioneaza","Cum funcționează"],["/pentru-clienti","Clienți"],["/ambasadori","Ambasadori"],["/pentru-firme","Firme"],["/#preturi","Prețuri"],["/despre-loial","Resurse"]]
+    links = "".join('<a href="' + href + '"' + (' aria-current="page"' if href == path else '') + '>' + label + '</a>' for href,label in menu)
+    role = {"/pentru-clienti": "client", "/pentru-firme": "business", "/ambasadori": "ambassador"}.get(path)
+    css_class = "loial-public" + (" loial-public-role" if role else "")
+    if role:
+        body = role_landing(role, title, body)
+        heading = ""
+    else:
+        heading = "<h1>" + title + "</h1>"
+    return HTMLResponse(f"""<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} | LOIAL</title><link rel="stylesheet" href="/loial-premium.css"><link rel="canonical" href="{canonical}"></head><body class="{css_class}"><header class="loial-public-header"><div class="loial-public-nav"><a class="loial-wordmark" href="/">loial.space<span class="loial-tagline">Spațiul tău loial</span></a><nav aria-label="Navigare principală">{links}</nav><a class="loial-public-button outline" href="/login.html">Intră în cont</a></div></header><main class="loial-public-main">{heading}{body}</main><footer class="loial-public-footer"><a href="/gdpr/privacy">Confidențialitate</a> · <a href="/despre-loial">Despre LOIAL</a></footer></body></html>""")
+
+def role_landing(role, title, body):
+    config = {
+        "client": ("PROGRAM DE LOIALITATE PENTRU CLIENȚI", "Beneficii la fiecare vizită.", "Toate cardurile de fidelitate ale firmelor participante, pe telefonul tău.", "/wallet", "Deschide portofelul", "Card digital", "Ștampile", "Recompense"),
+        "business": ("FIDELIZARE ȘI MANAGEMENT", "Construiește relații cu clienții afacerii tale.", "Configurează recompense și urmărește activitatea. LOIAL AI și campaniile sunt disponibile în planurile eligibile.", "/register.html", "Creează cont de firmă", "Carduri QR", "Fidelizare", "Analiză"),
+        "ambassador": ("PROGRAM DE PARTENERIAT", "Construiește-ți un venit lunar recomandând LOIAL.", "Comisioane aferente abonamentelor eligibile achitate. Înscrierea singură nu generează venit.", "/ambasador.html#contAmbasador", "Devino ambasador", "Link personal", "Firme active", "Comisioane")
+    }
+    kicker, headline, desc, href, action, a, b, c = config[role]
+    hero = f"""<section class="loial-hero"><div><span class="loial-kicker">{kicker}</span><h1>{headline}</h1><p>{desc}</p><div class="loial-hero-actions"><a class="loial-public-button gold" href="{href}">{action}</a><a class="loial-public-button light" href="/demo">Vezi demonstrația</a></div></div><div class="loial-hero-art" aria-hidden="true"><div class="loial-device"><div class="loial-device-brand">L · LOIAL</div><div class="loial-device-card">loial.space<small>Spațiul tău loial</small></div><div class="loial-device-row"><span>✓</span>{a}</div><div class="loial-device-row"><span>✓</span>{b}</div><div class="loial-device-row"><span>✓</span>{c}</div></div><div class="loial-art-orbit"></div></div></section>"""
+    if role == "ambassador":
+        tiers = "".join(f'<article class="loial-tier"><small>{band} firme plătitoare active</small><h3>{name}</h3><strong>20 EUR + {rate} EUR/lună</strong><p>20 EUR la prima plată eligibilă; {rate} EUR la fiecare reînnoire eligibilă, per firmă Business.</p></article>' for band,name,rate in [("1–25","Ambasador LOIAL",5),("26–50","Ambasador Manager",10),("51+","Ambasador Senior",15)])
+        hero += '<section class="loial-tiers" aria-label="Niveluri Business">' + tiers + '</section>'
+    return hero + '<div class="loial-content-panel">' + body + '</div>' + f'<div class="loial-bottom-actions"><a class="loial-public-button" href="{href}">{action}</a><a class="loial-public-button outline" href="/demo">Vezi demonstrația</a></div>'
 
 def install_growth(app, industries):
     @app.get("/api/loial-plans")
