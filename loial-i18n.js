@@ -38,7 +38,15 @@ function accountMenu(){
  box.style.cssText='position:fixed;top:46px;right:12px;z-index:2147483000;font:14px system-ui;color:#245b43';
  const summary=document.createElement('summary');summary.style.cssText='cursor:pointer;background:white;border:1px solid #d0dfd5;border-radius:9px;padding:8px 12px;list-style:none;font-weight:600;box-shadow:0 2px 8px #0001';
  const panel=document.createElement('div');panel.style.cssText='position:absolute;right:0;top:100%;margin-top:6px;width:220px;max-width:calc(100vw - 24px);padding:6px;background:white;border:1px solid #d0dfd5;border-radius:10px;box-shadow:0 6px 24px #0002';
- box.append(summary,panel);document.body.append(box);
+ box.append(summary,panel);
+ const headerNav=document.querySelector('header .nav-container > nav');
+ if(headerNav){
+  const oldLogin=Array.from(headerNav.querySelectorAll('button')).find(b=>b.getAttribute('onclick')==="location.href='/login.html'");
+  box.style.cssText='position:relative;flex:0 0 auto;z-index:300;font:14px system-ui;color:#245b43';
+  if(oldLogin)oldLogin.replaceWith(box);else headerNav.append(box);
+  headerNav.style.flexWrap='wrap';
+  headerNav.style.justifyContent='flex-end';
+ }else document.body.append(box);
  function render(){
   const a=labels[locale]||labels.en;summary.textContent='◉ '+a[0];
   panel.replaceChildren();
