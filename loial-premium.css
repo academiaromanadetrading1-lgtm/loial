@@ -23,3 +23,5 @@ header .loial-wordmark{color:inherit}
 .loial-quick-grid .loial-quick{scroll-margin-top:90px}
 #loialCustomers,#openScanLink,#rewardInput,#loialAiEntry,#loialRolesSection,#cardsSection,#inboxSection,#merchantReferralSection,#friendsSection,#dashWelcome,#dashRefUrl,#dashAmounts,#ambWiseForm{scroll-margin-top:100px}
 @media(max-width:680px){.loial-wordmark{font-size:21px}.loial-tagline{font-size:10px}.loial-nav a{min-height:40px;display:flex;align-items:center;justify-content:center}}
+
+.loial-guide{margin:24px 0}.loial-guide-step{display:grid;grid-template-columns:96px minmax(0,1fr);gap:16px;align-items:center;background:white;border:1px solid var(--loial-line);border-radius:16px;padding:14px;margin:10px 0}.loial-guide-step svg{width:100%;height:auto}.loial-guide-step h3{font-size:17px;margin:0 0 4px}.loial-guide-step p{margin:0;font-size:14px;line-height:1.5}@media(max-width:480px){.loial-guide-step{grid-template-columns:72px minmax(0,1fr);gap:12px;padding:10px}}
