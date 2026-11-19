@@ -20,8 +20,8 @@ jobs:
       - name: Install QR decoder
         run: python -m pip install opencv-python-headless
       - name: Compile acceptance runner
-        run: python -m py_compile scripts/staging_acceptance.py scripts/staging_growth_acceptance.py
+        run: python -m py_compile scripts/staging_acceptance.py scripts/staging_growth_acceptance.py scripts/staging_founders_acceptance.py
       - name: Run isolated synthetic acceptance
         env:
           LOIAL_QA_ADMIN_PASSWORD: ${{ secrets.LOIAL_QA_ADMIN_PASSWORD }}
-        run: python scripts/staging_growth_acceptance.py
+        run: python scripts/staging_founders_acceptance.py
