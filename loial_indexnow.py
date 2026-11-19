@@ -32,7 +32,7 @@ def submission(key, urls):
     urls=sorted(set(urls))
     if not urls or len(urls)>10000 or not all(public_url(u) for u in urls):
         raise ValueError("Only canonical public LOIAL URLs are allowed")
-    return {"host":HOST,"key":key,"keyLocation":ORIGIN+"/indexnow/"+key+".txt","urlList":urls}
+    return {"host":HOST,"key":key,"keyLocation":ORIGIN+"/"+key+".txt","urlList":urls}
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
