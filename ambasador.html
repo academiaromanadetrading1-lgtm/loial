@@ -100,11 +100,12 @@
   .qr-box img { width: 170px; height: 170px; border-radius: 10px; background: #ffffff; padding: 8px; }
   .hidden { display: none; }
 </style>
+<link rel="stylesheet" href="/loial-premium.css">
 </head>
 <body>
 
 <header>
-  <a href="/" class="logo"><div class="logo-icon">L</div> LOIAL.SPACE</a>
+  <a class="loial-wordmark" href="/">loial.space<span class="loial-tagline">Spațiul tău loial</span></a>
   <a href="/" class="btn-back">← Înapoi la pagina principală</a>
 </header>
 
@@ -229,7 +230,7 @@
         </form>
       </div>
       <p id="ambStatus" role="status" style="font-size:13px;color:#b91c1c"></p>
-      <div id="dashboardPanel" class="hidden">
+      <div id="dashboardPanel" class="hidden"><nav class="loial-nav" aria-label="Navigare rapidă"><a href="#dashWelcome">Acasă</a><a href="#dashRefUrl">Recomandă</a><a href="#dashAmounts">Comisioane</a><a href="#ambWiseForm">Cont</a></nav>
         <span class="tier-tag" id="dashRankBadge">Rang: Ambasador</span>
         <h2 id="dashWelcome">Panou Ambasador</h2>
         <p style="font-size:13.5px;color:var(--muted);" id="dashEmailLabel"></p>
@@ -264,7 +265,7 @@
           <p style="font-size:12px;color:var(--muted);margin-top:6px;">Cod partener: <strong id="dashRefCode"></strong></p>
         </div>
 
-        <label>Link-ul tău unic de recomandare (trimite-l pe WhatsApp / Email):</label>
+        <h3>Recomandă o firmă</h3><p>Câștigă bani pentru fiecare firmă recomandată care achită un abonament eligibil. Distribuie linkul personal.</p><label>Linkul tău de recomandare:</label>
         <input type="text" id="dashRefUrl" readonly style="font-weight:700;color:var(--primary);">
         <button type="button" class="btn-primary" id="copyBtn" onclick="copyRefUrl()">📋 Copiază link-ul de Ambasador</button>
         <p style="margin-top:18px;font-size:13px;font-weight:700;">Invită alt ambasador și primești 10 EUR pentru fiecare firmă nouă plătitoare adusă direct de acesta.</p>
