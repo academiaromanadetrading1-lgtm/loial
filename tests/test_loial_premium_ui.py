@@ -44,5 +44,7 @@ def test_public_guides_and_branding_are_present():
     for route in ("/pentru-clienti", "/pentru-firme", "/ambasadori"):
         assert '@app.get("' + route + '")' in source
     assert "Spațiul tău loial" in source
-    assert 'href="/wallet">Deschide portofelul' not in source
+    assert 'href="/wallet">Deschide portofelul' in source
+    assert 'href="/wallet-recovery.html"' in source
+    assert '@router.get("/wallet"' in read("loial_pwa.py")
     assert 'loial-premium.css' in read("main.py")
