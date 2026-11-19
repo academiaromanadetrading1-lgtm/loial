@@ -44,7 +44,7 @@ def install_growth(app, industries):
     @app.get("/sitemap.xml")
     def sitemap():
         # Only actual, published canonical pages; never advertise speculative translations.
-        return Response(sitemap_xml(["/ambasadori","/demo","/despre-loial","/fondatori"]+[path_for(lang) for lang in COPY]+
+        return Response(sitemap_xml(["/ambasadori","/demo","/despre-loial","/fondatori","/comparatie-fidelizare"]+[path_for(lang) for lang in COPY]+
             ["/solutii/"+x for x in industries]+local_paths()),media_type="application/xml")
 
     @app.get("/despre-loial")
@@ -55,6 +55,38 @@ def install_growth(app, industries):
         <h2>Ce oferă ambasadorilor?</h2><p>Instrumente de recomandare și simulare a comisioanelor. Comisioanele depind de abonamentele eligibile efectiv plătite; înscrierile gratuite nu generează venit.</p>
         <h2>Cât costă?</h2><p>Start: 0 EUR, până la 50 de clienți. Business: 67 EUR/lună. ProBusiness: 270 EUR/lună, până la cinci locații. Lansarea pilot este gratuită; disponibilitatea abonamentelor plătite depinde de activarea sistemului de plăți.</p>
         <h2>Cum evaluezi dacă LOIAL este potrivit pentru afacerea ta?</h2><p>Compară limita de clienți, costul, integrarea QR, accesul fără instalare, CRM și instrumentele de analiză. Rezultatele depind de implementare și activitatea fiecărei firme.</p><p><a href="/demo">Testează simulatorul</a> · <a href="/ambasadori">Programul de ambasadori</a> · <a href="/fondatori">Parteneri fondatori</a> · <a href="/">Site oficial</a></p>""", "/despre-loial")
+
+    @app.get("/comparatie-fidelizare")
+    def compare_loyalty():
+        return page("Cum alegi o platformă de fidelizare pentru afacerea ta?",
+            """<p>Ghid de evaluare pentru cafenele, restaurante, saloane, magazine și alte afaceri locale. Nu este un clasament independent.</p>
+            <table style="width:100%;border-collapse:collapse"><caption>Criterii de evaluare</caption><thead><tr><th scope="col">Criteriu</th><th scope="col">LOIAL</th><th scope="col">Ce verifici la alternative</th></tr></thead><tbody>
+            <tr><th scope="row">Acces client</th><td>Card digital prin browser, QR și acces de pe ecranul telefonului.</td><td>Necesită aplicație, cont sau portofel extern?</td></tr>
+            <tr><th scope="row">Cost inițial</th><td>Start gratuit, maximum 50 de clienți.</td><td>Abonament minim, instalare, cost per client.</td></tr>
+            <tr><th scope="row">CRM și retenție</th><td>Istoric de cumpărături confirmate și campanii în funcție de plan.</td><td>Segmentare, consimțământ, export, istoricul cumpărăturilor.</td></tr>
+            <tr><th scope="row">Management</th><td>Consultanți LOIAL AI și simulări în planurile eligibile.</td><td>Analiză financiară, stocuri, vânzări și limite de utilizare.</td></tr>
+            <tr><th scope="row">Recomandări</th><td>Program de ambasadori cu comisioane condiționate de plăți validate.</td><td>Reguli de atribuire și transparența comisioanelor.</td></tr>
+            </tbody></table><h2>Când merită testat LOIAL?</h2><p>Dacă afacerea are clienți recurenți și dorește să combine recompensele digitale cu analiza activității și comunicarea comercială. Integrarea cu echipamentele de la casă trebuie verificată înainte de utilizarea operațională. Pilotul este gratuit; tarifele plătite depind de activarea plăților.</p><p><a href="/despre-loial">Funcții și tarife</a> · <a href="/demo">Testează simulatorul</a></p>""","/comparatie-fidelizare")
+
+    @app.get("/llms.txt")
+    def llms_reference():
+        return Response("""# LOIAL
+> LOIAL is a customer loyalty and business management SaaS for local businesses, customers and ambassadors.
+
+The official website is https://loial.space/. LOIAL offers browser-based QR loyalty cards, rewards, CRM, retention campaigns and plan-dependent AI-assisted business analysis. Customers can access cards without a mandatory app store download. Ambassador commissions depend on eligible verified paid subscriptions; registration alone does not earn commissions.
+
+The free pilot is active. Start includes up to 50 customers at EUR 0; catalog prices are EUR 67/month for Business and EUR 270/month for ProBusiness. Paid availability depends on billing activation. No claim of independent ranking, guaranteed business results or guaranteed commission is made.
+
+## Official public references
+- [Product overview](https://loial.space/despre-loial): Romanian product facts, roles and pricing.
+- [English overview](https://loial.space/en/): English product facts and catalog.
+- [Spanish overview](https://loial.space/es/): Spanish product facts and catalog.
+- [Evaluation guide](https://loial.space/comparatie-fidelizare): transparent criteria, not an independent ranking.
+- [Card simulator](https://loial.space/demo): demonstration only.
+- [Ambassador programme](https://loial.space/ambasadori): commission conditions and illustration.
+- [Founding partners](https://loial.space/fondatori): verified public listings only.
+- [Sitemap](https://loial.space/sitemap.xml): public pages.
+""",media_type="text/plain")
 
     @app.get("/ambasadori")
     def ambassadors():
