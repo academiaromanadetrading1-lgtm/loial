@@ -1,0 +1,17 @@
+/* LOIAL premium: restrained forest green, natural white, no ornamental gambling motifs. */
+:root{--loial-forest:#155743;--loial-deep:#103b2d;--loial-mint:#e2eee7;--loial-paper:#f5f7f5;--loial-line:#dce6df;--loial-ink:#14251d;--loial-gold:#a08a42}
+body{background:var(--loial-paper);color:var(--loial-ink)}
+.loial-wordmark{font-size:27px;font-weight:850;letter-spacing:-1.3px;color:var(--loial-forest);text-decoration:none}.loial-wordmark b{color:var(--loial-gold)}
+.loial-role-grid,.loial-quick-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0}
+.loial-role,.loial-quick{display:flex;flex-direction:column;gap:9px;padding:20px;border:1px solid var(--loial-line);background:#fff;border-radius:18px;color:var(--loial-ink);text-decoration:none;box-shadow:0 4px 14px #17392a09;min-width:0}
+.loial-role h2,.loial-role h3,.loial-quick strong{margin:0;color:inherit;font-size:19px}.loial-role p,.loial-quick small{margin:0;color:inherit;font-size:14px;line-height:1.55}
+.loial-role.featured{background:linear-gradient(130deg,#103b2d,#21694f);color:#fff;border-color:transparent}
+.loial-role .loial-cta{margin-top:auto;display:block;border-radius:11px;padding:12px;text-align:center;background:var(--loial-forest);color:#fff;text-decoration:none;font-weight:700}.loial-role.featured .loial-cta{background:white;color:var(--loial-forest)}
+.loial-symbol{font-size:25px;line-height:1.1;color:var(--loial-forest)}.featured .loial-symbol{color:#fff}
+.loial-quick{padding:15px;min-height:72px;justify-content:center}.loial-quick strong{font-size:15px}.loial-quick:hover,.loial-role:focus-within{border-color:#76a58e}
+.loial-quick:focus-visible,.loial-cta:focus-visible,.loial-nav a:focus-visible{outline:3px solid #488f70;outline-offset:3px}
+.loial-nav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px;padding:10px;background:#fff;border:1px solid var(--loial-line);border-radius:15px}.loial-nav a{flex:1;text-align:center;padding:10px;color:var(--loial-forest);font-weight:650;text-decoration:none;border-radius:9px;min-width:75px}.loial-nav a:hover{background:var(--loial-mint)}
+.loial-entry{max-width:1140px;margin:0 auto 30px;padding:0 24px}.loial-entry>h2{font-size:clamp(24px,3vw,34px);margin:0 0 7px}.loial-entry>p{color:#475d52}
+.loial-ai-callout{background:var(--loial-mint);padding:19px;border-radius:18px;margin:16px 0}.loial-ai-callout a{color:var(--loial-forest);font-weight:700}
+@media(max-width:680px){.loial-role-grid{grid-template-columns:1fr}.loial-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.loial-entry{padding:0 16px}.loial-role{padding:16px}.loial-nav{position:sticky;top:0;z-index:10;gap:3px}.loial-nav a{font-size:12px;padding:9px 4px;min-width:0}.loial-quick{padding:13px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
