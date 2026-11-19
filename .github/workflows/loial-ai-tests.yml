@@ -34,7 +34,7 @@ jobs:
         run: |
           node - <<'NODE'
           const fs = require('fs');
-          for(const file of ['join.html','loial-ai.html','loial-receipt.html','wallet-recovery.html','platform.html','scan.html','loial-wallet.html','ambasador.html','index.html','fondatori.html']){
+          for(const file of ['join.html','loial-ai.html','loial-receipt.html','wallet-recovery.html','platform.html','scan.html','loial-wallet.html','ambasador.html','index.html','fondatori.html','login.html']){
             const html=fs.readFileSync(file,'utf8');
             let n=0;
             for(const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)){
@@ -128,3 +128,5 @@ jobs:
 # Owner authorized one ten-minute regression retest after premium navigation test correction.
 
 # Owner approved one ten-minute founders, homepage and admin regression run on 2026-11-19.
+
+# Owner approved one ten-minute account menu and language regression run, 2026-11-19.
