@@ -3512,3 +3512,40 @@ def admin_pilot_metrics(credentials: HTTPAuthorizationCredentials = Depends(secu
     require_platform_admin(credentials,db)
     from loial_scans import StampAward
     return pilot_snapshot(db,BusinessAccount,Customer,StampAward)
+
+
+# Founding partners: limited permanent slots, public display only with consent.
+from loial_founders import FoundersBase, Founder, FounderApproval, approve, public_directory
+FoundersBase.metadata.create_all(bind=engine)
+
+@app.get("/fondatori")
+def founders_page():
+    return FileResponse("fondatori.html",headers={"Cache-Control":"no-cache"})
+
+@app.get("/api/loial-founders")
+def founders_directory(db: Session=Depends(get_db)):
+    return public_directory(db)
+
+@app.get("/api/loial-founders/logo/{slot}")
+def founders_logo(slot:int,db:Session=Depends(get_db)):
+    row=db.get(Founder,slot)
+    if not row or not row.visible or not row.logo:
+        raise HTTPException(404,"Logo indisponibil")
+    return Response(content=base64.b64decode(row.logo),media_type="image/png",headers={"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"})
+
+@app.put("/api/admin/founders/{business_id}")
+def founders_approve(business_id:int,req:FounderApproval,credentials:HTTPAuthorizationCredentials=Depends(security),db:Session=Depends(get_db)):
+    require_platform_admin(credentials,db)
+    business=db.get(BusinessAccount,business_id)
+    if not business:raise HTTPException(404,"Firma nu există")
+    return {"slot":approve(db,business,req),"status":"approved"}
+
+@app.delete("/api/admin/founders/{business_id}")
+def founders_hide(business_id:int,credentials:HTTPAuthorizationCredentials=Depends(security),db:Session=Depends(get_db)):
+    require_platform_admin(credentials,db)
+    row=db.query(Founder).filter_by(business_id=business_id).first()
+    if not row:raise HTTPException(404,"Firma nu este fondator")
+    row.visible=False
+    row.logo=None
+    db.commit()
+    return {"status":"hidden","slot":row.slot}
