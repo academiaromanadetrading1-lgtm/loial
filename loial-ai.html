@@ -91,9 +91,10 @@ header{padding:14px max(24px,calc((100% - 1392px)/2));flex-wrap:wrap}
 .wallet-message p{white-space:pre-wrap!important;overflow-wrap:anywhere}
 .management-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px}.management-grid button{font-size:12px;text-align:left;background:#f0f7f2;color:#194b35;border-color:#d0e5d7;min-height:44px}.management-grid button.active{background:#20573c;color:white}.management-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:14px 0}.management-metrics div{padding:12px;border-radius:12px;background:#eff6f0}.management-metrics strong{display:block;font-size:21px;color:#20573c;margin-top:6px}.management-track{height:20px;background:#e6eee8;border-radius:6px;overflow:hidden;margin:7px 0}.management-track span{display:block;height:100%;background:#2d805a;max-width:100%}
 </style>
+<link rel="stylesheet" href="/loial-premium.css">
 </head>
 <body>
-<header><a class="brand" href="/platform.html">◉ LOIAL • AI BUSINESS</a><a class="back" href="/platform.html">← Panou firmă</a></header>
+<header><a class="loial-wordmark" href="/">loial.space<span class="loial-tagline">Spațiul tău loial</span></a><a class="back" href="/platform.html">← Panou firmă</a></header>
 <main class="layout workspace">
 <nav class="workspace-nav" aria-label="Instrumente LOIAL"><button class="workspace-tab active" type="button" data-workspace="chat" aria-pressed="true"><span aria-hidden="true">◉</span><span>Conversație</span></button><button class="workspace-tab" type="button" data-workspace="documents" aria-pressed="false"><span aria-hidden="true">▤</span><span>Documente și facturi</span></button><button class="workspace-tab" type="button" data-workspace="sales" aria-pressed="false"><span aria-hidden="true">▧</span><span>Bonuri și vânzări</span></button><button class="workspace-tab" type="button" data-workspace="reports" aria-pressed="false"><span aria-hidden="true">▥</span><span>Rapoarte și indicatori</span></button><button class="workspace-tab" type="button" data-workspace="customers" aria-pressed="false"><span aria-hidden="true">◎</span><span>Clienți și exporturi</span></button><button class="workspace-tab" type="button" data-workspace="messages" aria-pressed="false"><span aria-hidden="true">✉</span><span>Campanii și mesaje</span></button></nav>
 <aside class="card loial-specialist" id="specialistGuide" aria-label="LOIAL AI">
@@ -113,7 +114,7 @@ header{padding:14px max(24px,calc((100% - 1392px)/2));flex-wrap:wrap}
 <label for="sector">Tip de activitate</label>
 <select id="sector"></select>
 <label for="currency">Moneda rapoartelor</label>
-<select id="currency"><option value="RON">RON</option><option value="EUR">EUR</option><option value="USD">USD</option><option value="GBP">GBP</option></select>
+<select id="currency"><option value="EUR">EUR</option><option value="RON">RON</option><option value="USD">USD</option><option value="GBP">GBP</option></select>
 <label for="details">Cum funcționează afacerea ta?</label>
 <textarea id="details" maxlength="1200" placeholder="Ex.: Lucrez cu Uber și Bolt, am o mașină electrică și țin evidența kilometrilor."></textarea>
 <button class="ghost" style="width:100%;margin:8px 0 5px" id="saveProfile">Salvează profilul</button>
