@@ -15,7 +15,7 @@ class Plan:
 PLANS = {
     "start": Plan("start", "Start", 0, 50, 1, 0, 0, (0, 0, 0)),
     "business": Plan("business", "Business", 6700, None, 1, 2000, 1000, (500, 1000, 1500)),
-    "probusiness": Plan("probusiness", "ProBusiness", 27000, None, 5, 8000, 4000, (2000, 4000, 6000)),
+    "probusiness": Plan("probusiness", "ProBusiness", 27000, None, 5, 4000, 4000, (2000, 4000, 6000)),
 }
 def plan_for_amount(cents):
     if type(cents) is not int:
