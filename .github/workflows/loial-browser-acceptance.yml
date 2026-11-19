@@ -21,4 +21,4 @@ jobs:
       - name: Run browser acceptance
         env:
           LOIAL_QA_ADMIN_PASSWORD: ${{ secrets.LOIAL_QA_ADMIN_PASSWORD }}
-        run: python scripts/staging_browser_acceptance.py
+        run: python scripts/staging_account_acceptance.py
