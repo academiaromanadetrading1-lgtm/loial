@@ -140,3 +140,5 @@ jobs:
 # Owner approved one IndexNow regression run, maximum ten minutes.
 
 # Owner approved one premium UI regression run, maximum ten minutes.
+
+# Owner-approved single ten-minute regression run for the final three commercial landing pages and unified menu.
