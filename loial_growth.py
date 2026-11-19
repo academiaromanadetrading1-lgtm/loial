@@ -1,4 +1,6 @@
 """Public acquisition routes. No customer data, external services or paid calls."""
+import os
+import re
 from html import escape
 from xml.etree.ElementTree import Element, SubElement, tostring
 from fastapi import HTTPException
@@ -36,6 +38,13 @@ def install_growth(app, industries):
             return simulate_portfolio(new_business,renewed_business,new_pro,renewed_pro,recruited_business,recruited_pro)
         except ValueError:
             raise HTTPException(422,"Portofoliu invalid")
+
+    @app.get("/indexnow/{filename}")
+    def indexnow_key(filename: str):
+        key=os.environ.get("LOIAL_INDEXNOW_KEY","")
+        if not re.fullmatch(r"[A-Za-z0-9-]{8,128}",key) or filename!=key+".txt":
+            raise HTTPException(404,"Not found")
+        return Response(key,media_type="text/plain",headers={"X-Robots-Tag":"noindex"})
 
     @app.get("/robots.txt")
     def robots():
