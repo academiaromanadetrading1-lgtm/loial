@@ -115,7 +115,7 @@
     <div class="plan-badge" id="planBadge">Plan Start: 0 / 50 clienți</div>
   </div>
 
-<section id="loialQuickActions" class="loial-quick-grid" aria-label="Funcțiile afacerii"><a class="loial-quick" href="#loialCustomers"><strong>Clienți</strong><small>Activitate și carduri</small></a><a class="loial-quick" href="#openScanLink"><strong>Scanează card</strong><small>Terminalul de la casă</small></a><a class="loial-quick" href="#rewardInput"><strong>Fidelizare</strong><small>Oferta și recompensele</small></a><a class="loial-quick" href="#loialAiEntry"><strong>Campanii</strong><small>Mesaje și retenție</small></a><a class="loial-quick" href="#loialAiEntry"><strong>Analiza afacerii</strong><small>Rapoarte LOIAL AI</small></a><a class="loial-quick" href="#loialRolesSection"><strong>Administrare</strong><small>Roluri și configurare</small></a></section>
+<section id="loialQuickActions" class="loial-quick-grid" aria-label="Funcțiile afacerii"><a class="loial-quick" href="#loialCustomers"><strong>Clienți</strong><small>Activitate și carduri</small></a><a class="loial-quick" href="#openScanLink"><strong>Scanează card</strong><small>Terminalul de la casă</small></a><a class="loial-quick" href="#rewardInput"><strong>Fidelizare</strong><small>Oferta și recompensele</small></a><a class="loial-quick" data-premium-url="/loial-ai.html#messages" role="link" aria-disabled="true" tabindex="0"><strong>Campanii</strong><small>Mesaje și retenție</small></a><a class="loial-quick" data-premium-url="/loial-ai.html#reports" role="link" aria-disabled="true" tabindex="0"><strong>Analiza afacerii</strong><small>Rapoarte LOIAL AI</small></a><a class="loial-quick" href="#loialRolesSection"><strong>Administrare</strong><small>Roluri și configurare</small></a></section>
   <div class="card" id="wiseBillingCard">
     <span class="step-tag">ABONAMENT LOIAL BUSINESS</span>
     <h2>67 EUR / lună, fără TVA adăugat</h2>
@@ -712,7 +712,7 @@
       advice.textContent='Ai '+n+' clienți. Verifică segmentele de cumpărături și pregătește o ofertă relevantă pentru clienții care au permis mesaje.';
       action.textContent='Deschide CRM';action.onclick=()=>location.assign('/loial-ai.html#customers');
     }
-    for(const link of document.querySelectorAll('#loialAiEntry [data-premium-url]')) {
+    for(const link of document.querySelectorAll('#loialAiEntry [data-premium-url], #loialQuickActions [data-premium-url]')) {
       const url=link.dataset.premiumUrl;
       const parsed=new URL(url,location.origin);
       const feature=parsed.searchParams.get('specialist')||parsed.hash.slice(1);
