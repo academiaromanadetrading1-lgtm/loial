@@ -96,16 +96,17 @@
     }
   }
 </style>
+<link rel="stylesheet" href="/loial-premium.css">
 </head>
 <body>
 
 <header>
-  <div class="logo"><div class="logo-icon">L</div> LOIAL • ADMINISTRATOR</div>
+  <a class="loial-wordmark" href="/">loial.space<span class="loial-tagline">Spațiul tău loial</span></a>
   <button class="btn-logout" onclick="logout()">Ieșire din cont</button>
 </header>
 
 <div class="container">
-  <div id="businessOwnerSection">
+  <div id="businessOwnerSection"><nav class="loial-nav" aria-label="Navigare rapidă"><a href="#bizTitle">Acasă</a><a href="#loialQuickActions">Funcții</a><a href="#loialAiEntry">LOIAL AI</a><a href="#loialRolesSection">Cont</a></nav>
   <div class="welcome-bar">
     <div>
       <h1 id="bizTitle">Panou Afacere</h1>
@@ -114,6 +115,7 @@
     <div class="plan-badge" id="planBadge">Plan Start: 0 / 50 clienți</div>
   </div>
 
+<section id="loialQuickActions" class="loial-quick-grid" aria-label="Funcțiile afacerii"><a class="loial-quick" href="#loialCustomers"><strong>Clienți</strong><small>Activitate și carduri</small></a><a class="loial-quick" href="#openScanLink"><strong>Scanează card</strong><small>Terminalul de la casă</small></a><a class="loial-quick" href="#rewardInput"><strong>Fidelizare</strong><small>Oferta și recompensele</small></a><a class="loial-quick" href="#loialAiEntry"><strong>Campanii</strong><small>Mesaje și retenție</small></a><a class="loial-quick" href="#loialAiEntry"><strong>Analiza afacerii</strong><small>Rapoarte LOIAL AI</small></a><a class="loial-quick" href="#loialRolesSection"><strong>Administrare</strong><small>Roluri și configurare</small></a></section>
   <div class="card" id="wiseBillingCard">
     <span class="step-tag">ABONAMENT LOIAL BUSINESS</span>
     <h2>67 EUR / lună, fără TVA adăugat</h2>
@@ -354,7 +356,7 @@
   </div>
 
   <div class="card">
-    <h2>Clienții tăi fideli (Activitate recentă)</h2>
+    <h2 id="loialCustomers">Clienții tăi fideli (Activitate recentă)</h2>
     <table>
       <thead>
         <tr><th>Nume Client</th><th>Ștampile adunate</th><th>Ultima vizită</th></tr>
