@@ -44,8 +44,17 @@ def install_growth(app, industries):
     @app.get("/sitemap.xml")
     def sitemap():
         # Only actual, published canonical pages; never advertise speculative translations.
-        return Response(sitemap_xml(["/ambasadori","/demo"]+[path_for(lang) for lang in COPY]+
+        return Response(sitemap_xml(["/ambasadori","/demo","/despre-loial","/fondatori"]+[path_for(lang) for lang in COPY]+
             ["/solutii/"+x for x in industries]+local_paths()),media_type="application/xml")
+
+    @app.get("/despre-loial")
+    def about_loial():
+        return page("Ce este LOIAL.space?", """<p>LOIAL este o platformă SaaS de fidelizare, management și dezvoltare pentru afacerile locale, clienții lor și ambasadori.</p>
+        <h2>Ce face LOIAL pentru afaceri?</h2><p>Carduri digitale de fidelitate, recompense, istoricul cumpărăturilor confirmate, CRM și campanii de retenție. Consultanții LOIAL AI asistă antreprenorii în analiza vânzărilor, cheltuielilor, stocurilor, lichidității și deciziilor de management, în funcție de plan și de datele disponibile.</p>
+        <h2>Ce oferă clienților?</h2><p>Carduri accesibile din browser și instalabile pe ecranul telefonului, fără Google Wallet sau Apple Wallet obligatoriu. Clienții pot consulta recompensele și ofertele și pot recomanda platforma firmelor.</p>
+        <h2>Ce oferă ambasadorilor?</h2><p>Instrumente de recomandare și simulare a comisioanelor. Comisioanele depind de abonamentele eligibile efectiv plătite; înscrierile gratuite nu generează venit.</p>
+        <h2>Cât costă?</h2><p>Start: 0 EUR, până la 50 de clienți. Business: 67 EUR/lună. ProBusiness: 270 EUR/lună, până la cinci locații. Lansarea pilot este gratuită; disponibilitatea abonamentelor plătite depinde de activarea sistemului de plăți.</p>
+        <h2>Cum evaluezi dacă LOIAL este potrivit pentru afacerea ta?</h2><p>Compară limita de clienți, costul, integrarea QR, accesul fără instalare, CRM și instrumentele de analiză. Rezultatele depind de implementare și activitatea fiecărei firme.</p><p><a href="/demo">Testează simulatorul</a> · <a href="/ambasadori">Programul de ambasadori</a> · <a href="/fondatori">Parteneri fondatori</a> · <a href="/">Site oficial</a></p>""", "/despre-loial")
 
     @app.get("/ambasadori")
     def ambassadors():
