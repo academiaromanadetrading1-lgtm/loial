@@ -93,3 +93,71 @@ def test_home_and_ambassador_entry_menu_matches_public_navigation():
     assert 'id="cum-functioneaza"' in read("index.html")
     assert 'id="preturi"' in read("index.html")
     assert 'id="contAmbasador"' in read("ambasador.html")
+
+
+def test_ambassador_slider_executes_real_script_and_matches_server_policy():
+    import json
+    import shutil
+    import subprocess
+    import pytest
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from loial_growth import install_growth
+    from loial_plans import simulate_portfolio
+
+    node = shutil.which("node")
+    assert node, "Node.js is required for the commission slider regression"
+    app = FastAPI()
+    install_growth(app, {})
+    with TestClient(app) as client:
+        source = client.get("/ambasadori").text
+    tags = Markup(source).tags
+    ranges = [attrs for tag, attrs in tags if tag == "input" and attrs.get("type") == "range"]
+    assert len(ranges) == 1
+    assert ranges[0]["id"] == "portfolioRange"
+    assert (ranges[0]["min"], ranges[0]["max"], ranges[0]["step"], ranges[0]["value"]) == ("0", "100", "1", "20")
+    assert not any(tag == "input" and attrs.get("type") == "number" for tag, attrs in tags)
+    assert not any(tag == "button" and attrs.get("type") == "submit" for tag, attrs in tags)
+    scripts = [x for x in re.findall(r"<script>(.*?)</script>", source, flags=re.S)
+               if "portfolioRange" in x]
+    assert len(scripts) == 1
+    cases = []
+    for plan in ("business", "probusiness"):
+        for n in (0, 1, 20, 25, 26, 50, 51, 100):
+            pro = plan == "probusiness"
+            first = simulate_portfolio(new_pro=n) if pro else simulate_portfolio(new_business=n)
+            renewal = simulate_portfolio(renewed_pro=n) if pro else simulate_portfolio(renewed_business=n)
+            cases.append({"plan": plan, "n": n,
+                          "activation": first["activation_cents"] // 100,
+                          "renewal": renewal["recurring_cents"] // 100})
+    harness = r"""
+const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
+const payload=JSON.parse(fs.readFileSync(0,'utf8')),nodes={},events={};
+for(const id of ['portfolioCount','portfolioRank','portfolioActivation','portfolioRenewal']) nodes[id]={textContent:''};
+nodes.portfolioRange={value:'20',style:{setProperty(){}}};
+nodes.portfolioForm={elements:{simPlan:{value:'business'}},
+                    addEventListener(name, fn){events[name]=fn;}};
+vm.runInNewContext(payload.script,{document:{getElementById:id=>nodes[id]},Intl});
+const numeric=id=>Number(nodes[id].textContent.replace(/[^\d]/g,''));
+assert.equal(numeric('portfolioActivation'),400);
+assert.equal(numeric('portfolioRenewal'),100);
+assert.equal(typeof events.input,'function');
+assert.equal(typeof events.change,'function');
+for(const c of payload.cases){
+  nodes.portfolioForm.elements.simPlan.value=c.plan;
+  nodes.portfolioRange.value=String(c.n);
+  events.input();
+  assert.equal(numeric('portfolioCount'),c.n);
+  assert.equal(numeric('portfolioActivation'),c.activation);
+  assert.equal(numeric('portfolioRenewal'),c.renewal);
+  if(c.n===0)assert.match(nodes.portfolioRank.textContent,/Nicio/);
+  else assert.match(nodes.portfolioRank.textContent,c.n>=51?/Senior/:c.n>=26?/Manager/:/LOIAL/);
+}
+nodes.portfolioForm.elements.simPlan.value='business';
+events.change();
+assert.equal(numeric('portfolioActivation'),2000);
+assert.equal(numeric('portfolioRenewal'),1500);
+"""
+    result = subprocess.run([node, "-e", harness], input=json.dumps({"script": scripts[0], "cases": cases}),
+                            text=True, capture_output=True, timeout=15)
+    assert result.returncode == 0, result.stderr
