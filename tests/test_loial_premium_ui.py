@@ -48,3 +48,48 @@ def test_public_guides_and_branding_are_present():
     assert 'href="/wallet-recovery.html"' in source
     assert '@router.get("/wallet"' in read("loial_pwa.py")
     assert 'loial-premium.css' in read("main.py")
+
+
+def test_public_role_pages_render_with_consistent_menu_and_correct_account_links():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from loial_growth import install_growth
+
+    app = FastAPI()
+    install_growth(app, {})
+    expected = ["/", "/#cum-functioneaza", "/pentru-clienti", "/ambasadori",
+                "/pentru-firme", "/#preturi", "/despre-loial"]
+    with TestClient(app) as client:
+        for path, account, action in (
+            ("/pentru-clienti", "/wallet", "/wallet"),
+            ("/pentru-firme", "/login.html", "/register.html"),
+            ("/ambasadori", "/ambasador.html#contAmbasador", "/ambasador.html#contAmbasador"),
+        ):
+            response = client.get(path)
+            assert response.status_code == 200
+            source = response.text
+            header = source.split("</header>", 1)[0]
+            menu = header.split('<nav aria-label="Navigare principală">', 1)[1].split("</nav>", 1)[0]
+            links = [a["href"] for tag, a in Markup(menu).tags if tag == "a"]
+            assert links == expected
+            assert 'href="' + account + '"' in header
+            assert 'href="' + action + '"' in source
+            assert source.count("<h1>") == 1
+            assert 'class="loial-hero"' in source
+            assert 'class="loial-tiers"' in source
+            assert 'https://loial.space' + path in source
+            assert not re.search(r'[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}', source)
+            if path == "/ambasadori":
+                assert 'id="portfolioForm"' in source
+                assert 'id="portfolioResult"' in source
+
+def test_home_and_ambassador_entry_menu_matches_public_navigation():
+    expected = ["/", "/#cum-functioneaza", "/pentru-clienti", "/ambasadori",
+                "/pentru-firme", "/#preturi", "/despre-loial"]
+    for name in ("index.html", "ambasador.html"):
+        source = read(name)
+        menu = source.split('class="loial-global-links"', 1)[1].split("</div>" if name == "index.html" else "</nav>", 1)[0]
+        assert [a["href"] for tag, a in Markup("<div" + menu).tags if tag == "a"] == expected
+    assert 'id="cum-functioneaza"' in read("index.html")
+    assert 'id="preturi"' in read("index.html")
+    assert 'id="contAmbasador"' in read("ambasador.html")
