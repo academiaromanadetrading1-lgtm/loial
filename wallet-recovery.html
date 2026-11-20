@@ -41,7 +41,7 @@ async function preview(){
     const data=await res.json();
     if(!res.ok)throw Error(data.detail||'Cod invalid sau expirat');
     previewData=data;
-    $('shop').textContent='Cardul tău de la '+data.business;
+    $('shop').textContent=(window.LoialLang?.format("Cardul tău de la {business}",{business:data.business}) ?? ('Cardul tău de la '+data.business));
     $('claim').disabled=false;status((window.LoialLang?.t("Cod verificat. Poți recupera cardul pe acest dispozitiv.") ?? "Cod verificat. Poți recupera cardul pe acest dispozitiv."));
   }catch(e){status(e.message,true);}
 }
@@ -83,7 +83,7 @@ $('claim').onclick=async()=>{
     localStorage.setItem('loial_universal_profile',JSON.stringify({
       uuid:result.wallet_uuid,name:result.name,email:''}));
     localStorage.removeItem('loial_recovery_pending');
-    status('Card recuperat: '+result.stamps+' ștampile. Poți deschide portofelul Loial.');
+    status((window.LoialLang?.format("Card recuperat. Ștampile: {count}. Poți deschide portofelul Loial.",{count:result.stamps}) ?? ('Card recuperat: '+result.stamps+' ștampile. Poți deschide portofelul Loial.')));
     const link=$('openCard');
     link.href='/join/'+Number(result.business_id);
     link.hidden=false;
