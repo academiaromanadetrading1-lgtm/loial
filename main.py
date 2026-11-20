@@ -1768,18 +1768,9 @@ def health(db: Session = Depends(get_db)):
     count = db.query(func.count(Customer.id)).scalar()
     return {"status": "healthy", "db": "sqlite", "customers": count, "timestamp": datetime.now().isoformat()}
 
-@app.get("/setup-admin")
-def setup_admin(email: str = "ciprianpop@academiadetrading.llc", db: Session = Depends(get_db)):
+@app.get("/setup-admin", include_in_schema=False)
+def setup_admin():
     raise HTTPException(status_code=410, detail="Activarea administratorului prin URL public este dezactivata.")
-    user = db.query(User).filter(User.email == email).first()
-    if not user:
-        user = User(email=email, password=pwd_context.hash("Admin123!"), name="Ciprian Pop", plan="network", role="admin")
-        db.add(user)
-    else:
-        user.role = "admin"
-        user.plan = "network"
-    db.commit()
-    return {"status": "admin", "email": email, "role": "admin"}
 
 # ==========================================
 # LOIAL GROWTH, QR, REVIEW GATE & SEO ROUTES
