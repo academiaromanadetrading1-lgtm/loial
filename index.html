@@ -256,11 +256,11 @@
 
     <div class="wallet-card" id="walletCard">
       <div class="card-header">
-        <span id="previewName">Numele Afacerii Tale</span>
+        <span id="previewName" data-no-translate>Numele Afacerii Tale</span>
         <span class="card-badge-count" id="stampCount">5/6</span>
       </div>
       <div class="stamps-grid" id="stampsGrid"></div>
-      <p id="previewReward" style="font-size:13px;opacity:0.95;position:relative;z-index:1;">La 6 vizite primești un premiu din partea noastră!</p>
+      <p id="previewReward" data-no-translate style="font-size:13px;opacity:0.95;position:relative;z-index:1;">La 6 vizite primești un premiu din partea noastră!</p>
       <div class="card-qr">
         <svg viewBox="0 0 100 100" width="48" height="48">
           <path d="M10,10 h30 v30 h-30 z M16,16 v18 h18 v-18 z M22,22 h6 v6 h-6 z M60,10 h30 v30 h-30 z M66,16 v18 h18 v-18 z M72,22 h6 v6 h-6 z M10,60 h30 v30 h-30 z M16,66 v18 h18 v-18 z M22,72 h6 v6 h-6 z M48,15 h6 v20 h-6 z M45,45 h15 v10 h-15 z M65,50 h25 v6 h-25 z M52,65 h10 v25 h-10 z M72,70 h18 v20 h-18 z" fill="#111f18"/>
@@ -496,8 +496,20 @@ fetch('/api/loial-founders',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();
     }
   }
 
-  document.getElementById('bizName').oninput = e => { document.getElementById('previewName').textContent = e.target.value || 'Nume Afacere'; };
-  document.getElementById('rewardText').oninput = e => { document.getElementById('previewReward').textContent = e.target.value || 'Recompensa ta'; };
+  // Translate demo defaults only, never names or rewards entered by the visitor.
+  const demoFields=[
+    {input:document.getElementById('bizName'),preview:document.getElementById('previewName'),key:'Numele afacerii tale',edited:false},
+    {input:document.getElementById('rewardText'),preview:document.getElementById('previewReward'),key:'La 6 vizite primești un premiu din partea noastră!',edited:false}
+  ];
+  function localizeDemo(){
+    for(const field of demoFields){
+      if(!field.edited)field.input.value=window.LoialLang?.t(field.key)??field.key;
+      field.preview.textContent=field.input.value;
+    }
+  }
+  for(const field of demoFields)field.input.addEventListener('input',()=>{field.edited=true;field.preview.textContent=field.input.value;});
+  document.addEventListener('loial:ready',localizeDemo);
+  document.addEventListener('loial:language',localizeDemo);
   document.querySelectorAll('.color-btn').forEach(btn => {
     btn.onclick = () => {
       document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
