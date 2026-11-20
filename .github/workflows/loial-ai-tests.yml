@@ -148,3 +148,5 @@ jobs:
 # Owner-approved single ten-minute regression run for final ProBusiness commission and ambassador CTA corrections.
 
 # Owner-approved single ten-minute regression rerun after correcting the full application integration expectation.
+
+# Owner-approved single ten-minute validation of security, multilingual runtime and PWA regressions.
