@@ -28,7 +28,7 @@
   <a href="/" class="logo">● LOIAL.SPACE</a>
   <h1>Creează-ți contul gratuit</h1>
   <p class="sub">Cardul tău digital este pregătit. Completează datele pentru activare:</p>
-  <div class="ref-pill" id="refBadge">🤝 Recomandat prin cod partener: <span id="refCodeLabel"></span></div>
+  <div class="ref-pill" id="refBadge"><span>🤝 Recomandat prin cod partener:</span> <span id="refCodeLabel" data-no-translate></span></div>
   <form id="regForm">
     <label>Email afacere</label>
     <input type="email" id="email" placeholder="contact@afacereata.ro" required>
@@ -57,7 +57,16 @@ if (savedRef) {
 }
 
 document.getElementById('bizName').value = localStorage.getItem('draft_biz') || '';
-document.getElementById('reward').value = localStorage.getItem('draft_reward') || 'La 6 vizite primești un premiu din partea noastră!';
+const rewardInput=document.getElementById('reward');
+const draftedReward=localStorage.getItem('draft_reward');
+let rewardEdited=Boolean(draftedReward);
+rewardInput.value=draftedReward||'La 6 vizite primești un premiu din partea noastră!';
+rewardInput.addEventListener('input',()=>{rewardEdited=true;});
+function localizeRewardDefault(){
+  if(!rewardEdited)rewardInput.value=window.LoialLang?.t('La 6 vizite primești un premiu din partea noastră!')||'La 6 vizite primești un premiu din partea noastră!';
+}
+document.addEventListener('loial:ready',localizeRewardDefault);
+document.addEventListener('loial:language',localizeRewardDefault);
 const color = localStorage.getItem('draft_color') || '#2d6a4f';
 document.getElementById('color').value = color;
 document.getElementById('colorPreview').style.background = color;
