@@ -265,8 +265,7 @@ button.black{background:#111318;color:#ddc48b}
     if(!token)return;
     try{
       const data=await json('/api/loial-friends/me');
-      $('friendStats').textContent='Recomandări validate: '+data.qualified+
-        ' · În așteptare: '+data.pending+' · Puncte pilot: '+data.points;
+      $('friendStats').textContent=(window.LoialLang?.format('Recomandări validate: {qualified} · În așteptare: {pending} · Puncte pilot: {points}',{qualified:data.qualified,pending:data.pending,points:data.points}) ?? ('Recomandări validate: '+data.qualified+' · În așteptare: '+data.pending+' · Puncte pilot: '+data.points));
       $('referralLink').value=data.share_url;
       $('shareFriends').classList.remove('hidden');
       if(data.my_invitation_status==='pending'){
