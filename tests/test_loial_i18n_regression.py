@@ -116,3 +116,36 @@ assert.ok(wallet.includes('<span>Accept regulile programului prezentate'));
     result = subprocess.run(["node", "-e", script], cwd=ROOT,
                             capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stderr
+
+
+def test_ambassador_simulator_language_and_amounts():
+    script = r"""
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const html=fs.readFileSync('ambasador.html','utf8');
+const localization=fs.readFileSync('loial-i18n.js','utf8');
+const rows=Function('return '+localization.slice(localization.indexOf('(function(){'),localization.indexOf('const dictionary='))+'return rows;})();')();
+const dictionary=new Map(rows.map(x=>[x[0],x]));
+const langs=['ro','en','de','fr','it','es','nl','pl','hu'];
+const script=html.slice(html.indexOf('  function updateCalc()'),html.indexOf('  // The dashboard only displays authenticated'));
+assert.ok(script.startsWith('  function updateCalc()'));
+for(const n of [1,20,26,50,51,80])for(const lang of langs){
+  const rate=n>=51?15:n>=26?10:5;
+  const elements={bizSlider:{value:String(n)}};
+  for(const id of ['calcCountLabel','calcRankLabel','calcMonth1','calcRecurring'])elements[id]={textContent:''};
+  const t=k=>dictionary.get(k)?.[langs.indexOf(lang)]||k;
+  const window={LoialLang:{t,format:(k,v)=>t(k).replace(/\{(\w+)\}/g,(_,name)=>String(v[name])),bindText:(el,k,v)=>{el.textContent=t(k).replace(/\{(\w+)\}/g,(_,name)=>String(v[name]));}}};
+  const events={};
+  const document={getElementById:id=>elements[id],addEventListener:(type,cb)=>events[type]=cb};
+  new Function('document','window',script)(document,window);
+  assert.ok(elements.calcCountLabel.textContent.includes(String(n)));
+  assert.ok(elements.calcRecurring.textContent.includes(String(n*rate)));
+  assert.equal(elements.calcMonth1.textContent,String(n*20)+' EUR');
+  assert.ok(elements.calcRankLabel.textContent.length>10);
+  assert.equal(typeof events['loial:language'],'function');
+  events['loial:language']();
+  assert.ok(elements.calcRecurring.textContent.includes(String(n*rate)));
+}
+"""
+    result = subprocess.run(["node", "-e", script], cwd=ROOT,
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
