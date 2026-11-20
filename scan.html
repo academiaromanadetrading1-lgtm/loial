@@ -155,8 +155,8 @@
     try{
       const response=await fetch('/api/loial-receipts/confirm-payment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({business_id:Number(bizId),pin:staffPin,approval_token:approvalToken})});
       const x=await response.json();if(!response.ok)throw Error(x.detail||(window.LoialLang?.t("Confirmare refuzată") ?? "Confirmare refuzată"));
-      playBeep();box.textContent='✓ Plată confirmată · '+x.stamps+'/'+x.target+' ștampile';
-    }catch(e){box.textContent='Confirmare nereușită: '+e.message;}
+      playBeep();box.textContent=(window.LoialLang?.format("✓ Plată confirmată · Ștampile: {count}/{target}",{count:x.stamps,target:x.target}) ?? ('✓ Plată confirmată · '+x.stamps+'/'+x.target+' ștampile'));
+    }catch(e){box.textContent=(window.LoialLang?.format("Confirmare nereușită: {error}",{error:e.message}) ?? ('Confirmare nereușită: '+e.message));}
   }
   function playBeep() {
     try {
