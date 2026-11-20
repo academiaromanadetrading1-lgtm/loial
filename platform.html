@@ -491,7 +491,7 @@
     const portal=document.getElementById('stripePortalButton');
     try{
       const response=await authorizedFetch('/api/loial-stripe/me');
-      if(!response.ok)throw Error('Autentifică-te în contul firmei.');
+      if(!response.ok)throw Error((window.LoialLang?.t("Autentifică-te în contul firmei.") ?? "Autentifică-te în contul firmei."));
       const data=await response.json();
       const active=!!data.subscription.active;
       button.style.display=active?'none':'inline-block';
@@ -695,19 +695,19 @@
     action.hidden=false;
     if (!Number.isFinite(n)||n<0) {
       advice.textContent='Configurează oferta și verifică primele carduri de fidelitate.';
-      action.textContent='Configurează oferta';action.onclick=()=>go('rewardInput');
+      action.textContent=(window.LoialLang?.t("Configurează oferta") ?? "Configurează oferta");action.onclick=()=>go('rewardInput');
     } else if(n===0) {
       advice.textContent='Primul pas: stabilește recompensa, afișează codul QR la casă și invită primul client.';
-      action.textContent='Pregătește cardul';action.onclick=()=>go('printablePoster');
+      action.textContent=(window.LoialLang?.t("Pregătește cardul") ?? "Pregătește cardul");action.onclick=()=>go('printablePoster');
     } else if(!premium && Number.isFinite(max)&&max>0&&n>=max) {
       advice.textContent='Ai '+n+' clienți. Ai atins limita START. Business permite extinderea bazei de clienți și campanii cu acordul lor.';
-      action.textContent='Descoperă Business';action.onclick=()=>go('wiseBillingCard');
+      action.textContent=(window.LoialLang?.t("Descoperă Business") ?? "Descoperă Business");action.onclick=()=>go('wiseBillingCard');
     } else if(!premium && Number.isFinite(max)&&max>0&&n>=0.8*max) {
       advice.textContent='Ai '+n+' din '+max+' clienți disponibili în START. Pregătește extinderea programului de fidelizare.';
       action.textContent='Vezi beneficiile Business';action.onclick=()=>go('wiseBillingCard');
     } else if(!premium) {
       advice.textContent='Ai '+n+' clienți în LOIAL. Folosește cardurile și ștampilele gratuite; Business adaugă analiza cumpărăturilor și campanii personalizate.';
-      action.textContent='Vezi funcțiile Business';action.onclick=()=>go('loialAiEntry');
+      action.textContent=(window.LoialLang?.t("Vezi funcțiile Business") ?? "Vezi funcțiile Business");action.onclick=()=>go('loialAiEntry');
     } else {
       advice.textContent='Ai '+n+' clienți. Verifică segmentele de cumpărături și pregătește o ofertă relevantă pentru clienții care au permis mesaje.';
       action.textContent='Deschide CRM';action.onclick=()=>location.assign('/loial-ai.html#customers');
@@ -721,7 +721,7 @@
         link.href=url;link.removeAttribute('aria-disabled');badge.hidden=true;link.onclick=null;link.onkeydown=null;
       }else{
         link.removeAttribute('href');link.setAttribute('aria-disabled','true');badge.hidden=false;
-        const explain=(event)=>{event.preventDefault();benefit.textContent=(growthBenefits[feature]||'Funcție disponibilă în Business.')+' Disponibil după activarea planului Business.';action.textContent='Vezi abonamentul';action.onclick=()=>go('wiseBillingCard');go('loialGrowthGuide');};
+        const explain=(event)=>{event.preventDefault();benefit.textContent=(growthBenefits[feature]||'Funcție disponibilă în Business.')+' Disponibil după activarea planului Business.';action.textContent=(window.LoialLang?.t("Vezi abonamentul") ?? "Vezi abonamentul");action.onclick=()=>go('wiseBillingCard');go('loialGrowthGuide');};
         link.onclick=explain;link.onkeydown=(event)=>{if(event.key==='Enter'||event.key===' ')explain(event);};
       }
     }
@@ -797,7 +797,7 @@
       :'PIN principal: ••••';
   }
   async function rotatePrimaryPin() {
-    if(!confirm('Schimbi PIN-ul principal? Codul vechi nu va mai putea acorda ștampile.'))return;
+    if(!confirm((window.LoialLang?.t("Schimbi PIN-ul principal? Codul vechi nu va mai putea acorda ștampile.") ?? "Schimbi PIN-ul principal? Codul vechi nu va mai putea acorda ștampile.")))return;
     try{
       const response=await authorizedFetch('/api/my-business/rotate-pin',{method:'POST'});
       const data=await response.json();
@@ -879,7 +879,7 @@
       status.textContent='Selectează clientul și descrie verificarea făcută în persoană.';
       return;
     }
-    if(!confirm('Confirmi că ai verificat personal titularul cardului înainte de transfer?'))return;
+    if(!confirm((window.LoialLang?.t("Confirmi că ai verificat personal titularul cardului înainte de transfer?") ?? "Confirmi că ai verificat personal titularul cardului înainte de transfer?")))return;
     try{
       const res=await authorizedFetch('/api/loial-wallet-recovery/request',{
         method:'POST',headers:{'Content-Type':'application/json'},
@@ -890,7 +890,7 @@
       document.getElementById('recoveryLink').value=data.recovery_url;
       document.getElementById('recoveryLink').style.display='block';
       document.getElementById('copyRecoveryLink').style.display='block';
-      status.textContent='Link unic valabil 15 minute. Arată-l doar titularului verificat.';
+      status.textContent=(window.LoialLang?.t("Link unic valabil 15 minute. Arată-l doar titularului verificat.") ?? "Link unic valabil 15 minute. Arată-l doar titularului verificat.");
     }catch(err){status.textContent=err.message;}
   }
 
@@ -909,7 +909,7 @@
     navigator.clipboard.writeText(url).then(() => {
       const btn = document.getElementById('copyLinkBtn');
       btn.textContent = '✓ Link copiat!';
-      setTimeout(() => { btn.textContent = '📋 Copiază link card'; }, 2000);
+      setTimeout(() => { btn.textContent = (window.LoialLang?.t("📋 Copiază link card") ?? "📋 Copiază link card"); }, 2000);
     });
   }
 
@@ -921,7 +921,7 @@
     const name = nameInput.value.trim();
     const pin = pinInput.value.trim();
     if (!name || pin.length !== 4) {
-      errEl.textContent = 'Introdu numele angajatului și un PIN din 4 cifre.';
+      errEl.textContent = (window.LoialLang?.t("Introdu numele angajatului și un PIN din 4 cifre.") ?? "Introdu numele angajatului și un PIN din 4 cifre.");
       return;
     }
     const res = await authorizedFetch(`/api/biz-full/${bizId}/staff`, {
@@ -947,7 +947,7 @@
 
   async function saveOfferSettings() {
     const btn = document.getElementById('saveOfferBtn');
-    btn.textContent = 'Se salvează...';
+    btn.textContent = (window.LoialLang?.t("Se salvează...") ?? "Se salvează...");
     const res = await authorizedFetch(`/api/biz-full/${bizId}/offer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -963,10 +963,10 @@
       loadDashboard();
       setTimeout(() => {
         btn.classList.remove('saved-ok');
-        btn.textContent = '💾 Salvează oferta și setările';
+        btn.textContent = (window.LoialLang?.t("💾 Salvează oferta și setările") ?? "💾 Salvează oferta și setările");
       }, 2000);
     } else {
-      btn.textContent = '💾 Salvează oferta și setările';
+      btn.textContent = (window.LoialLang?.t("💾 Salvează oferta și setările") ?? "💾 Salvează oferta și setările");
     }
   }
 
@@ -1011,7 +1011,7 @@
     }
     async function loadAdminOverview(){
     const status=document.getElementById('adminOverviewStatus');
-    status.textContent='Se actualizează…';
+    status.textContent=(window.LoialLang?.t("Se actualizează…") ?? "Se actualizează…");
     const res = await adminFetch('/api/admin/overview');
     if (!res.ok) throw Error('Overview HTTP '+res.status);
     const data = await res.json();
@@ -1031,7 +1031,7 @@
       item.textContent=date+' • '+row.message+(detail?' • '+detail:'');
       activityBox.appendChild(item);
     }
-    if(!(data.activity||[]).length)activityBox.textContent='Încă nu există activitate.';
+    if(!(data.activity||[]).length)activityBox.textContent=(window.LoialLang?.t("Încă nu există activitate.") ?? "Încă nu există activitate.");
 
 
     const founderSelect=document.getElementById('founderBiz');
@@ -1116,7 +1116,7 @@
   document.getElementById('founderAdminForm').addEventListener('submit',async event=>{
     event.preventDefault();const status=document.getElementById('founderAdminStatus'),submit=event.currentTarget.querySelector('button[type="submit"]'),id=Number(document.getElementById('founderBiz').value);
     if(!Number.isSafeInteger(id)||id<1)return;
-    submit.disabled=true;status.textContent='Se salvează…';
+    submit.disabled=true;status.textContent=(window.LoialLang?.t("Se salvează…") ?? "Se salvează…");
     try{
       const file=document.getElementById('founderLogo').files[0];let logo=null;
       if(file){if(file.size>120000||file.type!=='image/png')throw Error('Alege un PNG de maximum 120 KB.');logo=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=reject;reader.readAsDataURL(file);});}
@@ -1127,7 +1127,7 @@
   });
   document.getElementById('founderHide').addEventListener('click',async event=>{
     const id=Number(document.getElementById('founderBiz').value),status=document.getElementById('founderAdminStatus');
-    if(!Number.isSafeInteger(id)||id<1||!confirm('Retragi afișarea publică? Locul rămâne rezervat.'))return;
+    if(!Number.isSafeInteger(id)||id<1||!confirm((window.LoialLang?.t("Retragi afișarea publică? Locul rămâne rezervat.") ?? "Retragi afișarea publică? Locul rămâne rezervat.")))return;
     event.currentTarget.disabled=true;
     try{const res=await authorizedFetch('/api/admin/founders/'+id,{method:'DELETE'});const data=await res.json();if(!res.ok)throw Error(data.detail||'Operațiune nereușită');status.textContent='Afișarea publică a fost retrasă.';await refreshFoundersAdmin();}catch(e){status.textContent=e.message;}finally{document.getElementById('founderHide').disabled=false;}
   });
@@ -1164,7 +1164,7 @@
   }
   async function downloadCommissionXlsx() {
     const month=document.getElementById('adminMonthBadge').textContent.replace('Luna: ','').trim();
-    if(!/^\d{4}-\d{2}$/.test(month)){alert('Lună invalidă');return;}
+    if(!/^\d{4}-\d{2}$/.test(month)){alert((window.LoialLang?.t("Lună invalidă") ?? "Lună invalidă"));return;}
     const res=await authorizedFetch('/api/loial-revenue/admin/export/'+month+'.xlsx');
     if(!res.ok){alert('Exportul nu este disponibil.');return;}
     const blob=await res.blob();
@@ -1176,7 +1176,7 @@
   }
     async function saveNetworkRule() {
     const btn = document.getElementById('saveRuleBtn');
-    btn.textContent = 'Se salvează...';
+    btn.textContent = (window.LoialLang?.t("Se salvează...") ?? "Se salvează...");
     await authorizedFetch('/api/admin/network-rule', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1260,8 +1260,8 @@ async function loadLocations(){
     const list=q('locationList');list.replaceChildren();
     for(const loc of state.locations){
       const li=document.createElement('li');li.textContent='Locație #'+loc.business_id+' ';
-      const b=document.createElement('button');b.type='button';b.textContent='Dezasociază';
-      b.onclick=()=>run(async()=>{if(confirm('Elimini asocierea cu această locație?')){await api('member/'+loc.business_id,'DELETE');await loadLocations();}});li.append(b);list.append(li);
+      const b=document.createElement('button');b.type='button';b.textContent=(window.LoialLang?.t("Dezasociază") ?? "Dezasociază");
+      b.onclick=()=>run(async()=>{if(confirm((window.LoialLang?.t("Elimini asocierea cu această locație?") ?? "Elimini asocierea cu această locație?"))){await api('member/'+loc.business_id,'DELETE');await loadLocations();}});li.append(b);list.append(li);
     }
     async function run(action){try{await action()}catch(err){say(err.message)}}
     q('locationInviteBtn').onclick=()=>run(async()=>{
@@ -1269,10 +1269,10 @@ async function loadLocations(){
       const result=await api('invite','POST',{business_id:id});q('locationInviteCode').value=result.code;q('locationInviteCode').hidden=false;say('Trimite codul numai administratorului locației invitate. Valabil 24 de ore.');
     });
     q('locationAcceptBtn').onclick=()=>run(async()=>{
-      if(!confirm('Confirmi asocierea și partajarea rapoartelor agregate cu organizația?'))return;
+      if(!confirm((window.LoialLang?.t("Confirmi asocierea și partajarea rapoartelor agregate cu organizația?") ?? "Confirmi asocierea și partajarea rapoartelor agregate cu organizația?")))return;
       await api('accept','POST',{code:q('locationCode').value.trim()});q('locationCode').value='';await loadLocations();
     });
-    q('locationLeave').onclick=()=>run(async()=>{if(confirm('Retragi locația din organizație?')){await api('member/'+state.business_id,'DELETE');await loadLocations();}});
+    q('locationLeave').onclick=()=>run(async()=>{if(confirm((window.LoialLang?.t("Retragi locația din organizație?") ?? "Retragi locația din organizație?"))){await api('member/'+state.business_id,'DELETE');await loadLocations();}});
     if(!q('locationMonth').value){const now=new Date();q('locationMonth').value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');}
     q('locationReportBtn').onclick=()=>run(async()=>{
       report.replaceChildren();
