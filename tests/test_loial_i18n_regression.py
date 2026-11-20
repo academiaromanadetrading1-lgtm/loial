@@ -92,6 +92,26 @@ for(const lang of langs){
 const sections=['<span>Clienții revin.</span>','<span>Până la</span>','<span>cu PIN individual de 4 cifre</span>','id="previewName" data-no-translate','id="previewReward" data-no-translate'];
 for(const marker of sections)assert.ok(homepage.includes(marker),marker);
 
+
+const publicFlows=['register.html','loial-wallet.html'];
+for(const filename of publicFlows){
+  const source=fs.readFileSync(filename,'utf8');
+  const visible=source.slice(source.indexOf('<body'))
+    .replace(/<script\b[\s\S]*?<\/script>/gi,'')
+    .replace(/<svg\b[\s\S]*?<\/svg>/gi,'');
+  const labels=[...new Set([...visible.matchAll(/>([^<>]+)</g)]
+    .map(m=>m[1].trim()).filter(s=>/[ăâîșțĂÂÎȘȚ]/.test(s)))];
+  for(const label of labels){
+    state.lang.set('en');
+    assert.notEqual(state.lang.t(label),label, filename+': '+label);
+  }
+}
+const register=fs.readFileSync('register.html','utf8');
+const wallet=fs.readFileSync('loial-wallet.html','utf8');
+assert.ok(register.includes('rewardEdited'));
+assert.ok(register.includes("document.addEventListener('loial:language',localizeRewardDefault)"));
+assert.ok(wallet.includes('<span>Accept regulile programului prezentate'));
+
 """
     result = subprocess.run(["node", "-e", script], cwd=ROOT,
                             capture_output=True, text=True, timeout=15)
