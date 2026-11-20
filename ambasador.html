@@ -448,12 +448,11 @@
     document.getElementById('dashQrImg').src='/api/qr-link?url='+
       encodeURIComponent(data.referral_url);
     document.getElementById('dashAmounts').textContent=
-      'În așteptare: '+ledger.pending_eur.toFixed(2)+' EUR | Aprobat: '+
-      ledger.approved_eur.toFixed(2)+' EUR | Achitat: '+ledger.paid_eur.toFixed(2)+' EUR';
+      (window.LoialLang?.format('În așteptare: {pending} EUR | Aprobat: {approved} EUR | Achitat: {paid} EUR',{pending:ledger.pending_eur.toFixed(2),approved:ledger.approved_eur.toFixed(2),paid:ledger.paid_eur.toFixed(2)}) ?? ('În așteptare: '+ledger.pending_eur.toFixed(2)+' EUR | Aprobat: '+ledger.approved_eur.toFixed(2)+' EUR | Achitat: '+ledger.paid_eur.toFixed(2)+' EUR'));
     document.getElementById('ambWiseStatus').textContent=
       ledger.wise_details_saved?'Contul Wise este salvat.':'Completează datele Wise pentru virarea comisioanelor.';
     document.getElementById('dashRecruited').textContent=
-      'Ambasadori recrutați direct: '+ledger.sponsored_ambassadors;
+      (window.LoialLang?.format('Ambasadori recrutați direct: {count}',{count:ledger.sponsored_ambassadors}) ?? ('Ambasadori recrutați direct: '+ledger.sponsored_ambassadors));
     const firms=document.getElementById('dashFirmActivity');
     firms.replaceChildren();
     for(const firm of (ledger.firm_activity||[])){
