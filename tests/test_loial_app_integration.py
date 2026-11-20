@@ -245,6 +245,15 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             })
             assert second_business.status_code==200,second_business.text
             other_bearer={"Authorization":"Bearer "+second_business.json()["token"]}
+            # Cross-tenant access to merchant-private data must be denied in both directions.
+            other_business_id = second_business.json()["business_id"]
+            for owner_headers, foreign_id in ((bearer, other_business_id), (other_bearer, business_id)):
+                assert client.get("/api/biz-full/" + str(foreign_id), headers=owner_headers).status_code == 403
+            assert client.get("/api/biz-full/" + str(business_id), headers=bearer).status_code == 200
+            assert client.get("/setup-admin").status_code == 410
+            assert client.get("/setup-admin", params={"email":"unauthorized@example.invalid"}).status_code == 410
+            with main.SessionLocal() as db:
+                assert db.query(main.User).filter(main.User.email == "unauthorized@example.invalid").first() is None
             other_history=client.get("/api/loial-scans/history",headers=other_bearer)
             assert other_history.status_code==200
             assert other_history.json()["items"]==[]
