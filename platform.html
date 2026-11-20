@@ -781,7 +781,7 @@
       primaryPinValue=data.staff_pin||null;
       const label=document.getElementById('primaryPinStatus');
       if(!primaryPinValue||primaryPinValue==='1234'){
-        label.textContent='PIN vechi nesigur sau absent. Generează unul nou înainte de scanare.';
+        label.textContent=(window.LoialLang?.t('PIN vechi nesigur sau absent. Generează unul nou înainte de scanare.') ?? 'PIN vechi nesigur sau absent. Generează unul nou înainte de scanare.');
         label.style.color='#9c3d25';
       }else{
         label.textContent=primaryPinRevealed?'PIN principal: '+primaryPinValue:'PIN principal: ••••';
@@ -1003,8 +1003,8 @@
       if(!activity.childElementCount&&!activity.textContent.trim())activity.textContent='Se încarcă activitatea…';
       const overview=loadAdminOverview().catch(error=>{
         const status=document.getElementById('adminOverviewStatus');
-        status.textContent='Datele principale nu au putut fi actualizate. Încearcă din nou.';
-        if(!activity.childElementCount)activity.textContent='Activitate indisponibilă temporar.';
+        status.textContent=(window.LoialLang?.t('Datele principale nu au putut fi actualizate. Încearcă din nou.') ?? 'Datele principale nu au putut fi actualizate. Încearcă din nou.');
+        if(!activity.childElementCount)activity.textContent=(window.LoialLang?.t('Activitate indisponibilă temporar.') ?? 'Activitate indisponibilă temporar.');
       });
       loadSuperAdmin.inFlight=Promise.allSettled([overview,loadGooglePilot(),loadAcquisition()]);
       try{await loadSuperAdmin.inFlight;}finally{loadSuperAdmin.inFlight=null;}
@@ -1159,7 +1159,7 @@
       const result=await res.json();
       if(!res.ok)throw Error(result.detail||'Invitația nu a putut fi creată.');
       link.value=result.activation_url;link.hidden=false;copy.hidden=false;
-      status.textContent='Invitație valabilă 24 ore. Trimite linkul privat titularului; membrul își stabilește parola.';
+      status.textContent=(window.LoialLang?.t('Invitație valabilă 24 ore. Trimite linkul privat titularului; membrul își stabilește parola.') ?? 'Invitație valabilă 24 ore. Trimite linkul privat titularului; membrul își stabilește parola.');
     }catch(e){status.textContent=e.message;}
   }
   async function downloadCommissionXlsx() {
