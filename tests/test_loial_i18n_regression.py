@@ -157,7 +157,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
 const script=fs.readFileSync('loial-i18n.js','utf8');
 const rows=Function('return '+script.slice(script.indexOf('(function(){'),script.indexOf('const dictionary='))+'return rows;})();')();
 const keys=new Set(rows.map(row=>row[0]));
-const checked=['ambasador.html','register.html','loial-wallet.html','login.html','wallet-recovery.html'];
+const checked=['ambasador.html','register.html','loial-wallet.html','login.html','wallet-recovery.html','platform.html','loial-ai.html'];
 for(const filename of checked){
   const source=fs.readFileSync(filename,'utf8');
   const clean=source.slice(source.indexOf('<body'))
