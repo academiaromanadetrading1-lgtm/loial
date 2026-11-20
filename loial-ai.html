@@ -538,9 +538,7 @@ async function init(){
       ?'Loial pregătește săptămânal solicitarea în această conversație.'
       :'Generare la cerere. Automatizarea serverului nu este activă.';
     if(weekly.last_weekly_request_at){
-      $('report').textContent='Ultima solicitare săptămânală: '+
-        new Date(weekly.last_weekly_request_at).toLocaleString('ro-RO')+
-        '. Vezi mesajul din conversație.';
+      $('report').textContent=(window.LoialLang?.format('Ultima solicitare săptămânală: {date}. Vezi mesajul din conversație.',{date:new Date(weekly.last_weekly_request_at).toLocaleString(window.LoialLang?.get()||'en')}) ?? ('Ultima solicitare săptămânală: '+new Date(weekly.last_weekly_request_at).toLocaleString('ro-RO')+'. Vezi mesajul din conversație.'));
     }
 
   }catch(e){status(e.message,true);}
@@ -903,7 +901,7 @@ $('issueReceipt').onclick=async()=>{
   for(const raw of $('receiptItems').value.split(/\r?\n/).filter(x=>x.trim())){
     const parts=raw.split(';').map(x=>x.trim());
     if(parts.length<3||!parts[0]){
-      $('receiptStatus').textContent='Format: Produs;Cantitate;Preț unitar;Cost variabil (opțional)';return;
+      $('receiptStatus').textContent=(window.LoialLang?.t('Format: Produs;Cantitate;Preț unitar;Cost variabil (opțional)') ?? 'Format: Produs;Cantitate;Preț unitar;Cost variabil (opțional)');return;
     }
     const number=x=>Number(x.replace(',','.'));
     const row={product:parts[0],quantity:number(parts[1]),unit_price:number(parts[2])};
@@ -1205,7 +1203,7 @@ $('runTeam').onclick=()=>{
  const currency=savedProfile.currency,fmt=x=>new Intl.NumberFormat(language(),{maximumFractionDigits:2}).format(x)+' '+currency+'/h';
  metricTiles(out,[['Productivitate A',fmt(a)],['Productivitate B',fmt(b)],['Variație',a>0?((b-a)/a*100).toFixed(1)+'%':tr('Bază zero')]]);
  const max=Math.max(1,a,b);managementBar(out,'Perioada A',fmt(a),a/max);managementBar(out,'Perioada B',fmt(b),b/max);
- const note=document.createElement('p');note.textContent='Indicator agregat declarat. Compară aceleași responsabilități, trafic și sezonalitate; nu măsoară performanța individuală.';out.append(note);
+ const note=document.createElement('p');note.textContent=(window.LoialLang?.t('Indicator agregat declarat. Compară aceleași responsabilități, trafic și sezonalitate; nu măsoară performanța individuală.') ?? 'Indicator agregat declarat. Compară aceleași responsabilități, trafic și sezonalitate; nu măsoară performanța individuală.');out.append(note);
  teamScenario={salesA,hoursA,salesB,hoursB,currency};$('discussTeam').hidden=false;
 };
 for(const id of ['teamSalesA','teamHoursA','teamSalesB','teamHoursB'])$(id).addEventListener('input',()=>{teamScenario=null;$('teamResult').replaceChildren();$('discussTeam').hidden=true;});
