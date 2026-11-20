@@ -67,7 +67,7 @@ document.getElementById('regForm').onsubmit = async (e) => {
   const btn = document.getElementById('submitBtn');
   const errBox = document.getElementById('errBox');
   errBox.style.display = 'none';
-  btn.textContent = 'Se activează cardul...';
+  btn.textContent = (window.LoialLang?.t("Se activează cardul...") ?? "Se activează cardul...");
   btn.disabled = true;
 
   const data = {
@@ -86,7 +86,7 @@ document.getElementById('regForm').onsubmit = async (e) => {
       body: JSON.stringify(data)
     });
     const result = await res.json();
-    if (!res.ok) throw new Error(result.detail || 'Acest email este deja înregistrat.');
+    if (!res.ok) throw new Error(result.detail || (window.LoialLang?.t("Acest email este deja înregistrat.") ?? "Acest email este deja înregistrat."));
 
     localStorage.setItem('token', result.token);
     localStorage.setItem('biz_id', result.business_id);
@@ -100,7 +100,7 @@ document.getElementById('regForm').onsubmit = async (e) => {
   } catch (err) {
     errBox.textContent = err.message;
     errBox.style.display = 'block';
-    btn.textContent = 'Activează contul și cardul →';
+    btn.textContent = (window.LoialLang?.t("Activează contul și cardul →") ?? "Activează contul și cardul →");
     btn.disabled = false;
   }
 };
