@@ -182,3 +182,12 @@ def test_approved_ambassador_final_cta_and_probusiness_amount():
     assert simulate_portfolio(new_pro=1)["activation_cents"] == 4000
     assert simulate_portfolio(renewed_pro=1)["recurring_cents"] == 2000
     assert simulate_portfolio(recruited_pro=1)["sponsor_cents"] == 4000
+
+
+
+def test_multilingual_runtime_regression():
+    # This file is already part of the approved CI suite. Reuse the isolated
+    # regression without changing the workflow or triggering a runner.
+    import runpy
+    module = runpy.run_path(str(ROOT / "tests" / "test_loial_i18n_regression.py"))
+    module["test_locale_switching_preserves_data_and_form_values"]()
