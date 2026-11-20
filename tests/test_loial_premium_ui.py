@@ -191,3 +191,42 @@ def test_multilingual_runtime_regression():
     import runpy
     module = runpy.run_path(str(ROOT / "tests" / "test_loial_i18n_regression.py"))
     module["test_locale_switching_preserves_data_and_form_values"]()
+
+
+def test_pwa_cache_isolation_and_upgrade():
+    import subprocess
+    script = r"""
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const events={},deleted=[],fetched=[],cached=[];
+const self={location:{origin:'https://loial.space'},addEventListener:(k,v)=>events[k]=v,
+ skipWaiting:async()=>{},clients:{claim:async()=>{}}};
+const caches={keys:async()=>['loial-pwa-black-metal-v1','loial-pwa-black-metal-v2','unrelated-cache'],
+ delete:async k=>deleted.push(k),open:async()=>({addAll:async items=>cached.push(...items),match:async k=>k})};
+const fetch=async(req,options)=>{fetched.push({req,options});if(req.fail)throw Error('offline');return 'network';};
+new Function('self','caches','fetch','URL',fs.readFileSync('sw.js','utf8'))(self,caches,fetch,URL);
+async function run(){
+ let p;events.install({waitUntil:x=>p=x});await p;
+ assert.equal(cached.length,3);assert.ok(cached.includes('/loial-offline.html'));
+ events.activate({waitUntil:x=>p=x});await p;
+ assert.deepEqual(deleted,['loial-pwa-black-metal-v1']);
+ for(const [path,header,mode,method] of [
+ ['/api/test','','navigate','GET'],['/auth/login','','navigate','GET'],
+ ['/wallet','Authorization','navigate','GET'],['/wallet','X-Loial-Wallet-Token','navigate','GET'],
+ ['/wallet','','navigate','POST'],['/gdpr/export/1','','navigate','GET'],
+ ['/wallet-recovery.html','','navigate','GET'],['/loial-i18n.js','','cors','GET'],
+ ['https://external.invalid/wallet','','navigate','GET']]){
+ let hit=false;
+ events.fetch({request:{url:path.startsWith('https:')?path:'https://loial.space'+path,method,mode,headers:{has:k=>k===header}},respondWith(){hit=true;}});
+ assert.equal(hit,false,path);
+ }
+ for(const fail of [false,true]){
+ let response;events.fetch({request:{url:'https://loial.space/wallet',method:'GET',mode:'navigate',fail,headers:{has:()=>false}},respondWith:x=>response=x});
+ assert.equal(await response,fail?'/loial-offline.html':'network');
+ assert.equal(fetched.at(-1).options.cache,'no-store');
+ }
+}
+run().catch(e=>{console.error(e);process.exitCode=1;});
+"""
+    result = subprocess.run(["node", "-e", script], cwd=ROOT,
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
