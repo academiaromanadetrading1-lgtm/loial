@@ -106,7 +106,7 @@ async function login(e) {
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
   const btn = document.getElementById('loginBtn');
-  btn.textContent = 'Se conectează...';
+  btn.textContent = (window.LoialLang?.t("Se conectează...") ?? "Se conectează...");
   btn.disabled = true;
 
   try {
@@ -116,7 +116,7 @@ async function login(e) {
       body: JSON.stringify({email, password})
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Email sau parolă incorectă');
+    if (!res.ok) throw new Error(data.detail || (window.LoialLang?.t("Email sau parolă incorectă") ?? "Email sau parolă incorectă"));
 
     localStorage.setItem('token', data.access_token);
     localStorage.setItem('user', JSON.stringify(data.user || {email}));
@@ -124,7 +124,7 @@ async function login(e) {
     window.location.href = '/platform.html';
   } catch (err) {
     showError(err.message || 'Eroare de conectare');
-    btn.textContent = 'Intră în cont →';
+    btn.textContent = (window.LoialLang?.t("Intră în cont →") ?? "Intră în cont →");
     btn.disabled = false;
   }
 }
@@ -135,7 +135,7 @@ async function changePassword(e) {
   const old_password = document.getElementById('pwd-old').value;
   const new_password = document.getElementById('pwd-new').value;
   const btn = document.getElementById('pwdBtn');
-  btn.textContent = 'Se salvează...';
+  btn.textContent = (window.LoialLang?.t("Se salvează...") ?? "Se salvează...");
   btn.disabled = true;
 
   try {
@@ -152,7 +152,7 @@ async function changePassword(e) {
   } catch (err) {
     showError(err.message);
   }
-  btn.textContent = 'Actualizează parola →';
+  btn.textContent = (window.LoialLang?.t("Actualizează parola →") ?? "Actualizează parola →");
   btn.disabled = false;
 }
 </script>
