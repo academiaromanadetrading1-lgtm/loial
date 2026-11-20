@@ -635,7 +635,7 @@ async function expenseApi(path,options={}){
 $('expenseSave').onclick=async()=>{
   const output=$('expenseOutput');
   if(!$('expenseConfirmed').checked){
-    output.textContent='Confirmă că ai verificat datele de pe factură.';return;
+    output.textContent=(window.LoialLang?.t('Confirmă că ai verificat datele de pe factură.') ?? 'Confirmă că ai verificat datele de pe factură.');return;
   }
   const payload={
     document_id:$('expenseDoc').value?Number($('expenseDoc').value):null,
@@ -773,7 +773,7 @@ $('useTemplate').onclick=async()=>{
     $('subject').value=x.subject;
     $('offer').value=campaignBaseText(x.text,promo);
     renderWalletMessagePreview();
-    $('campaignPreview').textContent='Mesaj pregătit pentru Loial. Îl poți edita înainte de trimitere.';
+    $('campaignPreview').textContent=(window.LoialLang?.t('Mesaj pregătit pentru Loial. Îl poți edita înainte de trimitere.') ?? 'Mesaj pregătit pentru Loial. Îl poți edita înainte de trimitere.');
   }catch(e){status(e.message,true);}
 };
 async function nativeInbox(path,options={}){
@@ -893,9 +893,9 @@ async function receiptApi(path,options={}){
   return result;
 }
 $('printStatus').onclick=async()=>{try{const d=await receiptApi('/integration');$('printInfo').textContent=d.active?'Integrare activă':'Integrare inactivă';}catch(e){$('printInfo').textContent=e.message;}};
-$('printRotate').onclick=async()=>{if(!confirm('Generezi o cheie nouă? Cheia veche va fi dezactivată.'))return;try{const d=await receiptApi('/integration/rotate',{method:'POST'});$('printKey').value=d.api_key;$('printKey').hidden=false;$('printCopy').hidden=false;$('printInfo').textContent='Salvează cheia acum. Nu va mai fi afișată după reîncărcarea paginii.';}catch(e){$('printInfo').textContent=e.message;}};
-$('printRevoke').onclick=async()=>{if(!confirm('Dezactivezi emiterea automată?'))return;try{await receiptApi('/integration/revoke',{method:'POST'});$('printKey').value='';$('printKey').hidden=true;$('printCopy').hidden=true;$('printInfo').textContent='Integrare dezactivată.';}catch(e){$('printInfo').textContent=e.message;}};
-$('printCopy').onclick=async()=>{try{await navigator.clipboard.writeText($('printKey').value);$('printInfo').textContent='Cheie copiată.';}catch(e){$('printKey').select();}};
+$('printRotate').onclick=async()=>{if(!confirm('Generezi o cheie nouă? Cheia veche va fi dezactivată.'))return;try{const d=await receiptApi('/integration/rotate',{method:'POST'});$('printKey').value=d.api_key;$('printKey').hidden=false;$('printCopy').hidden=false;$('printInfo').textContent=(window.LoialLang?.t('Salvează cheia acum. Nu va mai fi afișată după reîncărcarea paginii.') ?? 'Salvează cheia acum. Nu va mai fi afișată după reîncărcarea paginii.');}catch(e){$('printInfo').textContent=e.message;}};
+$('printRevoke').onclick=async()=>{if(!confirm('Dezactivezi emiterea automată?'))return;try{await receiptApi('/integration/revoke',{method:'POST'});$('printKey').value='';$('printKey').hidden=true;$('printCopy').hidden=true;$('printInfo').textContent=(window.LoialLang?.t('Integrare dezactivată.') ?? 'Integrare dezactivată.');}catch(e){$('printInfo').textContent=e.message;}};
+$('printCopy').onclick=async()=>{try{await navigator.clipboard.writeText($('printKey').value);$('printInfo').textContent=(window.LoialLang?.t('Cheie copiată.') ?? 'Cheie copiată.');}catch(e){$('printKey').select();}};
 $('issueReceipt').onclick=async()=>{
   const ref=$('receiptNumber').value.trim();
   if(ref.length<2){$('receiptStatus').textContent='Completează numărul bonului.';return;}
@@ -928,7 +928,7 @@ $('issueReceipt').onclick=async()=>{
 $('copyReceipt').onclick=async()=>{
   try{await navigator.clipboard.writeText($('receiptUrl').value);
   $('receiptStatus').textContent='Linkul de bon Loial a fost copiat.';}
-  catch(e){$('receiptStatus').textContent='Nu am putut copia linkul; selectează-l din câmp.';}
+  catch(e){$('receiptStatus').textContent=(window.LoialLang?.t('Nu am putut copia linkul; selectează-l din câmp.') ?? 'Nu am putut copia linkul; selectează-l din câmp.');}
 };
 $('showReceipts').onclick=async()=>{
   const list=$('receiptList');list.replaceChildren();
