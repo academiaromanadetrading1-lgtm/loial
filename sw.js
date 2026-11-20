@@ -1,5 +1,5 @@
 /* Loial PWA: cache only public static shell/assets; never cache customer data. */
-const VERSION = 'loial-pwa-black-metal-v1';
+const VERSION = 'loial-pwa-black-metal-v2';
 const SHELL = ['/loial-offline.html', '/pwa-icon-192.png', '/pwa-icon-512.png'];
 const PUBLIC = new Set(SHELL);
 self.addEventListener('install', event => {
@@ -19,7 +19,8 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) return;
   // Sensitive content: token-authenticated API, dynamic account, referral data,
   // receipt and QR state. Do not read or write any of it to the SW cache.
-  if (url.pathname.startsWith('/api/') ||
+  if (request.headers.has('Authorization') || request.headers.has('X-Loial-Wallet-Token') ||
+      url.pathname.startsWith('/auth/') || url.pathname.startsWith('/api/') ||
       url.pathname.startsWith('/gdpr/') ||
       url.pathname.startsWith('/loial-receipt') ||
       url.pathname.startsWith('/wallet-profile/') ||
@@ -30,7 +31,7 @@ self.addEventListener('fetch', event => {
     return;
   }
   if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).catch(() =>
+    event.respondWith(fetch(request, {cache: 'no-store'}).catch(() =>
       caches.open(VERSION).then(cache => cache.match('/loial-offline.html'))));
   }
 });
