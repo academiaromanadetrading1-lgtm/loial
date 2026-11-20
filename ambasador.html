@@ -297,7 +297,7 @@
   function updateCalc() {
     const n = parseInt(document.getElementById('bizSlider').value, 10) || 1;
     const tr = key => window.LoialLang?.t(key) ?? key;
-    const fmt = (key,values) => window.LoialLang?.format(key,values) ?? key.replace(/\\{(\\w+)\\}/g,(_,k)=>String(values[k]));
+    const fmt = (key,values) => window.LoialLang?.format(key,values) ?? key.replace(/\{(\w+)\}/g,(_,k)=>String(values[k]));
     const countLabel=document.getElementById('calcCountLabel');
     countLabel.textContent=fmt(n===1?'{count} firmă':'{count} firme',{count:n});
     const rank=n>=51?'Ambasador Senior 50+ (15 EUR/lună/firmă)':n>=26?'Ambasador Manager (10 EUR/lună/firmă)':'Ambasador Loial (5 EUR/lună/firmă)';
