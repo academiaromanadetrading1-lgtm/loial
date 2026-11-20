@@ -41,7 +41,7 @@ async function preview(){
     const data=await res.json();
     if(!res.ok)throw Error(data.detail||'Cod invalid sau expirat');
     previewData=data;
-    $('shop').textContent=(window.LoialLang?.format("Cardul tău de la {business}",{business:data.business}) ?? ('Cardul tău de la '+data.business));
+    {if(window.LoialLang?.bindText){window.LoialLang.bindText($('shop'),"Cardul tău de la {business}",{business:data.business});}else{$('shop').textContent=('Cardul tău de la '+data.business);}}
     $('claim').disabled=false;status((window.LoialLang?.t("Cod verificat. Poți recupera cardul pe acest dispozitiv.") ?? "Cod verificat. Poți recupera cardul pe acest dispozitiv."));
   }catch(e){status(e.message,true);}
 }
