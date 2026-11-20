@@ -262,3 +262,35 @@ assert.ok(wallet.includes("LoialLang?.format('"+cases[5][0]+"'"),'Wallet missing
     result = subprocess.run(["node", "-e", script], cwd=ROOT,
                             capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stderr
+
+
+def test_ai_and_merchant_dynamic_ui_no_raw_critical_messages():
+    script = r"""
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const dict=fs.readFileSync('loial-i18n.js','utf8');
+const rows=Function('return '+dict.slice(dict.indexOf('(function(){'),dict.indexOf('const dictionary='))+'return rows;})();')();
+const lookup=new Map(rows.map(row=>[row[0],row]));
+const paths=['platform.html','loial-ai.html','ambasador.html','loial-wallet.html'];
+let translated=0,templated=0;
+for(const filename of paths){
+  const html=fs.readFileSync(filename,'utf8');
+  for(const match of html.matchAll(/LoialLang\?\.t\('([^']+)'\) \?\? '([^']+)'/g)){
+    assert.equal(match[1],match[2],filename+' has inconsistent fallback');
+    assert.ok(lookup.has(match[1]),filename+' lacks dictionary key '+match[1]);
+    translated++;
+  }
+  for(const match of html.matchAll(/LoialLang\?\.format\('([^']+)'/g)){
+    assert.ok(lookup.has(match[1]),filename+' lacks format key '+match[1]);
+    templated++;
+  }
+}
+assert.ok(translated>=30,'Expected explicit runtime translation coverage');
+assert.ok(templated>=8,'Expected dynamic templates');
+const ai=fs.readFileSync('loial-ai.html','utf8');
+assert.ok(ai.includes("LoialLang?.format('Ultima solicitare săptămânală: {date}. Vezi mesajul din conversație.'"));
+assert.ok(ai.includes("LoialLang?.t('Format: Produs;Cantitate;Preț unitar;Cost variabil (opțional)'"));
+assert.ok(ai.includes("LoialLang?.t('Indicator agregat declarat."));
+"""
+    result = subprocess.run(["node", "-e", script], cwd=ROOT,
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
