@@ -1757,7 +1757,8 @@ def detect_language(accept_language: str = None, country: str = None):
     return {"detected": detected, "country": country, "supported": list(lang_map.keys())}
 
 @app.post("/auth/change-password")
-def change_password(old_password: str, new_password: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def change_password(request: Request, old_password: str, new_password: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not pwd_context.verify(old_password, current_user.password):
         raise HTTPException(status_code=400, detail="Parola veche e incorectă")
     if len(new_password) < 6:
@@ -2652,19 +2653,21 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 @app.post("/api/change-password")
-def change_any_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def change_any_password(request: Request, req: ChangePasswordRequest, db: Session = Depends(get_db)):
     email = sanitize_input(req.email, 100)
     if len(req.new_password) < 6:
         raise HTTPException(status_code=400, detail="Parola nouă trebuie să aibă minim 6 caractere")
-    new_hash = pwd_context.hash(req.new_password)
-    updated = False
+    matching_accounts = []
     for model in [User, BusinessAccount, SalesAgent]:
         acc = db.query(model).filter(model.email == email).first()
-        if acc and pwd_context.verify(req.old_password, acc.password):
-            acc.password = new_hash
-            updated = True
-    if not updated:
+        if acc and acc.password and pwd_context.verify(req.old_password, acc.password):
+            matching_accounts.append(acc)
+    if not matching_accounts:
         raise HTTPException(status_code=401, detail="Email sau parolă actuală incorectă")
+    new_hash = pwd_context.hash(req.new_password)
+    for acc in matching_accounts:
+        acc.password = new_hash
     db.commit()
     return {"status": "password_updated", "message": "Parola a fost schimbată cu succes!"}
 
