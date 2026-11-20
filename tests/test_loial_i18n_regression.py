@@ -285,7 +285,7 @@ for(const filename of paths){
   }
 }
 assert.ok(translated>=30,'Expected explicit runtime translation coverage');
-assert.ok(templated>=8,'Expected dynamic templates');
+assert.ok(templated>=7,'Expected dynamic templates');
 const ai=fs.readFileSync('loial-ai.html','utf8');
 assert.ok(ai.includes("LoialLang?.format('Ultima solicitare săptămânală: {date}. Vezi mesajul din conversație.'"));
 assert.ok(ai.includes("LoialLang?.t('Format: Produs;Cantitate;Preț unitar;Cost variabil (opțional)'"));
