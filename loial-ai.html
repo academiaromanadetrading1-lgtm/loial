@@ -705,7 +705,7 @@ $('runBreakEven').onclick=async()=>{
   const output=$('beResult');output.textContent='';
   if(!/^\d{4}-\d{2}$/.test(month)||!$('beFixed').value||
      !Number.isFinite(fixed_costs)||fixed_costs<0){
-    output.textContent='Completează luna și costurile fixe reale pentru perioada respectivă.';
+    output.textContent=(window.LoialLang?.t('Completează luna și costurile fixe reale pentru perioada respectivă.') ?? 'Completează luna și costurile fixe reale pentru perioada respectivă.');
     return;
   }
   $('runBreakEven').disabled=true;
@@ -739,7 +739,7 @@ $('runBreakEven').onclick=async()=>{
 $('showClients').onclick=async()=>{
   try{
     const response=await api('/customers'),list=$('customerList');list.replaceChildren();
-    if(!response.items.length){list.textContent='Nu există clienți înregistrați.';return;}
+    if(!response.items.length){list.textContent=(window.LoialLang?.t('Nu există clienți înregistrați.') ?? 'Nu există clienți înregistrați.');return;}
     for(const c of response.items){
       const b=document.createElement('button');b.className='topic';
       b.textContent=c.name+' • '+(c.stamps||0)+' ștampile';
@@ -785,7 +785,7 @@ async function nativeInbox(path,options={}){
 }
 async function loadMessageRecipients(){
   const select=$('singleRecipient');select.replaceChildren();
-  const all=document.createElement('option');all.value='';all.textContent='Toți cei din segment';select.appendChild(all);
+  const all=document.createElement('option');all.value='';all.textContent=(window.LoialLang?.t('Toți cei din segment') ?? 'Toți cei din segment');select.appendChild(all);
   const clients=await api('/customers');
   clients.items.forEach(c=>{const option=document.createElement('option');
     option.value=String(c.id);option.textContent=c.name+' (card #'+c.id+')';
@@ -898,7 +898,7 @@ $('printRevoke').onclick=async()=>{if(!confirm('Dezactivezi emiterea automată?'
 $('printCopy').onclick=async()=>{try{await navigator.clipboard.writeText($('printKey').value);$('printInfo').textContent=(window.LoialLang?.t('Cheie copiată.') ?? 'Cheie copiată.');}catch(e){$('printKey').select();}};
 $('issueReceipt').onclick=async()=>{
   const ref=$('receiptNumber').value.trim();
-  if(ref.length<2){$('receiptStatus').textContent='Completează numărul bonului.';return;}
+  if(ref.length<2){$('receiptStatus').textContent=(window.LoialLang?.t('Completează numărul bonului.') ?? 'Completează numărul bonului.');return;}
   const lines=[];
   for(const raw of $('receiptItems').value.split(/\r?\n/).filter(x=>x.trim())){
     const parts=raw.split(';').map(x=>x.trim());
@@ -909,11 +909,11 @@ $('issueReceipt').onclick=async()=>{
     const row={product:parts[0],quantity:number(parts[1]),unit_price:number(parts[2])};
     if(parts[3])row.unit_variable_cost=number(parts[3]);
     if(!Number.isFinite(row.quantity)||!Number.isFinite(row.unit_price)){
-      $('receiptStatus').textContent='Verifică valorile numerice din linii.';return;
+      $('receiptStatus').textContent=(window.LoialLang?.t('Verifică valorile numerice din linii.') ?? 'Verifică valorile numerice din linii.');return;
     }
     lines.push(row);
   }
-  if(!lines.length){$('receiptStatus').textContent='Adaugă cel puțin un produs.';return;}
+  if(!lines.length){$('receiptStatus').textContent=(window.LoialLang?.t('Adaugă cel puțin un produs.') ?? 'Adaugă cel puțin un produs.');return;}
   $('issueReceipt').disabled=true;
   try{
     const res=await receiptApi('/issue',{method:'POST',
@@ -934,7 +934,7 @@ $('showReceipts').onclick=async()=>{
   const list=$('receiptList');list.replaceChildren();
   try{
     const records=await receiptApi('/recent');
-    if(!records.length){list.textContent='Nu există bonuri înregistrate.';return;}
+    if(!records.length){list.textContent=(window.LoialLang?.t('Nu există bonuri înregistrate.') ?? 'Nu există bonuri înregistrate.');return;}
     for(const receipt of records.slice(0,20)){
       const row=document.createElement('div');row.className='file-row';
       const title=document.createElement('span');
@@ -1160,7 +1160,7 @@ let loanScenario=null;
 $('runLoan').onclick=()=>{
  const ids=['loanPrincipal','loanRate','loanMonths','loanCash','loanExisting'], inputs=ids.map($), vals=inputs.map(x=>Number(x.value));
  const out=$('loanResult');out.replaceChildren();loanScenario=null;$('discussLoan').hidden=true;
- if(inputs.some(x=>x.value.trim()===''||!x.checkValidity())||vals.some(x=>!Number.isFinite(x))||!Number.isInteger(vals[2])){out.textContent='Completează toate cele cinci valori valide; introdu 0 dacă nu există rate anterioare.';return;}
+ if(inputs.some(x=>x.value.trim()===''||!x.checkValidity())||vals.some(x=>!Number.isFinite(x))||!Number.isInteger(vals[2])){out.textContent=(window.LoialLang?.t('Completează toate cele cinci valori valide; introdu 0 dacă nu există rate anterioare.') ?? 'Completează toate cele cinci valori valide; introdu 0 dacă nu există rate anterioare.');return;}
  const [principal,annual,months,cash,existing]=vals,r=annual/1200;
  const installment=r===0?principal/months:principal*r/(-Math.expm1(-months*Math.log1p(r)));
  const debt=installment+existing,interest=Math.max(0,installment*months-principal),available=cash-debt,dscr=cash/debt;
@@ -1185,10 +1185,10 @@ function managementBar(parent,label,value,ratio){
  const track=document.createElement('div');track.className='management-track';const fill=document.createElement('span');fill.style.width=Math.max(0,Math.min(100,ratio*100))+'%';track.append(fill);parent.append(track);
 }
 $('loadManagementOverview').onclick=async()=>{
- const out=$('managementOverviewResult');out.textContent='Se încarcă…';$('loadManagementOverview').disabled=true;
+ const out=$('managementOverviewResult');out.textContent=(window.LoialLang?.t('Se încarcă…') ?? 'Se încarcă…');$('loadManagementOverview').disabled=true;
  try{
   const [data,goals]=await Promise.all([api('/management-overview'),api('/management-health')]);out.replaceChildren();const fmt=x=>new Intl.NumberFormat(language(),{maximumFractionDigits:2}).format(x)+' '+data.currency;
-  if(!data.latest){out.textContent='Nu există vânzări înregistrate. Importă bonurile și costurile înainte de analiză.';if(goals.snapshots.length){const x=goals.snapshots[0];metricTiles(out,[[mgCopy('Perioada','Period'),x.period],[mgCopy('Atingerea țintelor','Goal attainment'),x.score+'/100']]);}return;}
+  if(!data.latest){out.textContent=(window.LoialLang?.t('Nu există vânzări înregistrate. Importă bonurile și costurile înainte de analiză.') ?? 'Nu există vânzări înregistrate. Importă bonurile și costurile înainte de analiză.');if(goals.snapshots.length){const x=goals.snapshots[0];metricTiles(out,[[mgCopy('Perioada','Period'),x.period],[mgCopy('Atingerea țintelor','Goal attainment'),x.score+'/100']]);}return;}
   const l=data.latest;
   metricTiles(out,[['Ultima perioadă cu date',l.period],['Vânzări înregistrate',fmt(l.revenue)],['Contribuție estimată',l.contribution===null?tr('Date lipsă'):fmt(l.contribution)],[mgCopy('Atingerea țintelor','Goal attainment'),goals.snapshots.find(x=>x.period===l.period)?.score!=null?goals.snapshots.find(x=>x.period===l.period).score+'/100':mgCopy('Date insuficiente','Insufficient data')]]);
   const max=Math.max(1,...data.series.map(x=>Math.abs(x.revenue)));for(const m of data.series)managementBar(out,m.period,fmt(m.revenue),Math.max(0,m.revenue)/max);
@@ -1199,7 +1199,7 @@ let teamScenario=null;
 $('runTeam').onclick=()=>{
  const out=$('teamResult');out.replaceChildren();teamScenario=null;$('discussTeam').hidden=true;
  const inputs=['teamSalesA','teamHoursA','teamSalesB','teamHoursB'].map($);
- if(inputs.some(x=>!x.value.trim()||!x.checkValidity())){out.textContent='Completează toate valorile valide, inclusiv orele pozitive.';return;}
+ if(inputs.some(x=>!x.value.trim()||!x.checkValidity())){out.textContent=(window.LoialLang?.t('Completează toate valorile valide, inclusiv orele pozitive.') ?? 'Completează toate valorile valide, inclusiv orele pozitive.');return;}
  const [salesA,hoursA,salesB,hoursB]=inputs.map(x=>Number(x.value));const a=salesA/hoursA,b=salesB/hoursB;
  if(!savedProfile){out.textContent=mgCopy('Încarcă profilul firmei înainte de calcul.','Load the business profile before calculating.');return;}
  const currency=savedProfile.currency,fmt=x=>new Intl.NumberFormat(language(),{maximumFractionDigits:2}).format(x)+' '+currency+'/h';
