@@ -175,7 +175,7 @@ button.black{background:#111318;color:#ddc48b}
       advice.textContent='La '+c.name+' mai ai nevoie de '+remaining+' '+(remaining===1?'ștampilă':'ștampile')+' pentru recompensa afișată. Folosește cardul când ai oricum nevoie de o cumpărătură.';
       action.href='/join/'+c.id;action.textContent=(window.LoialLang?.t("Vezi progresul cardului") ?? "Vezi progresul cardului");
     }else{
-      advice.textContent='Arată codul universal la firmele participante pentru a înregistra vizitele. Poți recomanda LOIAL unei afaceri și descoperi programul de ambasador.';
+      advice.textContent=(window.LoialLang?.t('Arată codul universal la firmele participante pentru a înregistra vizitele. Poți recomanda LOIAL unei afaceri și descoperi programul de ambasador.') ?? 'Arată codul universal la firmele participante pentru a înregistra vizitele. Poți recomanda LOIAL unei afaceri și descoperi programul de ambasador.');
       action.href='#merchantReferralSection';action.textContent=(window.LoialLang?.t("Descoperă programul de ambasador") ?? "Descoperă programul de ambasador");
     }
   }
