@@ -12,6 +12,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 @dataclass(frozen=True)
 class Check:
@@ -22,6 +23,8 @@ class Check:
 
 def preflight(env=None,stage="production"):
     env=dict(os.environ if env is None else env)
+    if stage not in ("production", "staging"):
+        raise ValueError("Invalid deployment stage")
     strict=stage=="production"
     checks=[]
     def add(key,passed,message,severity="blocker"):
@@ -34,8 +37,18 @@ def preflight(env=None,stage="production"):
         and not any(x in secret.lower() for x in ("test","demo","example","1234")),
         "Use a fresh random JWT secret (48+ characters; do not reuse previously exposed keys)")
     origins=[x.strip() for x in env.get("ALLOWED_ORIGINS","").split(",") if x.strip()]
-    add("allowed_origins",bool(origins) and all(
-        x.startswith("https://") and "*" not in x for x in origins),
+    def exact_https_origin(value):
+        try:
+            parts = urlsplit(value)
+            port = parts.port
+            return (parts.scheme == "https" and bool(parts.hostname)
+                    and parts.username is None and parts.password is None
+                    and not parts.path and not parts.query and not parts.fragment
+                    and not any(c.isspace() or c in "*\\\\?#" for c in value)
+                    and (port is None or 1 <= port <= 65535))
+        except ValueError:
+            return False
+    add("allowed_origins",bool(origins) and all(exact_https_origin(x) for x in origins),
         "Only exact HTTPS allowed origins")
     add("apple_postponed",env.get("LOIAL_APPLE_PILOT_ENABLED","0")!="1",
         "Apple Wallet issuance must stay disabled before the first 100 firms")
@@ -94,6 +107,10 @@ def preflight(env=None,stage="production"):
     add("loial_stripe_return_origin",origin=="https://loial.space",
         "Checkout return URLs restricted to https://loial.space",
         severity=stripe_severity)
+    add("public_origin_https",exact_https_origin(origin),
+        "Public origin must be an exact HTTPS origin")
+    add("public_origin_allowed",origin in origins,
+        "Public origin must be included in allowed origins")
     # This cannot prove that a previously exposed secret was rotated.
     add("credential_rotation_manual",False,
         "Manually verify historical exposed secrets were rotated before deployment",
