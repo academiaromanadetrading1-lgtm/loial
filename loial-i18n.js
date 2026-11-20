@@ -28,7 +28,10 @@ function apply(){
    const item=source.get(el);
    const raw=item&&old===item.last?item.raw:old;
    if(!dictionary.has(raw))continue;
-   const val=t(raw);el.textContent=val;source.set(el,{raw,last:val});
+   const val=t(raw);
+   // Preserve implicit option values before translating display labels.
+   if(el.tagName==='OPTION'&&!el.hasAttribute('value'))el.value=el.value;
+   el.textContent=val;source.set(el,{raw,last:val});
  }
  for(const el of document.querySelectorAll('input[placeholder],textarea[placeholder]')){const raw=el.dataset.loialOriginalPlaceholder||el.placeholder;if(dictionary.has(raw)){el.dataset.loialOriginalPlaceholder=raw;el.placeholder=t(raw);}}
  for(const el of document.querySelectorAll('[data-loial-language]'))el.value=locale;
