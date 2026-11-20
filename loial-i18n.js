@@ -23,7 +23,7 @@ if(!langs.includes(locale))locale='en';
 function t(value){const r=dictionary.get(value);return r?r[langs.indexOf(locale)]||value:value;}
 function apply(){
  document.documentElement.lang=locale;
- for(const el of document.querySelectorAll('h1,h2,h3,h4,label,button,a,option,p,summary,legend,[data-loial-text],.loial-tagline,.loial-kicker,.loial-tier small,.loial-sim-results span,.gradient-text,.hero-title-line,.card-link,.badge,.plan-desc,.vat-note,.sim-title,.stat-label,.popular-tag,.plan-price span,.workspace-tab span:last-child')){
+ for(const el of document.querySelectorAll('h1,h2,h3,h4,label,button,a,option,p,summary,legend,[data-loial-text],.loial-tagline,.loial-kicker,.loial-tier small,.loial-sim-results span,.gradient-text,.hero-title-line,.card-link,.badge,.plan-desc,.vat-note,.sim-title,.stat-label,.popular-tag,.plan-price span,.workspace-tab span:last-child,span,small,strong')){
    if(el.children.length||el.closest('#chat,#headline,#details,#customerList,#files,#receiptList,#sentHistory,#report,#campaignPreview,#profileFeedback,#connection')||el.closest('tbody,[data-no-translate]'))continue;
    const old=el.textContent.trim();
    const item=source.get(el);
