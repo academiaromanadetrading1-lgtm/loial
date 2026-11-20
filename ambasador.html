@@ -317,10 +317,10 @@
   let ambassadorToken=sessionStorage.getItem('loial_ambassador_token')||'';
   const statusBox=document.getElementById('ambStatus');
   function authHeaders(){return {Authorization:'Bearer '+ambassadorToken};}
-  function fail(message){statusBox.textContent=message||'Operațiunea a eșuat.';}
+  function fail(message){statusBox.textContent=message||(window.LoialLang?.t("Operațiunea a eșuat.") ?? "Operațiunea a eșuat.");}
   async function ambassadorGet(path){
     const response=await fetch(path,{headers:authHeaders(),cache:'no-store'});
-    if(!response.ok)throw Error('Sesiunea a expirat sau nu este validă.');
+    if(!response.ok)throw Error((window.LoialLang?.t("Sesiunea a expirat sau nu este validă.") ?? "Sesiunea a expirat sau nu este validă."));
     return response.json();
   }
   async function reloadAmbassador(){
@@ -353,7 +353,7 @@
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({activation_token:activationToken,password:password.value})});
       const result=await res.json();
-      if(!res.ok)throw Error(result.detail||'Activarea a eșuat.');
+      if(!res.ok)throw Error(result.detail||(window.LoialLang?.t("Activarea a eșuat.") ?? "Activarea a eșuat."));
       ambassadorToken=result.access_token;activationToken='';
       sessionStorage.setItem('loial_ambassador_token',ambassadorToken);
       document.getElementById('manualActivatePanel').hidden=true;
@@ -402,7 +402,7 @@
         body:JSON.stringify({email:document.getElementById('ambLoginEmail').value.trim(),
           password:document.getElementById('ambLoginPassword').value})});
       const result=await response.json();
-      if(!response.ok)throw Error(result.detail||'Autentificare eșuată.');
+      if(!response.ok)throw Error(result.detail||(window.LoialLang?.t("Autentificare eșuată.") ?? "Autentificare eșuată."));
       ambassadorToken=result.access_token;
       sessionStorage.setItem('loial_ambassador_token',ambassadorToken);
       document.getElementById('ambLoginPassword').value='';
@@ -467,10 +467,10 @@
           : 'Plata încă neconfirmată');
       firms.appendChild(div);
     }
-    if(!(ledger.firm_activity||[]).length)firms.textContent='Încă nu există firme asociate.';
+    if(!(ledger.firm_activity||[]).length)firms.textContent=(window.LoialLang?.t("Încă nu există firme asociate.") ?? "Încă nu există firme asociate.");
     const container=document.getElementById('dashLedger');
     container.replaceChildren();
-    if(!ledger.entries.length){container.textContent='Încă nu există comisioane verificate.';return;}
+    if(!ledger.entries.length){container.textContent=(window.LoialLang?.t("Încă nu există comisioane verificate.") ?? "Încă nu există comisioane verificate.");return;}
     for(const row of ledger.entries){
       const div=document.createElement('div');
       div.style.borderBottom='1px solid #ddd';
@@ -495,7 +495,7 @@
         body:JSON.stringify({password:password.value,
           account_details:details.value.trim()})});
       const payload=await response.json().catch(()=>({}));
-      if(!response.ok)throw Error(payload.detail||'Actualizarea nu a reușit.');
+      if(!response.ok)throw Error(payload.detail||(window.LoialLang?.t("Actualizarea nu a reușit.") ?? "Actualizarea nu a reușit."));
       details.value='';
       password.value='';
       document.getElementById('ambWiseStatus').textContent='Detaliile Wise au fost salvate.';
