@@ -53,6 +53,27 @@ state.lang.apply();
 assert.equal(state.nodes[0].textContent,'Guardar perfil');
 state.lang.set('unsupported');
 assert.equal(state.lang.get(),'es');
+const metric=element('');
+state.nodes.push(metric);
+const key='Firme: {count} · Ștampile: {stamps}';
+const values={count:0,stamps:12};
+state.lang.bindText(metric,key,values);
+values.count=999;
+for(const lang of langs){
+  state.lang.set(lang);
+  assert.equal(metric.textContent,state.lang.format(key,{count:0,stamps:12}));
+  assert.ok(metric.textContent.includes('12'));
+  assert.ok(!metric.textContent.includes('999'));
+}
+metric.textContent='new private value';
+state.lang.set('en');
+assert.equal(metric.textContent,'new private value');
+const malicious='<img src=x onerror=alert(1)>';
+state.lang.bindText(metric,'Cardul tău de la {business}',{business:malicious});
+assert.equal(metric.textContent,'Your card from '+malicious);
+metric.isConnected=false;
+state.lang.set('ro');
+assert.equal(metric.textContent,'Your card from '+malicious);
 """
     result = subprocess.run(["node", "-e", script], cwd=ROOT,
                             capture_output=True, text=True, timeout=15)
