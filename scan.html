@@ -110,7 +110,7 @@
     if (bizId && staffPin.length === 4) {
       document.getElementById('pinScreen').classList.add('hidden');
       document.getElementById('readyScreen').classList.remove('hidden');
-      document.getElementById('subText').textContent = 'Terminal activ pentru acordarea ștampilelor';
+      document.getElementById('subText').textContent = (window.LoialLang?.t("Terminal activ pentru acordarea ștampilelor") ?? "Terminal activ pentru acordarea ștampilelor");
 
       if (approvalToken) { await confirmSmartReceipt(); }
       else if (isDirectScan && scannedWalletUuid) {
@@ -133,7 +133,7 @@
     staffPin = pin;
     document.getElementById('pinScreen').classList.add('hidden');
     document.getElementById('readyScreen').classList.remove('hidden');
-    document.getElementById('subText').textContent = 'Terminal activ pentru acordarea ștampilelor';
+    document.getElementById('subText').textContent = (window.LoialLang?.t("Terminal activ pentru acordarea ștampilelor") ?? "Terminal activ pentru acordarea ștampilelor");
     if (approvalToken) { confirmSmartReceipt(); }
     else if (isDirectScan && scannedWalletUuid) {
       grantStampDirect(scannedWalletUuid);
@@ -151,10 +151,10 @@
 
   async function confirmSmartReceipt(){
     const box=document.getElementById('resultBox');
-    box.textContent='Se confirmă încasarea...';
+    box.textContent=(window.LoialLang?.t("Se confirmă încasarea...") ?? "Se confirmă încasarea...");
     try{
       const response=await fetch('/api/loial-receipts/confirm-payment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({business_id:Number(bizId),pin:staffPin,approval_token:approvalToken})});
-      const x=await response.json();if(!response.ok)throw Error(x.detail||'Confirmare refuzată');
+      const x=await response.json();if(!response.ok)throw Error(x.detail||(window.LoialLang?.t("Confirmare refuzată") ?? "Confirmare refuzată"));
       playBeep();box.textContent='✓ Plată confirmată · '+x.stamps+'/'+x.target+' ștampile';
     }catch(e){box.textContent='Confirmare nereușită: '+e.message;}
   }
@@ -184,7 +184,7 @@
   async function grantStampDirect(walletUuid) {
     const box = document.getElementById('resultBox');
     box.className = 'status-box';
-    box.innerHTML = '⏳ Se acordă ștampila...';
+    box.innerHTML = (window.LoialLang?.t("⏳ Se acordă ștampila...") ?? "⏳ Se acordă ștampila...");
 
     try {
       const res = await fetch('/api/scan-universal', {
@@ -215,7 +215,7 @@
 
       if(data.duplicate_ignored){
         box.className='status-box';
-        box.textContent='✓ Această scanare a fost deja procesată. Ștampilele nu s-au dublat.';
+        box.textContent=(window.LoialLang?.t("✓ Această scanare a fost deja procesată. Ștampilele nu s-au dublat.") ?? "✓ Această scanare a fost deja procesată. Ștampilele nu s-au dublat.");
         return;
       }
       playBeep();
@@ -238,7 +238,7 @@
         reward.style.fontWeight='700';reward.style.margin='10px 0';
         const button=document.createElement('button');
         button.type='button';button.className='btn-reward';
-        button.textContent='🎁 Acordă premiul și resetează cardul (0)';
+        button.textContent=(window.LoialLang?.t("🎁 Acordă premiul și resetează cardul (0)") ?? "🎁 Acordă premiul și resetează cardul (0)");
         button.onclick=()=>redeemDirect(walletUuid);
         box.appendChild(button);
       } else {
