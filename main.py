@@ -61,7 +61,7 @@ app.add_middleware(
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Authorization", "Content-Type", "X-Loial-Wallet-Token"],
 )
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -73,6 +73,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        # Do not allow browser/proxy caches to persist credentials or private API data.
+        path = request.url.path
+        if (request.headers.get("Authorization") or
+                request.headers.get("X-Loial-Wallet-Token") or
+                "loial_token" in request.cookies or
+                path.startswith(("/api/", "/auth/", "/gdpr/", "/sales/", "/admin/", "/analytics/", "/business/")) or
+                path in ("/customers", "/platform.html", "/wallet", "/loial-wallet.html", "/wallet-recovery.html")):
+            response.headers["Cache-Control"] = "no-store"
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
