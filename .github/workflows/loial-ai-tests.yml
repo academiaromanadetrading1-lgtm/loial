@@ -150,3 +150,5 @@ jobs:
 # Owner-approved single ten-minute regression rerun after correcting the full application integration expectation.
 
 # Owner-approved single ten-minute validation of security, multilingual runtime and PWA regressions.
+
+# Owner-approved single ten-minute multilingual homepage regression and staging gate, 2026-11-20.
