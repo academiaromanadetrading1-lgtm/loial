@@ -74,6 +74,24 @@ assert.equal(metric.textContent,'Your card from '+malicious);
 metric.isConnected=false;
 state.lang.set('ro');
 assert.equal(metric.textContent,'Your card from '+malicious);
+
+const homepage=fs.readFileSync('index.html','utf8');
+const neutral=new Set(['loial.space','RO','EN','DE','FR','IT','ES','NL','PL','HU','QR','0 EUR','LOIAL BUSINESS','Business','67 EUR','ProBusiness*','270 EUR','LOIAL.SPACE','FAQ']);
+const body=homepage.slice(homepage.indexOf('<body')).replace(/<script\b[\s\S]*?<\/script>/gi,'').replace(/<style\b[\s\S]*?<\/style>/gi,'').replace(/<svg\b[\s\S]*?<\/svg>/gi,'');
+const labels=[...new Set([...body.matchAll(/>([^<>]+)</g)].map(m=>m[1].trim()).filter(s=>/\p{L}/u.test(s)&&!neutral.has(s)))];
+for(const label of labels){
+  state.lang.set('en');const en=state.lang.t(label);
+  assert.ok(en!==label||langs.some(l=>{state.lang.set(l);return state.lang.t(label)!==label;}), 'Missing homepage translation: '+label);
+}
+for(const lang of langs){
+  state.lang.set(lang);
+  const line=state.lang.format('{reserved} / 500 locuri rezervate · {remaining} disponibile',{reserved:12,remaining:488});
+  assert.ok(line.includes('12')&&line.includes('488')&&!line.includes('{'));
+  assert.ok(state.lang.t('Ai o metodă de recuperare a cardului? Ieșirea elimină accesul local de pe acest dispozitiv.').length>20);
+}
+const sections=['<span>Clienții revin.</span>','<span>Până la</span>','<span>cu PIN individual de 4 cifre</span>','id="previewName" data-no-translate','id="previewReward" data-no-translate'];
+for(const marker of sections)assert.ok(homepage.includes(marker),marker);
+
 """
     result = subprocess.run(["node", "-e", script], cwd=ROOT,
                             capture_output=True, text=True, timeout=15)
