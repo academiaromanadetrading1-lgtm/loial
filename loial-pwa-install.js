@@ -16,11 +16,11 @@
       return;
     }
     b.hidden=false;
-    b.textContent='Adaugă Loial pe ecranul telefonului';
+    b.textContent=(window.LoialLang?.t("Adaugă Loial pe ecranul telefonului") ?? "Adaugă Loial pe ecranul telefonului");
     if(isiOS){
       t.textContent='iPhone: deschide din Safari, apasă Partajare, apoi „Adaugă pe ecranul principal”. Alege „Deschide ca aplicație” dacă opțiunea apare.';
     }else if(installPrompt){
-      t.textContent='Apasă butonul pentru a instala Loial ca aplicație, fără Google Wallet sau magazin de aplicații.';
+      t.textContent=(window.LoialLang?.t("Apasă butonul pentru a instala Loial ca aplicație, fără Google Wallet sau magazin de aplicații.") ?? "Apasă butonul pentru a instala Loial ca aplicație, fără Google Wallet sau magazin de aplicații.");
     }else{
       t.textContent='Android: folosește meniul browserului → „Instalează aplicația” sau „Adaugă la ecranul principal”.';
     }
