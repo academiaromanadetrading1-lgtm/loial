@@ -76,3 +76,23 @@ def test_free_only_public_pilot_can_prepare_without_stripe_but_not_with_partial_
     env["LOIAL_STRIPE_PRICE_ID"]="price_accidental_partial"
     partial=preflight(env,"production")
     assert "free_pilot_stripe_disabled" in partial["blockers"]
+
+
+def test_exact_https_origin_validation():
+    for origin in ("https://", "https://loial.space/path", "https://loial.space?x=1",
+                   "https://user@loial.space", "https://loial.space:99999",
+                   "http://loial.space", "https://*.loial.space", "https://loial.space#fragment"):
+        env=sample_env()
+        env["ALLOWED_ORIGINS"]=origin
+        assert "allowed_origins" in preflight(env,"production")["blockers"], origin
+    env=sample_env()
+    env["ALLOWED_ORIGINS"]="https://staging.loial.space"
+    assert "public_origin_allowed" in preflight(env,"production")["blockers"]
+    env["LOIAL_PUBLIC_ORIGIN"]="http://staging.loial.space"
+    assert "public_origin_https" in preflight(env,"staging")["blockers"]
+
+
+def test_unknown_deployment_stage_is_rejected():
+    import pytest
+    with pytest.raises(ValueError):
+        preflight(sample_env(),"prodution")
