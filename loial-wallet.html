@@ -144,7 +144,7 @@ button.black{background:#111318;color:#ddc48b}
   const incoming=query.get('invite');
   if(incoming && /^L-[A-Za-z0-9]{15,50}$/.test(incoming)){
     localStorage.setItem('loial_friend_invite',incoming);
-    $('inviteBanner').textContent='Ai primit o invitație! Activează un card Loial la un partener. Recomandarea va fi verificată după prima ștampilă reală.';
+    $('inviteBanner').textContent=(window.LoialLang?.t("Ai primit o invitație! Activează un card Loial la un partener. Recomandarea va fi verificată după prima ștampilă reală.") ?? "Ai primit o invitație! Activează un card Loial la un partener. Recomandarea va fi verificată după prima ștampilă reală.");
   }
   const params=new URLSearchParams(location.search);
   if(params.get('tab')==='inbox')$('inboxSection').scrollIntoView({block:'start'});
@@ -169,14 +169,14 @@ button.black{background:#111318;color:#ddc48b}
     const advice=$('customerValueAdvice'), action=$('customerValueAction');
     if(ready.length){
       advice.textContent='Ai '+ready.length+' '+(ready.length===1?'card cu recompensă disponibilă.':'carduri cu recompense disponibile.')+' Verifică oferta '+ready[0].name+' înainte de următoarea vizită.';
-      action.href='/join/'+ready[0].id;action.textContent='Vezi recompensa';
+      action.href='/join/'+ready[0].id;action.textContent=(window.LoialLang?.t("Vezi recompensa") ?? "Vezi recompensa");
     }else if(nearly.length){
       const c=nearly[0],remaining=c.target-c.stamps;
       advice.textContent='La '+c.name+' mai ai nevoie de '+remaining+' '+(remaining===1?'ștampilă':'ștampile')+' pentru recompensa afișată. Folosește cardul când ai oricum nevoie de o cumpărătură.';
-      action.href='/join/'+c.id;action.textContent='Vezi progresul cardului';
+      action.href='/join/'+c.id;action.textContent=(window.LoialLang?.t("Vezi progresul cardului") ?? "Vezi progresul cardului");
     }else{
       advice.textContent='Arată codul universal la firmele participante pentru a înregistra vizitele. Poți recomanda LOIAL unei afaceri și descoperi programul de ambasador.';
-      action.href='#merchantReferralSection';action.textContent='Descoperă programul de ambasador';
+      action.href='#merchantReferralSection';action.textContent=(window.LoialLang?.t("Descoperă programul de ambasador") ?? "Descoperă programul de ambasador");
     }
   }
   async function loadCards(){
@@ -184,7 +184,7 @@ button.black{background:#111318;color:#ddc48b}
     try{
       const data=await json('/api/wallet-profile/'+encodeURIComponent(walletId));
       $('walletHolder').textContent=data.name||'Membru Loial';
-      $('walletStatus').textContent='CARDURI ACTIVE · '+(data.businesses_count||0);
+      if(window.LoialLang?.bindText)window.LoialLang.bindText($('walletStatus'),"CARDURI ACTIVE · {count}",{count:data.businesses_count||0});else $('walletStatus').textContent='CARDURI ACTIVE · '+(data.businesses_count||0);
       {if(window.LoialLang?.bindText){window.LoialLang.bindText($('walletSummary'),"Firme: {count} · Ștampile: {stamps}",{count:data.businesses_count||0,stamps:data.total_stamps||0});}else{$('walletSummary').textContent=((data.businesses_count||0)+' firme · '+(data.total_stamps||0)+' ștampile');}}
       const qrURL=location.origin+'/scan.html?wallet_uuid='+encodeURIComponent(walletId);
       $('walletQr').src='/api/qr-link?url='+encodeURIComponent(qrURL)+'&color=%23D8BE7A&initial=L';
@@ -202,7 +202,7 @@ button.black{background:#111318;color:#ddc48b}
         link.href='/join/'+Number(c.business_id);
         card.appendChild(link);container.appendChild(card);
       }
-      if(!data.cards?.length)container.textContent='Cardul universal e activ. Următoarea firmă îți va apărea aici.';
+      if(!data.cards?.length)container.textContent=(window.LoialLang?.t("Cardul universal e activ. Următoarea firmă îți va apărea aici.") ?? "Cardul universal e activ. Următoarea firmă îți va apărea aici.");
     }catch(error){
       $('state').textContent=error.message;
       $('verifiedWallet').classList.add('hidden');
@@ -212,7 +212,7 @@ button.black{background:#111318;color:#ddc48b}
   let inboxGeneration=0;
   async function loadInbox(){
     const g=++inboxGeneration,list=$('inboxList');
-    if(!token){list.textContent='Portofelul nu este activat.';return;}
+    if(!token){list.textContent=(window.LoialLang?.t("Portofelul nu este activat.") ?? "Portofelul nu este activat.");return;}
     try{
       const data=await json('/api/loial-inbox/threads');
       if(g!==inboxGeneration)return;
@@ -237,8 +237,8 @@ button.black{background:#111318;color:#ddc48b}
         const data=await json('/api/loial-inbox/threads/'+thread.business_id+'?before='+before);
         if(g!==inboxGeneration)return;
         let enabled=data.offers_enabled;
-        pref.disabled=false;pref.textContent=enabled?(window.LoialLang?.t("Oprește ofertele acestei afaceri") ?? "Oprește ofertele acestei afaceri"):'Activează ofertele acestei afaceri';
-        pref.onclick=async()=>{try{await json('/api/loial-inbox/preferences',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({business_id:thread.business_id,enabled:!enabled})});enabled=!enabled;pref.textContent=enabled?(window.LoialLang?.t("Oprește ofertele acestei afaceri") ?? "Oprește ofertele acestei afaceri"):'Activează ofertele acestei afaceri';}catch(e){pref.textContent=e.message;}};
+        pref.disabled=false;pref.textContent=enabled?(window.LoialLang?.t("Oprește ofertele acestei afaceri") ?? "Oprește ofertele acestei afaceri"):(window.LoialLang?.t("Activează ofertele acestei afaceri") ?? "Activează ofertele acestei afaceri");
+        pref.onclick=async()=>{try{await json('/api/loial-inbox/preferences',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({business_id:thread.business_id,enabled:!enabled})});enabled=!enabled;pref.textContent=enabled?(window.LoialLang?.t("Oprește ofertele acestei afaceri") ?? "Oprește ofertele acestei afaceri"):(window.LoialLang?.t("Activează ofertele acestei afaceri") ?? "Activează ofertele acestei afaceri");}catch(e){pref.textContent=e.message;}};
         for(const message of data.messages){
           const item=newEl('details',null,'merchant');item.style.marginTop='8px';
           const summary=newEl('summary',(message.read?'':'● ')+(message.subject||'Mesaj Loial'));summary.style.cursor='pointer';item.appendChild(summary);
@@ -247,12 +247,12 @@ button.black{background:#111318;color:#ddc48b}
           const feedback=newEl('p','','muted');
           item.ontoggle=async()=>{if(item.open&&!message.read){try{await json('/api/loial-inbox/read/'+message.delivery_id,{method:'POST'});message.read=true;summary.textContent=message.subject||'Mesaj Loial';}catch(e){feedback.textContent=e.message;}}};
           if(message.kind==='marketing'){
-            for(const [choice,label] of [['interested','Mă interesează'],['not_interested','Nu mă interesează']]){
+            for(const [choice,label] of [['interested','Mă interesează'],['not_interested',(window.LoialLang?.t("Nu mă interesează") ?? "Nu mă interesează")]]){
               const button=newEl('button',label,'button secondary');
               button.onclick=async()=>{try{await json('/api/loial-crm/reaction/'+message.delivery_id+'/'+choice,{method:'POST'});{if(window.LoialLang?.bindText){window.LoialLang.bindText(feedback,"Răspuns salvat: {label}",{label});}else{feedback.textContent=('Răspuns salvat: '+label);}}}catch(e){feedback.textContent=e.message;}};
               item.appendChild(button);
             }
-            if(message.reaction)feedback.textContent='Răspuns salvat: '+(message.reaction==='interested'?(window.LoialLang?.t("Mă interesează") ?? "Mă interesează"):'Nu mă interesează');
+            if(message.reaction)feedback.textContent='Răspuns salvat: '+(message.reaction==='interested'?(window.LoialLang?.t("Mă interesează") ?? "Mă interesează"):(window.LoialLang?.t("Nu mă interesează") ?? "Nu mă interesează"));
           }
           item.appendChild(feedback);feed.appendChild(item);
         }
@@ -270,14 +270,14 @@ button.black{background:#111318;color:#ddc48b}
       $('referralLink').value=data.share_url;
       $('shareFriends').classList.remove('hidden');
       if(data.my_invitation_status==='pending'){
-        $('inviteBanner').textContent='Invitația ta este înregistrată. Punctele apar după prima ștampilă verificată.';
+        $('inviteBanner').textContent=(window.LoialLang?.t("Invitația ta este înregistrată. Punctele apar după prima ștampilă verificată.") ?? "Invitația ta este înregistrată. Punctele apar după prima ștampilă verificată.");
       }
     }catch(error){$('friendStats').textContent=error.message;}
   }
   $('inboxReload').onclick=loadInbox;
   $('copyFriendLink').onclick=async()=>{
     try{await navigator.clipboard.writeText($('referralLink').value);
-      $('copyFriendLink').textContent='✓ Copiat';}
+      $('copyFriendLink').textContent=(window.LoialLang?.t("✓ Copiat") ?? "✓ Copiat");}
     catch(error){$('copyFriendLink').textContent=(window.LoialLang?.t("Selectează linkul pentru copiere") ?? "Selectează linkul pentru copiere");}
   };
   $('shareFriendLink').onclick=async()=>{
@@ -310,7 +310,7 @@ button.black{background:#111318;color:#ddc48b}
     $('merchantAmbassadorNameRow').hidden=existing;
     $('merchantAmbassadorPassword').minLength=existing?1:10;
     $('merchantAmbassadorPassword').autocomplete=existing?'current-password':'new-password';
-    $('merchantAmbassadorSubmit').textContent=existing?(window.LoialLang?.t("Asociază contul") ?? "Asociază contul"):'Activează contul';
+    $('merchantAmbassadorSubmit').textContent=existing?(window.LoialLang?.t("Asociază contul") ?? "Asociază contul"):(window.LoialLang?.t("Activează contul") ?? "Activează contul");
   };
   $('merchantAmbassadorForm').onsubmit=async(event)=>{
     event.preventDefault();
@@ -325,13 +325,13 @@ button.black{background:#111318;color:#ddc48b}
       if(data.status!=='ambassador')throw Error((window.LoialLang?.t("Activarea nu a fost confirmată.") ?? "Activarea nu a fost confirmată."));
       $('merchantAmbassadorForm').classList.add('hidden');
       $('merchantAmbassadorDashboard').classList.remove('hidden');
-      $('merchantReferralStatus').textContent='Contul de ambasador este activ.';
+      $('merchantReferralStatus').textContent=(window.LoialLang?.t("Contul de ambasador este activ.") ?? "Contul de ambasador este activ.");
       await loadMerchantReferral();
     }catch(error){result.textContent=error.message;}
     finally{password.value='';submit.disabled=false;}
   };
   $('copyMerchantReferral').onclick=async()=>{
-    try{await navigator.clipboard.writeText($('merchantReferralLink').value);$('copyMerchantReferral').textContent='✓ Copiat';}
+    try{await navigator.clipboard.writeText($('merchantReferralLink').value);$('copyMerchantReferral').textContent=(window.LoialLang?.t("✓ Copiat") ?? "✓ Copiat");}
     catch(error){$('merchantReferralLink').select();}
   };
   $('shareMerchantReferral').onclick=async()=>{
