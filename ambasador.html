@@ -425,8 +425,8 @@
   }
   document.getElementById('ambGrowthSector').onchange=renderAmbPitch;
   document.getElementById('ambGrowthCopy').onclick=async()=>{
-    try{await navigator.clipboard.writeText(document.getElementById('ambGrowthPitch').textContent);document.getElementById('ambGrowthStatus').textContent='Mesaj copiat. Trimite-l individual, când este relevant.';}
-    catch(e){document.getElementById('ambGrowthStatus').textContent='Selectează textul pentru copiere.';}
+    try{await navigator.clipboard.writeText(document.getElementById('ambGrowthPitch').textContent);document.getElementById('ambGrowthStatus').textContent=(window.LoialLang?.t('Mesaj copiat. Trimite-l individual, când este relevant.') ?? 'Mesaj copiat. Trimite-l individual, când este relevant.');}
+    catch(e){document.getElementById('ambGrowthStatus').textContent=(window.LoialLang?.t('Selectează textul pentru copiere.') ?? 'Selectează textul pentru copiere.');}
   };
   function renderAmbDashboard(data,ledger){
     document.getElementById('enrollPanel').classList.add('hidden');
@@ -434,7 +434,7 @@
     document.getElementById('dashboardPanel').classList.remove('hidden');
     document.getElementById('dashRankBadge').textContent='Rang: '+data.rank;
     document.getElementById('dashWelcome').textContent='Salut, '+data.name+'!';
-    document.getElementById('dashEmailLabel').textContent='Comisioanele sunt afișate numai după confirmarea încasărilor în Wise Business.';
+    document.getElementById('dashEmailLabel').textContent=(window.LoialLang?.t('Comisioanele sunt afișate numai după confirmarea încasărilor în Wise Business.') ?? 'Comisioanele sunt afișate numai după confirmarea încasărilor în Wise Business.');
     {if(window.LoialLang?.bindText){window.LoialLang.bindText(document.getElementById('dashActiveBiz'),"Firme plătitoare verificate: {count}",{count:ledger.direct_paid_businesses});}else{document.getElementById('dashActiveBiz').textContent=(ledger.direct_paid_businesses+' firme plătitoare verificate');}}
     {if(window.LoialLang?.bindText){window.LoialLang.bindText(document.getElementById('dashMonthlyRate'),"{amount} EUR / firmă / lună",{amount:data.monthly_rate});}else{document.getElementById('dashMonthlyRate').textContent=(data.monthly_rate+' EUR / firmă / lună');}}
     document.getElementById('dashRefCode').textContent=data.ref_code;
