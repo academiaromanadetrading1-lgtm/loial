@@ -226,3 +226,39 @@ assert.ok(matched>=13,'Dynamic security/payment statuses missing');
     result = subprocess.run(["node", "-e", script], cwd=ROOT,
                             capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stderr
+
+
+def test_dynamic_variable_translations_and_runtime_links():
+    script = r"""
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const script=fs.readFileSync('loial-i18n.js','utf8');
+const data=Function('return '+script.slice(script.indexOf('(function(){'),script.indexOf('const dictionary='))+'return rows;})();')();
+const dictionary=new Map(data.map(x=>[x[0],x]));
+const languages=['ro','en','de','fr','it','es','nl','pl','hu'];
+const cases=[
+  ['Colectează {count} ștampile și primești premiul!',{count:6}],
+  ['Locație #{id}',{id:15}],
+  ['Vânzări înregistrate: {amount}',{amount:'500 EUR'}],
+  ['În așteptare: {pending} EUR | Aprobat: {approved} EUR | Achitat: {paid} EUR',{pending:'12.00',approved:'8.00',paid:'5.00'}],
+  ['Ambasadori recrutați direct: {count}',{count:7}],
+  ['Recomandări validate: {qualified} · În așteptare: {pending} · Puncte pilot: {points}',{qualified:4,pending:2,points:16}]
+];
+for(const [key,values] of cases){
+  const translations=dictionary.get(key);
+  assert.ok(translations,'Missing dynamic template '+key);
+  for(const [index,lang] of languages.entries()){
+    const text=translations[index].replace(/\{([a-zA-Z]\w*)\}/g,(_,name)=>String(values[name]));
+    for(const value of Object.values(values))assert.ok(text.includes(String(value)),lang+': '+key);
+    assert.ok(!/\{[a-zA-Z]\w*\}/.test(text),lang+': unresolved template '+key);
+  }
+}
+const merchant=fs.readFileSync('platform.html','utf8');
+const ambassador=fs.readFileSync('ambasador.html','utf8');
+const wallet=fs.readFileSync('loial-wallet.html','utf8');
+for(const key of cases.slice(0,3).map(x=>x[0]))assert.ok(merchant.includes("LoialLang?.format('"+key+"'"),'Merchant missing formatting: '+key);
+for(const key of cases.slice(3,5).map(x=>x[0]))assert.ok(ambassador.includes("LoialLang?.format('"+key+"'"),'Ambassador missing formatting: '+key);
+assert.ok(wallet.includes("LoialLang?.format('"+cases[5][0]+"'"),'Wallet missing formatting');
+"""
+    result = subprocess.run(["node", "-e", script], cwd=ROOT,
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
