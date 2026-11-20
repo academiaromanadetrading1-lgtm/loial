@@ -185,7 +185,7 @@ button.black{background:#111318;color:#ddc48b}
       const data=await json('/api/wallet-profile/'+encodeURIComponent(walletId));
       $('walletHolder').textContent=data.name||'Membru Loial';
       $('walletStatus').textContent='CARDURI ACTIVE · '+(data.businesses_count||0);
-      $('walletSummary').textContent=(data.businesses_count||0)+' firme · '+(data.total_stamps||0)+' ștampile';
+      $('walletSummary').textContent=(window.LoialLang?.format("Firme: {count} · Ștampile: {stamps}",{count:data.businesses_count||0,stamps:data.total_stamps||0}) ?? ((data.businesses_count||0)+' firme · '+(data.total_stamps||0)+' ștampile'));
       const qrURL=location.origin+'/scan.html?wallet_uuid='+encodeURIComponent(walletId);
       $('walletQr').src='/api/qr-link?url='+encodeURIComponent(qrURL)+'&color=%23D8BE7A&initial=L';
       $('verifiedWallet').classList.remove('hidden');
@@ -249,7 +249,7 @@ button.black{background:#111318;color:#ddc48b}
           if(message.kind==='marketing'){
             for(const [choice,label] of [['interested','Mă interesează'],['not_interested','Nu mă interesează']]){
               const button=newEl('button',label,'button secondary');
-              button.onclick=async()=>{try{await json('/api/loial-crm/reaction/'+message.delivery_id+'/'+choice,{method:'POST'});feedback.textContent='Răspuns salvat: '+label;}catch(e){feedback.textContent=e.message;}};
+              button.onclick=async()=>{try{await json('/api/loial-crm/reaction/'+message.delivery_id+'/'+choice,{method:'POST'});feedback.textContent=(window.LoialLang?.format("Răspuns salvat: {label}",{label}) ?? ('Răspuns salvat: '+label));}catch(e){feedback.textContent=e.message;}};
               item.appendChild(button);
             }
             if(message.reaction)feedback.textContent='Răspuns salvat: '+(message.reaction==='interested'?(window.LoialLang?.t("Mă interesează") ?? "Mă interesează"):'Nu mă interesează');
@@ -302,7 +302,7 @@ button.black{background:#111318;color:#ddc48b}
       $('merchantReferralActions').classList.remove('hidden');
       $('merchantAmbassadorForm').classList.toggle('hidden',data.status!=='eligible_for_activation');
       $('merchantAmbassadorDashboard').classList.toggle('hidden',data.status!=='ambassador');
-      if(data.status==='ambassador')$('merchantReferralStatus').textContent='Ambasador activ · '+data.registered_merchants+' firme recomandate. Continuă cu firme noi și verifică veniturile confirmate în cont.';
+      if(data.status==='ambassador')$('merchantReferralStatus').textContent=(window.LoialLang?.format("Firme recomandate: {count}. Ambasador activ. Continuă cu firme noi și verifică veniturile confirmate în cont.",{count:data.registered_merchants}) ?? ('Ambasador activ · '+data.registered_merchants+' firme recomandate. Continuă cu firme noi și verifică veniturile confirmate în cont.'));
     }catch(error){$('merchantReferralStatus').textContent=error.message;}
   }
   $('merchantAmbassadorMode').onchange=()=>{
