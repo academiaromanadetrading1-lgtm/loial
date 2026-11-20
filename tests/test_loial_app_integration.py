@@ -29,6 +29,9 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert len(manifest.json()["icons"])>=2
             app_page=client.get("/wallet")
             assert app_page.status_code==200,app_page.text
+            assert app_page.headers["cache-control"] == "no-store"
+            assert app_page.headers["x-content-type-options"] == "nosniff"
+            assert app_page.headers["x-frame-options"] == "DENY"
             assert "id=\"walletQr\"" in app_page.text
             assert "loial-pwa-install.js" in app_page.text
             for size in (192,512):
@@ -76,6 +79,7 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
 
             unauthorized = client.get("/api/loial-identity/me")
             assert unauthorized.status_code == 401
+            assert unauthorized.headers["cache-control"] == "no-store"
 
             sign_up = client.post("/api/register", json={
                 "email": "owner.smoke@example.invalid",
@@ -91,6 +95,7 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                 "email":"owner.smoke@example.invalid",
                 "password":"strong-test-password-only"})
             assert login.status_code==200,login.text
+            assert login.headers["cache-control"] == "no-store"
             login_headers={"Authorization":"Bearer "+login.json()["access_token"]}
             assert client.get("/api/loial-stripe/me",headers=login_headers).status_code==200
             from jose import jwt as jose_jwt
@@ -117,6 +122,7 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert client.get("/api/loial-ai/context",headers=bearer).status_code==402
             identity = client.get("/api/loial-identity/me", headers=bearer)
             assert identity.status_code == 200, identity.text
+            assert identity.headers["cache-control"] == "no-store"
             assert identity.json()["roles"] == ["business"]
 
             new_card = client.post("/api/enroll-sync", json={
@@ -140,6 +146,7 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             inbox = client.get("/api/loial-inbox/me",
                 headers={"X-Loial-Wallet-Token": "T" * 48})
             assert inbox.status_code == 200
+            assert inbox.headers["cache-control"] == "no-store"
             assert any(message["kind"] == "service"
                        for message in inbox.json()["messages"])
             assert client.get("/api/premium-wallet/customer/cards",
