@@ -295,22 +295,22 @@
 
 <script>
   function updateCalc() {
-    const n = parseInt(document.getElementById('bizSlider').value) || 1;
-    document.getElementById('calcCountLabel').textContent = n + (n === 1 ? ' firmă' : ' firme');
-    let rate = 5;
-    let rank = 'Ambasador Loial (5 EUR/lună/firmă)';
-    if (n >= 51) {
-      rate = 15;
-      rank = 'Ambasador Senior 50+ (15 EUR/lună/firmă)';
-    } else if (n >= 26) {
-      rate = 10;
-      rank = 'Ambasador Manager (10 EUR/lună/firmă)';
-    }
-    document.getElementById('calcRankLabel').textContent = rank;
-    document.getElementById('calcMonth1').textContent = (n * 20) + ' EUR';
-    {if(window.LoialLang?.bindText){window.LoialLang.bindText(document.getElementById('calcRecurring'),"{amount} EUR / lună",{amount:n*rate});}else{document.getElementById('calcRecurring').textContent=((n * rate) + ' EUR / lună');}}
+    const n = parseInt(document.getElementById('bizSlider').value, 10) || 1;
+    const tr = key => window.LoialLang?.t(key) ?? key;
+    const fmt = (key,values) => window.LoialLang?.format(key,values) ?? key.replace(/\\{(\\w+)\\}/g,(_,k)=>String(values[k]));
+    const countLabel=document.getElementById('calcCountLabel');
+    countLabel.textContent=fmt(n===1?'{count} firmă':'{count} firme',{count:n});
+    const rank=n>=51?'Ambasador Senior 50+ (15 EUR/lună/firmă)':n>=26?'Ambasador Manager (10 EUR/lună/firmă)':'Ambasador Loial (5 EUR/lună/firmă)';
+    const rate=n>=51?15:n>=26?10:5;
+    document.getElementById('calcRankLabel').textContent=tr(rank);
+    document.getElementById('calcMonth1').textContent=(n*20)+' EUR';
+    const recurring=document.getElementById('calcRecurring');
+    if(window.LoialLang?.bindText)window.LoialLang.bindText(recurring,'{amount} EUR / lună',{amount:n*rate});
+    else recurring.textContent=(n*rate)+' EUR / lună';
   }
   updateCalc();
+  document.addEventListener('loial:ready',updateCalc);
+  document.addEventListener('loial:language',updateCalc);
 
   // The dashboard only displays authenticated server data, never a stored
   // self-reported commission or registration response.
