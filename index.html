@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LOIAL — Fidelizare, clienți recurenți și recomandări</title>
+<title data-loial-text>LOIAL — Fidelizare, clienți recurenți și recomandări</title>
 <meta name="description" content="LOIAL este platforma SaaS de fidelizare și management pentru afaceri locale: carduri digitale QR, CRM, retenție, consultanți AI și program de ambasadori. Start gratuit, până la 50 de clienți.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="LOIAL — Fidelizare și management pentru afaceri locale">
@@ -186,7 +186,7 @@
 
 <header>
   <div class="nav-container">
-    <a class="loial-wordmark" href="/">loial.space<span class="loial-tagline">Spațiul tău loial</span></a>
+    <a class="loial-wordmark" href="/"><span>loial.space</span><span class="loial-tagline">Spațiul tău loial</span></a>
     <nav>
       <div class="dropdown">
         <button type="button" class="dropdown-btn" id="industriesMenuBtn" aria-label="Soluții pentru industrii">Industrii ▾</button>
@@ -273,7 +273,7 @@
   </div>
 </section>
 
-<section class="founder-section" id="fondatori" data-founders="ticker"><h2>Primele 500 de firme fondatoare LOIAL</h2><p>Intră printre fondatori și primești vizibilitate gratuită în galeria oficială și afișare rotativă pe homepage, cât timp programul LOIAL este disponibil. Validare și acord necesare.</p><div class="founder-count" data-founder-count>Se încarcă locurile disponibile…</div><div class="founder-label" data-founder-demo></div><div data-founder-list></div><div class="founder-controls"><a href="/register.html">Înscrie firma gratuit →</a><a href="/fondatori">Galeria fondatorilor</a><button type="button" data-founder-pause aria-pressed="false">Oprește animația</button></div></section><script>(()=>{const root=document.querySelector('[data-founders]');if(!root)return;
+<section class="founder-section" id="fondatori" data-founders="ticker"><h2>Primele 500 de firme fondatoare LOIAL</h2><p>Intră printre fondatori și primești vizibilitate gratuită în galeria oficială și afișare rotativă pe homepage, cât timp programul LOIAL este disponibil. Validare și acord necesare.</p><div class="founder-count" data-founder-count data-loial-text>Se încarcă locurile disponibile…</div><div class="founder-label" data-founder-demo></div><div data-founder-list></div><div class="founder-controls"><a href="/register.html">Înscrie firma gratuit →</a><a href="/fondatori">Galeria fondatorilor</a><button type="button" data-founder-pause aria-pressed="false">Oprește animația</button></div></section><script>(()=>{const root=document.querySelector('[data-founders]');if(!root)return;
 const demo=['Exemplu · Cafenea 01','Exemplu · Bistro 02','Exemplu · Florărie 03','Exemplu · Studio 04','Exemplu · Atelier 05','Exemplu · Brutărie 06','Exemplu · Retail 07','Exemplu · Frizerie 08','Exemplu · Restaurant 09','Exemplu · Service auto 10','Exemplu · Pizzerie 11','Exemplu · Patiserie 12','Exemplu · Ceainărie 13','Exemplu · Pet shop 14','Exemplu · Salon 15','Exemplu · Spălătorie 16','Exemplu · Cofetărie 17','Exemplu · Magazin 18','Exemplu · Optică 19','Exemplu · Fitness 20','Exemplu · Studio foto 21','Exemplu · Băcănie 22','Exemplu · Gelaterie 23','Exemplu · Librărie 24','Exemplu · Cadouri 25','Exemplu · Boutique 26','Exemplu · Barber 27','Exemplu · Fast food 28','Exemplu · Catering 29','Exemplu · Design 30'];
 const node=(tag,cls,txt)=>{const e=document.createElement(tag);e.className=cls;if(txt)e.textContent=txt;return e};
 const tr=key=>window.LoialLang?.t(key)??key;
@@ -289,9 +289,9 @@ document.addEventListener('loial:ready',refresh);document.addEventListener('loia
 fetch('/api/loial-founders',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();return r.json()}).then(data=>{latestData=data;loaded=true;refresh()}).catch(()=>{latestData=null;loaded=true;refresh()});})();</script><section class="growth-wrap" id="pentru-cine">
   <div class="growth-intro"><small>O REȚEA. TREI MODURI DE A CÂȘTIGA.</small><h2>Ce câștigi concret cu LOIAL?</h2><p>Alege rolul tău. Poți fi și client, și ambasador.</p></div>
   <div class="growth-grid">
-  <article class="growth-card"><span class="growth-icon">01</span><h3>Am o afacere</h3><p>Transformă vizitele în relații cu clienții pe care le poți măsura.</p><ul><li>Card digital personalizat și ștampile la casă.</li><li>Istoric al cumpărăturilor confirmate și segmente CRM în Business.</li><li>Campanii native și consultanți virtuali LOIAL AI în planurile eligibile.</li></ul><a class="btn-primary" href="/register.html">Creează cont gratuit</a></article>
-  <article class="growth-card"><span class="growth-icon">02</span><h3>Sunt client</h3><p>Cardurile LOIAL într-un singur portofel, direct pe telefon.</p><ul><li>Urmărești recompensele firmelor participante.</li><li>Primești oferte de la firmele cărora le-ai dat acordul.</li><li>Recomanzi o afacere și poți activa statutul de ambasador după prima înscriere eligibilă.</li></ul><a class="btn-outline" href="/wallet">Deschide portofelul</a></article>
-  <article class="growth-card"><span class="growth-icon">03</span><h3>Sunt ambasador</h3><p>Ajută antreprenorii locali să descopere LOIAL.</p><ul><li>Link și QR personal pentru recomandări.</li><li>Comisioane pentru abonamente eligibile achitate și confirmate.</li><li>Simulator de venit și mentor comercial cu mesaje pe domenii.</li></ul><a class="btn-outline" href="/ambasador.html">Vezi programul și simulatorul</a></article>
+  <article class="growth-card"><span class="growth-icon">01</span><h3>Am o afacere</h3><p>Transformă vizitele în relații cu clienții pe care le poți măsura.</p><ul><li><span>Card digital personalizat și ștampile la casă.</span></li><li><span>Istoric al cumpărăturilor confirmate și segmente CRM în Business.</span></li><li><span>Campanii native și consultanți virtuali LOIAL AI în planurile eligibile.</span></li></ul><a class="btn-primary" href="/register.html">Creează cont gratuit</a></article>
+  <article class="growth-card"><span class="growth-icon">02</span><h3>Sunt client</h3><p>Cardurile LOIAL într-un singur portofel, direct pe telefon.</p><ul><li><span>Urmărești recompensele firmelor participante.</span></li><li><span>Primești oferte de la firmele cărora le-ai dat acordul.</span></li><li><span>Recomanzi o afacere și poți activa statutul de ambasador după prima înscriere eligibilă.</span></li></ul><a class="btn-outline" href="/wallet">Deschide portofelul</a></article>
+  <article class="growth-card"><span class="growth-icon">03</span><h3>Sunt ambasador</h3><p>Ajută antreprenorii locali să descopere LOIAL.</p><ul><li><span>Link și QR personal pentru recomandări.</span></li><li><span>Comisioane pentru abonamente eligibile achitate și confirmate.</span></li><li><span>Simulator de venit și mentor comercial cu mesaje pe domenii.</span></li></ul><a class="btn-outline" href="/ambasador.html">Vezi programul și simulatorul</a></article>
   </div>
 </section>
 <section class="growth-wrap" id="cum-functioneaza"><div class="growth-dark">
@@ -366,12 +366,12 @@ fetch('/api/loial-founders',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();
   <div class="pricing-grid">
     <div class="price-card">
       <div>
-        <div class="plan-name">Plan Start</div>
+        <div class="plan-name" data-loial-text>Plan Start</div>
         <div class="plan-desc">Ideal pentru testare și primele campanii în locație.</div>
         <div class="plan-price">0 EUR <span>/ lună</span></div>
         <div class="vat-note">Gratuit pentru totdeauna până la 50 de clienți</div>
         <ul class="feature-list">
-          <li><span class="check-icon">✓</span> Până la <strong>50 de clienți activi</strong></li>
+          <li><span class="check-icon">✓</span> <span>Până la</span> <strong>50 de clienți activi</strong></li>
           <li><span class="check-icon">✓</span> <span>Scanări și ștampile nelimitate</span></li>
           <li><span class="check-icon">✓</span> <span>Afiș QR A5 printabil pentru tejghea</span></li>
           <li><span class="check-icon">✓</span> <span>Card digital instant fără aplicație</span></li>
@@ -384,13 +384,13 @@ fetch('/api/loial-founders',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();
     <div class="price-card featured">
       <div class="popular-tag">RECOMANDAT PENTRU AFACERI ACTIVE</div>
       <div>
-        <div class="plan-name">Business</div>
+        <div class="plan-name" data-loial-text>Business</div>
         <div class="plan-desc">Fidelizare, CRM și LOIAL AI pentru o singură locație.</div>
         <div class="plan-price">67 EUR <span>/ lună</span></div>
         <div class="vat-note">Fără TVA adăugat în prezent</div>
         <ul class="feature-list">
           <li><span class="check-icon">✓</span> <span>O locație</span></li><li><span class="check-icon">✓</span> <strong>Clienți activi nelimitați</strong></li>
-          <li><span class="check-icon">✓</span> <strong>Angajați nelimitați</strong> cu PIN individual de 4 cifre</li>
+          <li><span class="check-icon">✓</span> <strong>Angajați nelimitați</strong> <span>cu PIN individual de 4 cifre</span></li>
           <li><span class="check-icon">✓</span> <span>Coduri QR personalizate în culoarea brandului</span></li>
           <li><span class="check-icon">✓</span> <span>Funcții offline, în limita compatibilității dispozitivului</span></li>
           <li><span class="check-icon">✓</span> <span>Statistici detaliate și top scanări per angajat</span></li>
@@ -400,16 +400,16 @@ fetch('/api/loial-founders',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();
       <button type="button" class="btn-primary" style="width:100%;padding:15px;font-size:15px;" onclick="goRegister()">Testează gratuit, apoi Business →</button>
     </div>
     <div class="price-card">
-      <div><div class="plan-name">ProBusiness*</div><div class="plan-desc">Pentru afaceri cu mai multe locații.</div>
+      <div><div class="plan-name" data-loial-text>ProBusiness*</div><div class="plan-desc">Pentru afaceri cu mai multe locații.</div>
       <div class="plan-price">270 EUR <span>/ lună</span></div>
       <div class="vat-note">Până la 5 locații • ofertă personalizată peste 5</div>
-      <ul class="feature-list"><li>✓ Clienți și angajați nelimitați</li><li>✓ Management centralizat al locațiilor</li><li>✓ Statistici și analiză financiară consolidată</li><li>✓ Compararea performanței locațiilor</li><li>✓ LOIAL AI avansat</li></ul>
+      <ul class="feature-list"><li><span>✓ Clienți și angajați nelimitați</span></li><li><span>✓ Management centralizat al locațiilor</span></li><li><span>✓ Statistici și analiză financiară consolidată</span></li><li><span>✓ Compararea performanței locațiilor</span></li><li><span>✓ LOIAL AI avansat</span></li></ul>
       <p>Plan în pregătire; activarea va fi disponibilă după validarea funcțiilor.</p></div>
       <button type="button" class="btn-outline" style="width:100%;padding:14px" onclick="goRegister()">Începe cu Start →</button>
     </div>
   </div>
 
-  <div class="roi-box">💡 <strong>Calculează rentabilitatea:</strong> La un câștig incremental de 5 EUR per vizită, ai nevoie de 14 vizite suplimentare pe lună pentru a acoperi abonamentul de 67 EUR. Exemplu ipotetic, fără garanția rezultatului.</div>
+  <div class="roi-box">💡 <strong>Calculează rentabilitatea:</strong> <span>La un câștig incremental de 5 EUR per vizită, ai nevoie de 14 vizite suplimentare pe lună pentru a acoperi abonamentul de 67 EUR. Exemplu ipotetic, fără garanția rezultatului.</span></div>
 </section>
 
 <section class="section-wrap" id="intrebari">
