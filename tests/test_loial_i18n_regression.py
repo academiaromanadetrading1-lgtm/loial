@@ -175,3 +175,27 @@ for(const row of rows)assert.equal(row.length,9,'Incomplete locale row: '+row[0]
     result = subprocess.run(["node", "-e", script], cwd=ROOT,
                             capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stderr
+
+
+def test_accessibility_attribute_translation_and_locale_switching():
+    script = r"""
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const js=fs.readFileSync('loial-i18n.js','utf8');
+const attrs={'aria-label':'Cardurile mele',title:'Cardurile mele',alt:'Cardurile mele'};
+const element={closest:()=>null,hasAttribute:key=>Object.hasOwn(attrs,key),
+  getAttribute:key=>attrs[key],setAttribute:(key,value)=>{attrs[key]=value;}};
+const document={readyState:'loading',documentElement:{},
+  addEventListener(){},dispatchEvent(){},
+  querySelectorAll:selector=>selector.startsWith('[aria-label]')?[element]:[]};
+const window={addEventListener(){}};
+const localStorage={getItem:()=>null,setItem(){}};
+new Function('document','window','localStorage','CustomEvent',js)(document,window,localStorage,function(){});
+for(const lang of ['en','ro','de','fr','it','es','nl','pl','hu']){
+  window.LoialLang.set(lang);
+  const expected=window.LoialLang.t('Cardurile mele');
+  for(const attribute of ['aria-label','title','alt'])assert.equal(attrs[attribute],expected);
+}
+"""
+    result = subprocess.run(["node", "-e", script], cwd=ROOT,
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
