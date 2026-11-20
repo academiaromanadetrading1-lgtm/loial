@@ -549,9 +549,9 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
     role = "pending"
     name = email
 
-    if user and pwd_context.verify(req.password, user.password):
+    if user and user.role and pwd_context.verify(req.password, user.password):
         authenticated = user
-        role = user.role or "admin"
+        role = user.role
         name = user.name
     elif agent and pwd_context.verify(req.password, agent.password):
         authenticated = agent
@@ -838,7 +838,8 @@ def privacy_info():
     }
 
 @app.post("/sales/register")
-def register_agent(name: str, email: str, password: str, phone: str = "", db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def register_agent(request: Request, name: str, email: str, password: str, phone: str = "", db: Session = Depends(get_db)):
     existing = db.query(SalesAgent).filter(SalesAgent.email == email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -855,7 +856,8 @@ def register_agent(name: str, email: str, password: str, phone: str = "", db: Se
     return {"status": "pending", "message": "Cont creat. Așteaptă validarea administratorului.", "agent_id": agent.id}
 
 @app.post("/sales/login")
-def agent_login(email: str, password: str, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+def agent_login(request: Request, email: str, password: str, db: Session = Depends(get_db)):
     agent = db.query(SalesAgent).filter(SalesAgent.email == email).first()
     if not agent or not pwd_context.verify(password, agent.password):
         raise HTTPException(status_code=401, detail="Email sau parolă incorectă")
@@ -1212,7 +1214,8 @@ def respond_feedback(feedback_id: int, response: str, current_user: User = Depen
     return {"status": "responded"}
 
 @app.post("/business/login")
-def business_login(email: str, password: str, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+def business_login(request: Request, email: str, password: str, db: Session = Depends(get_db)):
     biz = db.query(BusinessAccount).filter(BusinessAccount.email == email).first()
     if not biz or not pwd_context.verify(password, biz.password):
         raise HTTPException(status_code=401, detail="Email sau parolă incorectă")
