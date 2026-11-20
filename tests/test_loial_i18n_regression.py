@@ -149,3 +149,29 @@ for(const n of [1,20,26,50,51,80])for(const lang of langs){
     result = subprocess.run(["node", "-e", script], cwd=ROOT,
                             capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stderr
+
+
+def test_public_account_and_ambassador_static_locale_coverage():
+    script = r"""
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const script=fs.readFileSync('loial-i18n.js','utf8');
+const rows=Function('return '+script.slice(script.indexOf('(function(){'),script.indexOf('const dictionary='))+'return rows;})();')();
+const keys=new Set(rows.map(row=>row[0]));
+const checked=['ambasador.html','register.html','loial-wallet.html','login.html','wallet-recovery.html'];
+for(const filename of checked){
+  const source=fs.readFileSync(filename,'utf8');
+  const clean=source.slice(source.indexOf('<body'))
+    .replace(/<script\b[\s\S]*?<\/script>/gi,'')
+    .replace(/<style\b[\s\S]*?<\/style>/gi,'')
+    .replace(/<svg\b[\s\S]*?<\/svg>/gi,'');
+  const missing=[...new Set([...clean.matchAll(/>([^<>]+)</g)]
+    .map(m=>m[1].trim())
+    .filter(s=>/[ăâîșțĂÂÎȘȚ]/.test(s)&&!keys.has(s)))];
+  assert.deepEqual(missing,[],filename+' missing translations');
+}
+assert.equal(rows.length,new Set(rows.map(r=>r[0])).size,'Duplicate translation keys');
+for(const row of rows)assert.equal(row.length,9,'Incomplete locale row: '+row[0]);
+"""
+    result = subprocess.run(["node", "-e", script], cwd=ROOT,
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
