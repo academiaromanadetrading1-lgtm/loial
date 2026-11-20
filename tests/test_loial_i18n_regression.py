@@ -199,3 +199,30 @@ for(const lang of ['en','ro','de','fr','it','es','nl','pl','hu']){
     result = subprocess.run(["node", "-e", script], cwd=ROOT,
                             capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stderr
+
+
+def test_dynamic_security_and_payment_status_locales():
+    script = r"""
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const code=fs.readFileSync('loial-i18n.js','utf8');
+const rows=Function('return '+code.slice(code.indexOf('(function(){'),code.indexOf('const dictionary='))+'return rows;})();')();
+const dict=new Map(rows.map(x=>[x[0],x]));
+const langs=['ro','en','de','fr','it','es','nl','pl','hu'];
+const routes=['platform.html','loial-ai.html','ambasador.html'];
+let matched=0;
+for(const filename of routes){
+  const html=fs.readFileSync(filename,'utf8');
+  for(const match of html.matchAll(/window\.LoialLang\?\.t\('([^']+)'\) \?\? '([^']+)'/g)){
+    assert.equal(match[1],match[2],filename+' fallback differs');
+    const translations=dict.get(match[1]);
+    assert.ok(translations,filename+' missing translation: '+match[1]);
+    assert.equal(translations.length,9,filename+' incomplete translation: '+match[1]);
+    for(const locale of langs)assert.ok(translations[langs.indexOf(locale)].trim().length>0);
+    matched++;
+  }
+}
+assert.ok(matched>=13,'Dynamic security/payment statuses missing');
+"""
+    result = subprocess.run(["node", "-e", script], cwd=ROOT,
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
