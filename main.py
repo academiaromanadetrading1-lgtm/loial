@@ -2817,8 +2817,22 @@ def scan_universal_card(request: Request, req: UniversalScanRequest, db: Session
         raise HTTPException(status_code=409,
             detail="Recompensa este deja disponibila; acord-o inaintea unei noi stampile.")
     previous_visit = customer.last_visit
-    customer.stamps = (customer.stamps or 0) + 1
-    customer.last_visit = datetime.now().isoformat()
+    # Keep stamp increments atomic across simultaneous staff requests. A stale
+    # SQLAlchemy customer object must not overwrite a concurrent scan.
+    from sqlalchemy import update as sql_update
+    now_stamp = datetime.now().isoformat()
+    updated = db.execute(sql_update(Customer).where(
+        Customer.id == customer.id,
+        func.coalesce(Customer.stamps, 0) < target
+    ).values(
+        stamps=func.coalesce(Customer.stamps, 0) + 1,
+        last_visit=now_stamp
+    )).rowcount
+    if updated != 1:
+        db.rollback()
+        raise HTTPException(status_code=409,
+            detail="Recompensa este deja disponibila; acord-o inaintea unei noi stampile.")
+    db.refresh(customer)
     if staff:
         staff.scans_count = (staff.scans_count or 0) + 1
 
