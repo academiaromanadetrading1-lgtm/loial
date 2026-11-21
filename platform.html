@@ -116,6 +116,38 @@
   </div>
 
 <section id="loialQuickActions" class="loial-quick-grid" aria-label="Funcțiile afacerii"><a class="loial-quick" href="#loialCustomers"><strong>Clienți</strong><small>Activitate și carduri</small></a><a class="loial-quick" href="#openScanLink"><strong>Scanează card</strong><small>Terminalul de la casă</small></a><a class="loial-quick" href="#rewardInput"><strong>Fidelizare</strong><small>Oferta și recompensele</small></a><a class="loial-quick" data-premium-url="/loial-ai.html#messages" role="link" aria-disabled="true" tabindex="0"><strong>Campanii</strong><small>Mesaje și retenție</small><small data-lock-label>Business</small></a><a class="loial-quick" data-premium-url="/loial-ai.html#reports" role="link" aria-disabled="true" tabindex="0"><strong>Analiza afacerii</strong><small>Rapoarte LOIAL AI</small><small data-lock-label>Business</small></a><a class="loial-quick" href="#loialRolesSection"><strong>Administrare</strong><small>Roluri și configurare</small></a></section>
+  <section class="card" id="loialWinbackPanel" aria-labelledby="winbackHeading">
+    <span class="step-tag">RETENȚIE · DATE CONFIRMATE</span>
+    <h2 id="winbackHeading">Acțiuni Win-Back</h2>
+    <p id="winbackStatus" role="status" aria-live="polite">Se verifică vizitele confirmate ale firmei…</p>
+    <div class="grid-2" style="margin:16px 0;">
+      <div><strong style="font-size:30px;color:var(--primary)" id="winbackAtRisk">—</strong><p>Clienți care nu au revenit la intervalul estimat</p></div>
+      <div><strong style="font-size:30px;color:var(--primary)" id="winbackPotential">—</strong><p>Scenariu de venit potențial, nu vânzări confirmate</p></div>
+    </div>
+    <details>
+      <summary style="cursor:pointer;font-weight:700">Configurează estimarea</summary>
+      <form id="winbackSettingsForm" style="margin-top:15px">
+        <div class="grid-2">
+          <label>Bon mediu estimat (în moneda aleasă)
+            <input id="winbackTicket" type="number" min="0" max="1000000" step="0.01" required>
+          </label>
+          <label>Marjă de contribuție estimată (%)
+            <input id="winbackMargin" type="number" min="0" max="100" step="1" required>
+          </label>
+          <label>Prag de revenire implicit (zile)
+            <input id="winbackDays" type="number" min="3" max="365" step="1" required>
+          </label>
+          <label>Monedă
+            <select id="winbackCurrency"><option value="RON">RON</option><option value="EUR">EUR</option><option value="USD">USD</option><option value="GBP">GBP</option></select>
+          </label>
+        </div>
+        <button class="btn-secondary" type="submit" id="winbackSaveBtn">Salvează estimările</button>
+      </form>
+    </details>
+    <button class="btn-primary" type="button" id="winbackDraftBtn" disabled style="margin-top:14px">Pregătește campania de revenire</button>
+    <p id="winbackDraftHint" style="font-size:12px;color:var(--text-muted)">Trimiterea nu este activată. Ofertele se vor putea trimite doar după verificarea consimțământului și aprobarea explicită a firmei.</p>
+    <p style="font-size:12px;color:var(--text-muted)">Vizitele sunt numărate numai din ștampile confirmate. Scenariul presupune o revenire de 25% și nu măsoară creșterea incrementală. Nu s-a aplicat niciun curs valutar.</p>
+  </section>
   <div class="card" id="wiseBillingCard">
     <span class="step-tag">ABONAMENT LOIAL BUSINESS</span>
     <h2>67 EUR / lună, fără TVA adăugat</h2>
@@ -894,6 +926,47 @@
     }catch(err){status.textContent=err.message;}
   }
 
+  async function loadWinback() {
+    const status=document.getElementById('winbackStatus');
+    try {
+      const [settingsResponse,insightsResponse]=await Promise.all([
+        authorizedFetch('/api/loial-winback/settings'),
+        authorizedFetch('/api/loial-winback/insights')
+      ]);
+      if(!settingsResponse.ok||!insightsResponse.ok)throw Error('Analiza retenției nu este disponibilă.');
+      const settings=await settingsResponse.json(),data=await insightsResponse.json();
+      document.getElementById('winbackTicket').value=(settings.average_ticket_minor/100).toFixed(2);
+      document.getElementById('winbackMargin').value=settings.estimated_margin_percent;
+      document.getElementById('winbackDays').value=settings.default_return_days;
+      document.getElementById('winbackCurrency').value=settings.currency;
+      document.getElementById('winbackAtRisk').textContent=String(data.at_risk_customers);
+      document.getElementById('winbackPotential').textContent=new Intl.NumberFormat(
+        window.LoialLang?.get()||'en',{style:'currency',currency:data.currency||'RON'}
+      ).format(data.potential_return_revenue_minor/100);
+      status.textContent='Analizate '+data.confirmed_visit_customers+' carduri cu vizite confirmate; '+data.with_personal_cycle+' au un ciclu individual estimat.';
+    }catch(error){status.textContent=error.message;}
+  }
+  document.getElementById('winbackSettingsForm').addEventListener('submit',async event=>{
+    event.preventDefault();
+    const status=document.getElementById('winbackStatus');
+    const ticket=Number(document.getElementById('winbackTicket').value);
+    const margin=Number(document.getElementById('winbackMargin').value);
+    const days=Number(document.getElementById('winbackDays').value);
+    if(!Number.isFinite(ticket)||ticket<0||!Number.isSafeInteger(days)||
+       !Number.isSafeInteger(margin)||ticket>1000000)return status.textContent='Valori invalide.';
+    const payload={average_ticket_minor:Math.round(ticket*100),
+      estimated_margin_percent:margin,default_return_days:days,
+      currency:document.getElementById('winbackCurrency').value};
+    const button=document.getElementById('winbackSaveBtn');
+    button.disabled=true;
+    try{
+      const res=await authorizedFetch('/api/loial-winback/settings',{method:'PUT',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      if(!res.ok)throw Error('Setările nu au putut fi salvate.');
+      await loadWinback();
+    }catch(error){status.textContent=error.message;}
+    finally{button.disabled=false;}
+  });
   async function loadDashboard() {
     const res = await authorizedFetch(`/api/biz-full/${bizId}`);
     if (!res.ok) return;
@@ -902,6 +975,7 @@
     renderDashboardData(data);
     await loadPrimaryPin();
     await loadStampAudit();
+    await loadWinback();
   }
 
   function copyJoinLink() {
