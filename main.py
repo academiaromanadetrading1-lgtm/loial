@@ -2480,7 +2480,15 @@ def get_manifest():
     return FileResponse("manifest.json", media_type="application/manifest+json")
 
 @app.get("/api/qr-raw/{code_text}")
-def generate_raw_qr_png(code_text: str, color: str = "#2d6a4f", initial: str = "L"):
+@limiter.limit("30/minute")
+def generate_raw_qr_png(request: Request, code_text: str, color: str = "#2d6a4f", initial: str = "L"):
+    # Unbounded text creates oversized QR images and consumes server memory.
+    if not 1 <= len(code_text) <= 512:
+        raise HTTPException(status_code=422, detail="QR text must contain 1–512 characters")
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+        raise HTTPException(status_code=422, detail="Invalid QR color")
+    if not initial or len(initial) > 32:
+        raise HTTPException(status_code=422, detail="Invalid QR initial")
     png_bytes = create_premium_qr_bytes(code_text, color=color, initial=initial)
     return Response(content=png_bytes, media_type="image/png")
     
