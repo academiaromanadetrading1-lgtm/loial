@@ -211,3 +211,12 @@ def test_recovery_rejects_malformed_destination_without_using_ticket(fixture,wal
     payload["new_wallet_uuid"]="W-VALID-RECOVERED-DEVICE-001"
     valid=client.post("/api/loial-wallet-recovery/claim",json=payload)
     assert valid.status_code==200,valid.text
+
+
+def test_recovery_page_removes_bearer_ticket_from_browser_history():
+    from pathlib import Path
+    page=(Path(__file__).resolve().parents[1]/"wallet-recovery.html").read_text(encoding="utf-8")
+    assert "const code=new URLSearchParams(location.search).get('code')||'';" in page
+    assert "history.replaceState(history.state,'',location.pathname);" in page
+    assert page.index("history.replaceState(") < page.index("preview();")
+    assert '<meta name="referrer" content="no-referrer">' in page
