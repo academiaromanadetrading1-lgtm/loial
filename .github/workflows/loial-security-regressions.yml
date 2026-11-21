@@ -9,6 +9,7 @@ on:
       - 'test_launch_preflight.py'
       - 'join.html'
       - 'scan.html'
+      - 'test_scan_idempotency.cjs'
       - 'platform.html'
       - 'ci_check_inline_js.py'
       - 'test_join_route_isolation.py'
@@ -41,6 +42,8 @@ jobs:
         run: python -m py_compile main.py loial_stripe_billing.py loial_preflight.py
       - name: Check inline JavaScript syntax
         run: python ci_check_inline_js.py join.html scan.html platform.html
+      - name: Test scan idempotency in Node
+        run: node test_scan_idempotency.cjs
       - name: Run isolated security regression tests
         run: |
           python -m unittest -v \
