@@ -89,8 +89,12 @@ app.add_middleware(SecurityHeadersMiddleware)
 DATABASE_URL = os.getenv("LOIAL_DATABASE_URL", "sqlite:////data/loial.db")
 if not DATABASE_URL.startswith("sqlite:///"):
     raise RuntimeError("LOIAL_DATABASE_URL accepta doar conexiuni SQLite pentru acest deployment")
-from loial_preflight import assert_staging_storage
-assert_staging_storage(DATABASE_URL, os.getenv("RAILWAY_ENVIRONMENT_NAME", ""))
+from loial_preflight import assert_staging_storage, validated_public_origin
+RAILWAY_DEPLOY_ENV = os.getenv("RAILWAY_ENVIRONMENT_NAME", "")
+assert_staging_storage(DATABASE_URL, RAILWAY_DEPLOY_ENV)
+if RAILWAY_DEPLOY_ENV.lower() == "staging":
+    # A missing origin must never silently fall back to loial.space.
+    validated_public_origin(os.getenv("LOIAL_PUBLIC_ORIGIN", ""), RAILWAY_DEPLOY_ENV)
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False},
