@@ -297,3 +297,43 @@ def test_late_business_invoice_cannot_downgrade_current_probusiness():
         assert db.query(PaidMerchantInvoice).count()==2
     finally:
         db.close()
+
+
+def test_monthly_billing_rejects_multi_month_and_tiny_invoice_periods():
+    db,state=db_fixture()
+    try:
+        from loial_stripe_billing import from_unix
+        assert from_unix(10**100) is None
+        assert from_unix(True) is None
+        base=invoice("in_abnormally_long")
+        period=base["lines"]["data"][0]["period"]
+        period["end"]=period["start"]+90*24*3600
+        assert book(db,state,base)=={"review":"missing_service_period"}
+        short=invoice("in_abnormally_short")
+        period=short["lines"]["data"][0]["period"]
+        period["end"]=period["start"]+24*3600
+        assert book(db,state,short)=={"review":"missing_service_period"}
+        oversized=invoice("in_unrepresentable_timestamp")
+        oversized["lines"]["data"][0]["period"]["end"]=10**100
+        assert book(db,state,oversized)=={"review":"missing_service_period"}
+        assert db.query(PaidMerchantInvoice).count()==0
+        assert db.query(AmbassadorCommission).count()==0
+        assert state.paid_until is None
+        assert db.get(Business,11).plan=="free"
+    finally:
+        db.close()
+
+
+def test_february_monthly_period_remains_eligible():
+    db,state=db_fixture()
+    try:
+        feb=invoice("in_feb")
+        start=datetime(2028,2,1,tzinfo=timezone.utc)
+        end=datetime(2028,3,1,tzinfo=timezone.utc)
+        feb["lines"]["data"][0]["period"]={
+            "start":int(start.timestamp()),"end":int(end.timestamp())}
+        assert book(db,state,feb)["credited"] is True
+        assert state.paid_until==end.isoformat()
+        assert db.get(Business,11).plan=="business"
+    finally:
+        db.close()
