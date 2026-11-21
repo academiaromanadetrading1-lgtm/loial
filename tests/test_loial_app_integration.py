@@ -103,6 +103,15 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                 main.SECRET_KEY,algorithms=[main.ALGORITHM])
             assert payload["role"]=="business"
             assert payload["business_id"]==business_id
+            # A QR must resolve to a real business and must be a valid PNG.
+            unknown_business_qr=client.get("/api/qr-image/999999999")
+            assert unknown_business_qr.status_code==404
+            assert client.get("/api/qr-image/0").status_code==404
+            merchant_qr=client.get(f"/api/qr-image/{business_id}")
+            assert merchant_qr.status_code==200,merchant_qr.text
+            merchant_payload=merchant_qr.json()
+            assert merchant_payload["url"]==f"https://loial.space/join/{business_id}"
+            assert merchant_payload["qr_base64"].startswith("data:image/png;base64,")
             public = client.get("/api/business-public/" + str(business_id))
             assert public.status_code == 200
             assert public.json()["name"] == "Service Auto Test"
