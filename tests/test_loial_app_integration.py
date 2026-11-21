@@ -190,6 +190,21 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert retry.status_code == 200
             assert retry.json()["inbox_access"] == "T" * 48
 
+            # A public wallet UUID must not be sufficient to disclose an
+            # existing card, its identity, or a private inbox access token.
+            for unauthorized_claim in (None, "P"*48):
+                payload={
+                    "business_id":business_id,
+                    "uuid":"W-INTEGRATION-TEST-001",
+                    "name":"Client Test",
+                }
+                if unauthorized_claim is not None:
+                    payload["wallet_claim_token"]=unauthorized_claim
+                denied_retry=client.post("/api/enroll-sync",json=payload)
+                assert denied_retry.status_code==401,denied_retry.text
+                assert "inbox_access" not in denied_retry.text
+
+
             inbox = client.get("/api/loial-inbox/me",
                 headers={"X-Loial-Wallet-Token": "T" * 48})
             assert inbox.status_code == 200
