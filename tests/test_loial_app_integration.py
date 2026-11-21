@@ -134,6 +134,34 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             })
             assert restored_password.status_code==200,restored_password.text
 
+            # The same email can exist in multiple account models. A public
+            # password change must not rotate both roles with one request.
+            with main.SessionLocal() as db:
+                conflicting=main.User(
+                    email="owner.smoke@example.invalid",
+                    name="Second account role",
+                    role="owner",
+                    password=main.pwd_context.hash("strong-test-password-only")
+                )
+                db.add(conflicting)
+                db.commit()
+                conflicting_id=conflicting.id
+            ambiguous=client.post("/api/change-password",json={
+                "email":"owner.smoke@example.invalid",
+                "old_password":"strong-test-password-only",
+                "new_password":"fresh-secure-password-only"
+            })
+            assert ambiguous.status_code==409,ambiguous.text
+            with main.SessionLocal() as db:
+                business=db.query(main.BusinessAccount).filter(
+                    main.BusinessAccount.email=="owner.smoke@example.invalid").one()
+                operator=db.get(main.User,conflicting_id)
+                assert main.pwd_context.verify("strong-test-password-only",business.password)
+                assert main.pwd_context.verify("strong-test-password-only",operator.password)
+                db.delete(operator)
+                db.commit()
+
+
             assert client.get("/api/loial-stripe/me",headers=login_headers).status_code==200
             from jose import jwt as jose_jwt
             payload=jose_jwt.decode(login.json()["access_token"],
