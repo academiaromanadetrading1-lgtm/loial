@@ -17,7 +17,7 @@ from sqlalchemy.pool import StaticPool
 from loial_winback import WinbackBase
 from loial_winback_campaigns import CampaignBase, install_winback_campaigns
 from loial_scans import ScanBase, StampAward
-from loial_inbox import InboxBase, InboxDelivery, PURPOSE
+from loial_inbox import InboxBase, InboxDelivery, InboxEntry, PURPOSE
 
 Base = declarative_base()
 
@@ -119,6 +119,7 @@ class WinbackCampaignApiTests(unittest.TestCase):
         self.assertEqual(response.json()["delivered_to_wallet_inbox"],0)
         with self.Session() as db:
             self.assertEqual(db.query(InboxDelivery).count(),0)
+            self.assertEqual(db.query(InboxEntry).count(),0)
 
     def test_customer_returning_after_draft_is_not_targeted(self):
         draft=self.draft()
@@ -132,6 +133,7 @@ class WinbackCampaignApiTests(unittest.TestCase):
         self.assertEqual(response.json()["delivered_to_wallet_inbox"],0)
         with self.Session() as db:
             self.assertEqual(db.query(InboxDelivery).count(),0)
+            self.assertEqual(db.query(InboxEntry).count(),0)
 
     def test_invalid_campaign_id_fails_closed(self):
         response=self.client.post("/api/loial-winback/campaigns/999999/approve")
