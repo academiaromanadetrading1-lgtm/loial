@@ -167,6 +167,29 @@ class WinbackCampaignApiTests(unittest.TestCase):
             self.assertEqual(db.query(InboxDelivery).count(),0)
             self.assertEqual(db.query(InboxEntry).count(),0)
 
+    def test_inactive_business_cannot_approve_winback_campaign(self):
+        draft=self.draft()
+        with patch("loial_stripe_billing.effective_entitlements",
+                   return_value={"active":False,"plan":"free"}):
+            response=self.client.post(
+                f"/api/loial-winback/campaigns/{draft['campaign_id']}/approve")
+        self.assertEqual(response.status_code,403,response.text)
+        with self.Session() as db:
+            self.assertEqual(db.query(InboxDelivery).count(),0)
+            self.assertEqual(db.query(InboxEntry).count(),0)
+
+    def test_attributions_are_scoped_to_authenticated_merchant(self):
+        first=self.draft()
+        approved=self.client.post(
+            f"/api/loial-winback/campaigns/{first['campaign_id']}/approve")
+        self.assertEqual(approved.status_code,200,approved.text)
+        foreign=self.client.get("/api/loial-winback/campaigns/attributions",
+            headers={"Authorization":"Bearer firm2"})
+        own=self.client.get("/api/loial-winback/campaigns/attributions")
+        self.assertEqual(foreign.status_code,200,foreign.text)
+        self.assertEqual(own.status_code,200,own.text)
+        self.assertNotIn("wallet11",foreign.text)
+
     def test_invalid_campaign_id_fails_closed(self):
         response=self.client.post("/api/loial-winback/campaigns/999999/approve")
         self.assertEqual(response.status_code,404)
