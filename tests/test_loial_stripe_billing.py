@@ -337,3 +337,35 @@ def test_february_monthly_period_remains_eligible():
         assert db.get(Business,11).plan=="business"
     finally:
         db.close()
+
+
+def test_stripe_checkout_binding_rejects_stale_cross_subscription_events():
+    from loial_stripe_billing import checkout_binding_is_stale
+    db,state=db_fixture()
+    try:
+        state.last_event_at=1732000200
+        assert checkout_binding_is_stale(state,1732000100,"sub_old")
+        assert checkout_binding_is_stale(state,1732000200,"sub_old")
+        assert not checkout_binding_is_stale(state,1732000201,"sub_new")
+        # An older duplicate for the same subscription never rebinds anything.
+        assert not checkout_binding_is_stale(state,1732000100,"sub_loial")
+        assert checkout_binding_is_stale(state,None,"sub_new")
+        assert checkout_binding_is_stale(state,True,"sub_new")
+        assert checkout_binding_is_stale(state,"1732000201","sub_new")
+        assert checkout_binding_is_stale(state,-1,"sub_new")
+        state.last_event_at=0
+        assert not checkout_binding_is_stale(state,1732000100,"sub_new")
+    finally:
+        db.close()
+
+
+def test_checkout_binding_guard_does_not_confuse_an_unbound_account_with_stale_event():
+    from loial_stripe_billing import checkout_binding_is_stale
+    db,state=db_fixture()
+    try:
+        state.subscription_id=None
+        state.last_event_at=0
+        assert not checkout_binding_is_stale(state,1732000100,"sub_new")
+        assert not checkout_binding_is_stale(None,1732000100,"sub_new")
+    finally:
+        db.close()
