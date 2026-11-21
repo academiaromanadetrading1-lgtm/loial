@@ -188,7 +188,7 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             qr_image=client.get("/api/qr-raw/valid-short-code")
             assert qr_image.status_code==200,qr_image.text
             assert qr_image.headers["content-type"]=="image/png"
-            assert qr_image.content.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+            assert qr_image.content.startswith(b"\x89PNG\r\n\x1a\n")
             # New firms no longer inherit a publicly predictable primary PIN.
             account=client.get("/api/my-business",headers=bearer)
             assert account.status_code==200,account.text
