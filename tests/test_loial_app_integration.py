@@ -106,6 +106,13 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                 "new_password":"short"
             })
             assert weak_password.status_code==422,weak_password.text
+            overlong_password=client.post("/api/change-password",json={
+                "email":"owner.smoke@example.invalid",
+                "old_password":"strong-test-password-only",
+                "new_password":"X"*73
+            })
+            assert overlong_password.status_code==422,overlong_password.text
+
             changed_password=client.post("/api/change-password",json={
                 "email":"owner.smoke@example.invalid",
                 "old_password":"strong-test-password-only",
