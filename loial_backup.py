@@ -15,9 +15,15 @@ from pathlib import Path
 
 # Presence of these tables distinguishes a LOIAL database from an arbitrary
 # but valid SQLite file. Validate before certifying an operational backup.
-LOIAL_REQUIRED_TABLES=frozenset({
-    "business_accounts", "customers", "users", "loial_stamp_awards"
-})
+LOIAL_REQUIRED_COLUMNS={
+    "business_accounts":frozenset({"id","email","name"}),
+    "customers":frozenset({"id","uuid","business_id","stamps"}),
+    "users":frozenset({"id","email","role"}),
+    "loial_stamp_awards":frozenset({
+        "id","business_id","customer_id","operation_key","stamps_after"
+    }),
+}
+LOIAL_REQUIRED_TABLES=frozenset(LOIAL_REQUIRED_COLUMNS)
 
 
 
@@ -58,6 +64,17 @@ def verify_restorable(snapshot: str | Path, *, require_loial_schema: bool = Fals
                             "Restored database is missing required LOIAL tables: "
                             + ", ".join(sorted(missing))
                         )
+                    for table,required in LOIAL_REQUIRED_COLUMNS.items():
+                        # Table names are code-defined constants, never user input.
+                        present={row[1] for row in dst.execute(
+                            f'PRAGMA table_info("{table}")'
+                        )}
+                        absent=required-present
+                        if absent:
+                            raise RuntimeError(
+                                f"Restored LOIAL table {table} lacks required columns: "
+                                + ", ".join(sorted(absent))
+                            )
                 return {"restored":True,"integrity":"ok","tables":tables}
 
 
