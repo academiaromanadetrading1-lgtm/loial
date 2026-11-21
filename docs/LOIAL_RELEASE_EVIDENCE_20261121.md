@@ -267,3 +267,13 @@ Public launch remains NO-GO while real restore, Stripe billing, device testing a
 - Regression tests cover absent/empty/wrong subscription IDs, zero billing side effects, and out-of-order ProBusiness followed by historical Business invoices.
 - Railway: staging remains idle-sleeping with its dedicated persistent volume and deployment 8479fe18-8589-461b-a004-17e0ad09002b. Production remains online and unchanged at 1bdeabfe-dc4b-473f-8b66-f3d19137feeb. New code was not deployed.
 - Public release remains NO-GO until staging has been updated to a verified revision and real backup/restore, Stripe TEST checkout/webhook, mobile QR/PWA and legal/operator verification are completed.
+
+## 2026-11-21 monthly invoice period validation
+
+- CI-verified source revision 8d82f367483debe66d3b2dc691d7c878ae05ca99. Run: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44948087903
+- **303 isolated tests PASS; 1 assembled FastAPI integration PASS**. Python compilation, JavaScript and PWA checks passed.
+- Paid invoice period validation now requires a plausible monthly interval (27-35 days); a malformed 1-day or 90-day period cannot extend subscription access or earn ambassador commissions.
+- Invalid and unrepresentable Unix timestamps return a failed period validation instead of throwing an uncaught exception. The fixture tests also verify a legitimate February-to-March period in a leap year.
+- This is a source-level guard for LOIAL's currently monthly recurring plans, not a substitute for Stripe signed webhook and actual checkout testing.
+- Railway staging is online with persistent storage still attached, deployment 8479fe18-8589-461b-a004-17e0ad09002b. Railway production remains online on 1bdeabfe-dc4b-473f-8b66-f3d19137feeb. No deployment was made in this batch.
+- Release remains NO-GO pending real independent backup/restore, Stripe TEST checkout/webhook, mobile QR/PWA and legal/operator approval.
