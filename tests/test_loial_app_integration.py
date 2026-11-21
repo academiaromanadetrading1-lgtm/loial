@@ -154,6 +154,24 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert identity.headers["cache-control"] == "no-store"
             assert identity.json()["roles"] == ["business"]
 
+            # Reject oversized or malformed public identifiers before
+            # touching a merchant's customer records.
+            for invalid_uuid in ("short", "W-"+"X"*130, "W-name?query", " W-invalid! "):
+                rejected=client.post("/api/enroll-sync",json={
+                    "business_id":business_id,"uuid":invalid_uuid,"name":"Test",
+                    "wallet_claim_token":"T"*48})
+                assert rejected.status_code==422,(invalid_uuid,rejected.text)
+            for invalid_name in ("", " ", "X"*81):
+                rejected=client.post("/api/enroll-sync",json={
+                    "business_id":business_id,"uuid":"W-BOUNDARY-TEST-001",
+                    "name":invalid_name,"wallet_claim_token":"T"*48})
+                assert rejected.status_code==422,(invalid_name,rejected.text)
+            invalid_email=client.post("/api/enroll-sync",json={
+                "business_id":business_id,"uuid":"W-BOUNDARY-TEST-001",
+                "name":"Client Test","email":"X"*161,
+                "wallet_claim_token":"T"*48})
+            assert invalid_email.status_code==422,invalid_email.text
+
             new_card = client.post("/api/enroll-sync", json={
                 "business_id": business_id,
                 "uuid": "W-INTEGRATION-TEST-001",
