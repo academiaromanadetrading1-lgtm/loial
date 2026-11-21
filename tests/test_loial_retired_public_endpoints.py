@@ -96,3 +96,15 @@ def test_public_qr_generator_rejects_unbounded_payloads():
     assert 're.fullmatch(r"#[0-9a-fA-F]{6}", color)' in body
     assert "len(initial) > 32" in body
     assert body.index("len(code_text) <= 512") < body.index("create_premium_qr_bytes(")
+
+
+def test_join_card_updates_use_private_wallet_scope():
+    join = Path(__file__).resolve().parents[1].joinpath("join.html").read_text(encoding="utf-8")
+    assert "/api/presence/" not in join
+    assert "/api/customer-status/" not in join
+    assert "'/api/wallet-profile/' + encodeURIComponent(uuid)" in join
+    assert "'X-Loial-Wallet-Token': privateToken" in join
+    assert "if (!privateToken) return;" in join
+    assert "if (document.hidden) return;" in join
+    assert "if (window.loialPrivateCardInterval) clearInterval" in join
+    assert "cache: 'no-store'" in join
