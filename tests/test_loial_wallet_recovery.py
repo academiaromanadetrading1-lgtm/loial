@@ -220,3 +220,28 @@ def test_recovery_page_removes_bearer_ticket_from_browser_history():
     assert "history.replaceState(history.state,'',location.pathname);" in page
     assert page.index("history.replaceState(") < page.index("preview();")
     assert '<meta name="referrer" content="no-referrer">' in page
+
+
+def test_recovery_claim_cannot_cross_expiration_during_atomic_update(fixture, monkeypatch):
+    """Expiry must still be enforced if it passes after initial code lookup."""
+    from datetime import datetime, timedelta
+    import loial_wallet_recovery as recovery
+    client, factory, Customer, header = fixture
+    code = code_for(request(client, header(), 1))
+    with factory() as session:
+        ticket = session.query(RecoveryTicket).first()
+        expiry = datetime.fromisoformat(ticket.expires_at)
+    times = iter([expiry - timedelta(seconds=1), expiry + timedelta(seconds=1)])
+    monkeypatch.setattr(recovery, "now_utc", lambda: next(times))
+    denied = client.post("/api/loial-wallet-recovery/claim", json={
+        "code": code,
+        "new_wallet_uuid": "W-VALID-DEVICE-EXPIRED-001",
+        "new_private_token": "S" * 48,
+    })
+    assert denied.status_code == 409, denied.text
+    with factory() as session:
+        assert session.query(Customer).filter(Customer.id == 1).one().wallet_uuid == "W-LEGACY"
+        assert session.query(RecoveryTicket).first().status == "pending"
+        assert session.query(WalletInboxAccess).filter(
+            WalletInboxAccess.wallet_uuid == "W-VALID-DEVICE-EXPIRED-001"
+        ).count() == 0
