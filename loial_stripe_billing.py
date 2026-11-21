@@ -496,6 +496,8 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
             outcome=process_paid_invoice(db,obj,state,business,Agent,
                 price,PaidMerchantInvoice,
                 AmbassadorCommission,SponsorRelationship,tier,recompute_recurring,amount)
+            if outcome.get("credited") and type(event.get("created")) is int:
+                state.last_event_at=max(state.last_event_at or 0,event["created"])
         elif typ in ("credit_note.created","charge.dispute.created","charge.refunded"):
             invoice_id=obj.get("invoice")
             if isinstance(invoice_id,dict):invoice_id=invoice_id.get("id")
