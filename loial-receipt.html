@@ -32,6 +32,11 @@ button:disabled{opacity:.55;cursor:wait}.notice{font-size:12px;color:#617367}
 <script>
 const $=id=>document.getElementById(id);
 const token=new URLSearchParams(location.search).get('token')||'';
+// Read the bearer receipt code once and remove it from address/history.
+// Claim, reserve and payment-status continue using the in-memory token.
+if(new URLSearchParams(location.search).has('token')){
+  history.replaceState(history.state,'',location.pathname);
+}
 let receipt=null;
 function state(message,type){$('state').textContent=message;$('state').className=type||'';}
 async function preview(){
