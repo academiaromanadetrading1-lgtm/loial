@@ -13,6 +13,13 @@ from pydantic import BaseModel, Field
 
 WinbackBase = declarative_base()
 
+# Ledger also contains redeem/refund bookkeeping; only new staff scans and
+# redeemed receipt claims are evidence of a customer visit.
+CONFIRMED_VISIT_SOURCES = ("manual", "receipt")
+
+def is_confirmed_visit(row):
+    return getattr(row, "source", None) in CONFIRMED_VISIT_SOURCES
+
 class WinbackSettings(WinbackBase):
     __tablename__ = "loial_winback_settings"
     business_id = Column(Integer, primary_key=True)
@@ -44,6 +51,8 @@ def summarize_inactive(award_rows, customer_ids, threshold=30, ticket_minor=0,
     histories = defaultdict(set)
     eligible = set(customer_ids)
     for row in award_rows:
+        if not is_confirmed_visit(row):
+            continue
         cid = row.customer_id
         if cid not in eligible:
             continue
@@ -123,7 +132,8 @@ def install_winback(app, engine, get_db, BusinessAccount, Customer, StampAward,
             Customer.business_id == business.id).all()]
         # Select only this merchant's audited stamps, never another firm's data.
         awards = db.query(StampAward).filter(
-            StampAward.business_id == business.id).all()
+            StampAward.business_id == business.id,
+            StampAward.source.in_(CONFIRMED_VISIT_SOURCES)).all()
         result = summarize_inactive(awards, ids, threshold, ticket_minor, margin)
         result["currency"] = currency
         result["message_dispatch_enabled"] = False
