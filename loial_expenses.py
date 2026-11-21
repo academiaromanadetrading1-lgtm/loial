@@ -98,11 +98,13 @@ def install_expenses(app,engine,factory,BusinessAccount,AIDocument,secret,algori
             raise HTTPException(status_code=403,detail="Doar administratorul firmei")
         biz=db.query(BusinessAccount).filter(
             BusinessAccount.email==payload.get("sub")).first()
-        if not biz or (payload.get("business_id") and payload["business_id"]!=biz.id):
+        if not biz or type(payload.get("business_id")) is not int or payload["business_id"]!=biz.id:
             raise HTTPException(status_code=403,detail="Acces interzis")
-        if (biz.plan or "").lower() not in (
-            "business","probusiness","pro","premium","enterprise"):
-            raise HTTPException(status_code=403,detail="Loial AI este inclus in Business")
+        # A mutable business.plan label is never evidence of paid access.
+        from loial_stripe_billing import effective_entitlements
+        access=effective_entitlements(db,biz.id)
+        if not access["active"] or access.get("plan") not in ("business","probusiness"):
+            raise HTTPException(status_code=403,detail="Abonament Loial Business inactiv")
         return biz
 
     @router.get("/categories")
