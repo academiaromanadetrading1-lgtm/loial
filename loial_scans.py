@@ -27,6 +27,7 @@ def recent_duplicate(db,business_id,customer_id,now=None,cooldown_seconds=12):
     return db.query(StampAward).filter(
         StampAward.business_id==business_id,
         StampAward.customer_id==customer_id,
+        StampAward.source.in_(("manual", "receipt")),
         StampAward.created_at>=threshold).order_by(StampAward.id.desc()).first()
 
 def existing_operation(db,business_id,operation_key):
