@@ -225,7 +225,8 @@ def install_wallet_recovery(app,engine,factory,BusinessAccount,Customer,
         claimed=db.execute(
             update(RecoveryTicket).where(
                 RecoveryTicket.id==ticket.id,
-                RecoveryTicket.status=="pending").values(
+                RecoveryTicket.status=="pending",
+                RecoveryTicket.expires_at>current.isoformat()).values(
                     status="used",used_at=current.isoformat())
         ).rowcount
         if claimed!=1:
