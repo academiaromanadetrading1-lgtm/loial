@@ -47,16 +47,19 @@ class ApplicationBootSmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200,response.text)
 
     def test_winback_routes_registered(self):
-        # Some mounted routers expose an ASGI route wrapper without .path.
-        paths = {r.path for r in self.application.app.routes
-                 if isinstance(getattr(r,"path",None),str)}
-        for path in ("/api/loial-winback/insights",
-                     "/api/loial-winback/settings",
-                     "/api/loial-winback/campaigns/draft",
-                     "/api/loial-winback/campaigns/{campaign_id}/approve",
-                     "/api/loial-winback/campaigns/attributions"):
+        # FastAPI may nest included routes inside _IncludedRouter wrappers.
+        # Request the real ASGI app to prove route dispatch works end to end.
+        routes = (
+            ("GET", "/api/loial-winback/insights"),
+            ("GET", "/api/loial-winback/settings"),
+            ("POST", "/api/loial-winback/campaigns/draft"),
+            ("POST", "/api/loial-winback/campaigns/1/approve"),
+            ("GET", "/api/loial-winback/campaigns/attributions"),
+        )
+        for method,path in routes:
             with self.subTest(path=path):
-                self.assertIn(path,paths)
+                response = self.client.request(method,path)
+                self.assertIn(response.status_code,(401,403),response.text)
 
     def test_private_winback_api_denies_anonymous_requests(self):
         for path in ("/api/loial-winback/settings",
