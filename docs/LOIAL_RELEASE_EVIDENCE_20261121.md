@@ -89,3 +89,14 @@ This evidence covers CI only; it **does not** certify the currently deployed pro
 - Staging still lacks its required persistent volume; DO NOT bypass the staging boot guard or proceed with a pilot there until persistent isolated storage is confirmed.
 
 **Release decision: NO-GO**; additional real-device, payment, backup/restore, staging isolation, and legal checks remain mandatory.
+
+
+## 2026-11-21 atomic reward redemption and receipt URL privacy
+- Verified source revision: `c4a741d6c068cc2a3cc02aaa5a4b6f5d50fbafc6`.
+- CI: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44896790778
+- Isolated tests: **283 passed**. Assembled FastAPI integration: **1 passed**. JavaScript and PWA syntax checks also passed.
+- Reward redemption uses an atomic conditional UPDATE of the customer's stamp counter. A second attempt to consume the same unlocked reward receives HTTP 409; the first is audited exactly once.
+- One-use receipt claim tokens are read on page load and removed from the visible browser URL and history with `history.replaceState`, maintaining the existing in-memory claim flow.
+- Railway production remains on its earlier release and staging remains sleeping without a persistent volume. These changes were not deployed.
+
+**Public release status: NO-GO.** Durable staging, real-data backup/restore, paid Stripe testing, real-device PWA/QR checks and legal/operator approval remain outstanding.
