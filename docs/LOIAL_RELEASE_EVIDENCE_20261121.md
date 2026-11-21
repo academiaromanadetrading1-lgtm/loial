@@ -198,3 +198,12 @@ Public release NO-GO until isolated real backup/restore, billing verification, m
 - Staging Railway volume remains attached (service idle-sleeping); production has not been modified.
 
 Public launch remains NO-GO while real restore, Stripe billing, device testing and legal/operator sign-off remain open.
+
+## 2026-11-21 cross-model merchant login isolation
+
+- Verified commit 3e5633dd7bac1096a18f32addf1f115c34062af7, CI: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44903733608
+- The shared /auth/login endpoint can no longer emit a Business token through a legacy User row with the same email and business role. Business tokens are minted only after actual BusinessAccount authentication. A matching SalesAgent row likewise cannot provide a BusinessAccount identity.
+- Integration regression creates a separate User row with an identical merchant email, proves the legacy password cannot log in as a merchant, and proves that the actual merchant password still yields a scoped Business JWT.
+- CI: 296 isolated tests PASS, 1 complete FastAPI integration PASS; JavaScript/PWA checks PASS.
+- Production unchanged. Staging has a persistent volume but is in sleep state and remains on the earlier deployed commit; no live deployment was attempted.
+- Public launch NO-GO until real operational backup/restore, payment/Stripe verification, real mobile PWA/QR testing and legal/operator sign-off.
