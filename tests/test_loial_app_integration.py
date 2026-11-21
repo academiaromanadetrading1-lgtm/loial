@@ -97,6 +97,36 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert login.status_code==200,login.text
             assert login.headers["cache-control"] == "no-store"
             login_headers={"Authorization":"Bearer "+login.json()["access_token"]}
+
+            # Changing a password must enforce the same minimum length as
+            # creating an account, without locking out a valid merchant.
+            weak_password=client.post("/api/change-password",json={
+                "email":"owner.smoke@example.invalid",
+                "old_password":"strong-test-password-only",
+                "new_password":"short"
+            })
+            assert weak_password.status_code==422,weak_password.text
+            changed_password=client.post("/api/change-password",json={
+                "email":"owner.smoke@example.invalid",
+                "old_password":"strong-test-password-only",
+                "new_password":"fresh-secure-password-only"
+            })
+            assert changed_password.status_code==200,changed_password.text
+            assert client.post("/auth/login",json={
+                "email":"owner.smoke@example.invalid",
+                "password":"strong-test-password-only"
+            }).status_code==401
+            assert client.post("/auth/login",json={
+                "email":"owner.smoke@example.invalid",
+                "password":"fresh-secure-password-only"
+            }).status_code==200
+            restored_password=client.post("/api/change-password",json={
+                "email":"owner.smoke@example.invalid",
+                "old_password":"fresh-secure-password-only",
+                "new_password":"strong-test-password-only"
+            })
+            assert restored_password.status_code==200,restored_password.text
+
             assert client.get("/api/loial-stripe/me",headers=login_headers).status_code==200
             from jose import jwt as jose_jwt
             payload=jose_jwt.decode(login.json()["access_token"],
