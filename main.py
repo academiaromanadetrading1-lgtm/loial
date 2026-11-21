@@ -3533,15 +3533,7 @@ def business_stamp_audit(limit: int = 40, credentials: HTTPAuthorizationCredenti
     """Owner-only loyalty ledger: manual scans, receipts, rewards and reversals."""
     if not credentials:
         raise HTTPException(status_code=401,detail="Autentificare obligatorie")
-    try:
-        claims=jwt.decode(credentials.credentials,SECRET_KEY,algorithms=[ALGORITHM])
-    except JWTError:
-        raise HTTPException(status_code=401,detail="Sesiune invalida")
-    if claims.get("role")!="business":
-        raise HTTPException(status_code=403,detail="Doar administratorul firmei")
-    biz=db.query(BusinessAccount).filter(BusinessAccount.email==claims.get("sub")).first()
-    if not biz or (claims.get("business_id") and biz.id!=claims.get("business_id")):
-        raise HTTPException(status_code=403,detail="Firma nu este disponibila")
+    biz=require_business_account_token(credentials,db)
     from loial_scans import StampAward
     safe_limit=max(1,min(int(limit),100))
     entries=db.query(StampAward).filter(
