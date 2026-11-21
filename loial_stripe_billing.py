@@ -125,6 +125,18 @@ def checkout_binding_is_stale(state, event_created, subscription):
     return event_created <= (state.last_event_at or 0)
 
 
+def lifecycle_event_is_stale(state, event_created):
+    """Reject missing/older Stripe lifecycle timestamps before changing access.
+
+    Payment failure, suspension or deletion events must not undo a newer
+    verified invoice. For equal-second events, access changes are deferred
+    rather than risk reversing more recent financial evidence.
+    """
+    if type(event_created) is not int or event_created<1:
+        return True
+    return bool(state and event_created <= (state.last_event_at or 0))
+
+
 def subscription_event_matches(state, customer, subscription):
     """Ignore delayed events belonging to another subscription or customer."""
     if isinstance(customer,dict):customer=customer.get("id")
@@ -538,25 +550,33 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
                 outcome={"review":"billing_dispute_unmatched"}
         elif typ=="invoice.payment_failed":
             state=lookup_by_customer(obj.get("customer"))
-            outcome=(record_payment_failure(state)
-                     if subscription_event_matches(state,obj.get("customer"),obj.get("subscription"))
-                     else {"ignored":"unmatched_payment_failure"})
+            if not subscription_event_matches(state,obj.get("customer"),obj.get("subscription")):
+                outcome={"ignored":"unmatched_payment_failure"}
+            elif lifecycle_event_is_stale(state,event.get("created")):
+                outcome={"ignored":"stale_payment_failure"}
+            else:
+                outcome=record_payment_failure(state)
+                state.last_event_at=event["created"]
         elif typ in ("customer.subscription.updated","customer.subscription.deleted"):
             sub_id=obj.get("id")
             state=db.query(LoialSubscription).filter(
                 LoialSubscription.subscription_id==sub_id).first()
             if state:
-                incoming_status="canceled" if typ.endswith("deleted") else obj.get("status","")
-                if incoming_status in ("canceled","unpaid","incomplete_expired"):
-                    state.status=incoming_status
-                    state.grace_until=None
-                    outcome={"terminated":True}
-                elif incoming_status=="past_due":
-                    outcome=record_payment_failure(state)
+                if lifecycle_event_is_stale(state,event.get("created")):
+                    outcome={"ignored":"stale_subscription_lifecycle"}
                 else:
-                    # Never grant access solely from subscription.status=active.
-                    outcome={"status_observed":incoming_status}
-                state.updated_at=utc_iso(now_utc())
+                    incoming_status="canceled" if typ.endswith("deleted") else obj.get("status","")
+                    if incoming_status in ("canceled","unpaid","incomplete_expired"):
+                        state.status=incoming_status
+                        state.grace_until=None
+                        outcome={"terminated":True}
+                    elif incoming_status=="past_due":
+                        outcome=record_payment_failure(state)
+                    else:
+                        # Never grant access solely from subscription.status=active.
+                        outcome={"status_observed":incoming_status}
+                    state.last_event_at=event["created"]
+                    state.updated_at=utc_iso(now_utc())
         db.add(StripeWebhookEvent(id=eid,type=typ,received_at=utc_iso(now_utc())))
         try:db.commit()
         except IntegrityError:
