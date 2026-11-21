@@ -1700,27 +1700,13 @@ def create_invoice(business_id: int, plan: str = "pro", country: str = "RO", des
 
 @app.get("/preferences")
 def get_preferences(email: str, db: Session = Depends(get_db)):
-    pref = db.query(UserPreference).filter(UserPreference.user_email == email).first()
-    if not pref:
-        return {"language": "en", "country": None, "timezone": None}
-    return {"language": pref.language, "country": pref.country, "timezone": pref.timezone}
+    # Retired: email supplied by a caller does not prove ownership.
+    raise HTTPException(status_code=410, detail="Legacy preferences endpoint retired; use authenticated account settings.")
 
 @app.put("/preferences")
 def set_preferences(email: str, language: str = "en", country: str = None, timezone: str = None, db: Session = Depends(get_db)):
-    supported = ["en", "ro", "de", "fr", "it", "es", "nl", "pl", "hu"]
-    if language not in supported:
-        language = "en"
-    pref = db.query(UserPreference).filter(UserPreference.user_email == email).first()
-    if pref:
-        pref.language = language
-        pref.country = country
-        pref.timezone = timezone
-        pref.updated_at = datetime.now().isoformat()
-    else:
-        pref = UserPreference(user_email=email, language=language, country=country, timezone=timezone, updated_at=datetime.now().isoformat())
-        db.add(pref)
-    db.commit()
-    return {"status": "saved", "language": language, "country": country}
+    # Retired: unauthenticated email-based writes allow account preference takeover.
+    raise HTTPException(status_code=410, detail="Legacy preferences endpoint retired; use authenticated account settings.")
 
 @app.get("/languages")
 def get_languages():
@@ -2073,22 +2059,13 @@ ACTIVE_PRESENCE = {}
 
 @app.post("/api/presence/{business_id}/{customer_uuid}")
 def ping_customer_presence(business_id: int, customer_uuid: str, db: Session = Depends(get_db)):
-    cust = db.query(Customer).filter(Customer.uuid == customer_uuid, Customer.business_id == business_id).first()
-    if cust:
-        ACTIVE_PRESENCE[business_id] = {
-            "name": cust.name,
-            "uuid": cust.uuid,
-            "stamps": cust.stamps or 0,
-            "ts": datetime.now().timestamp()
-        }
-    return {"ok": True}
+    # Retired: a public request must not publish a customer's active presence.
+    raise HTTPException(status_code=410, detail="Legacy customer presence endpoint retired.")
 
 @app.get("/api/presence/{business_id}")
 def check_business_presence(business_id: int):
-    info = ACTIVE_PRESENCE.get(business_id)
-    if info and (datetime.now().timestamp() - info["ts"]) < 25:
-        return {"active": True, "customer": info}
-    return {"active": False}
+    # Retired: public polling disclosed customer identity and loyalty information.
+    raise HTTPException(status_code=410, detail="Legacy customer presence endpoint retired.")
 
 @app.get("/api/customer-status/{customer_uuid}")
 def get_customer_status(
@@ -2096,28 +2073,9 @@ def get_customer_status(
     business_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
-    # business_id este opțional pentru compatibilitatea cu apelurile vechi.
-    # Clientul poate avea un portofel universal cu mai multe carduri per afacere.
-    if business_id is not None:
-        cust = db.query(Customer).filter(
-            Customer.business_id == business_id,
-            (Customer.uuid == customer_uuid) | (Customer.wallet_uuid == customer_uuid),
-        ).first()
-        if cust:
-            return {"stamps": cust.stamps or 0, "name": cust.name}
-        existing = db.query(Customer).filter(
-            (Customer.uuid == customer_uuid) | (Customer.wallet_uuid == customer_uuid)
-        ).first()
-        if existing:
-            return {"stamps": 0, "name": existing.name}
-        raise HTTPException(status_code=404, detail="Cardul nu a fost găsit")
-
-    cust = db.query(Customer).filter(
-        (Customer.uuid == customer_uuid) | (Customer.wallet_uuid == customer_uuid)
-    ).first()
-    if not cust:
-        raise HTTPException(status_code=404, detail="Cardul nu a fost găsit")
-    return {"stamps": cust.stamps or 0, "name": cust.name}
+    # Retired: legacy UUID lookups exposed names and stamps without wallet proof.
+    # Authenticated wallet functions use their own scoped access token.
+    raise HTTPException(status_code=410, detail="Legacy customer status endpoint retired.")
 
 # ==========================================
 # BUSINESS DASHBOARD ENDPOINTS
