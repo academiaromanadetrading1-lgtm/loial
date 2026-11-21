@@ -55,3 +55,36 @@ def test_restore_checker_rejects_corrupt_file(tmp_path):
     damaged.write_bytes(b"not a database")
     with pytest.raises(sqlite3.DatabaseError):
         verify_restorable(damaged)
+
+
+@pytest.mark.parametrize("basename", [
+    "source #archive.sqlite",
+    "source ?v=1.sqlite",
+    "source % 2026.sqlite",
+])
+def test_backup_handles_reserved_file_uri_characters(tmp_path, basename):
+    source=tmp_path/basename
+    destination=tmp_path/"verified-backup.sqlite"
+    with sqlite3.connect(source) as db:
+        db.execute("CREATE TABLE members (id INTEGER, label TEXT)")
+        db.execute("INSERT INTO members VALUES (1, 'existing data')")
+        db.commit()
+    outcome=backup_database(source,destination)
+    assert outcome["restore_verified"] is True
+    with sqlite3.connect(destination) as snapshot:
+        assert snapshot.execute("SELECT label FROM members").fetchone()[0]=="existing data"
+
+
+def test_backup_includes_committed_wal_data(tmp_path):
+    source=tmp_path/"wal-source.sqlite"
+    destination=tmp_path/"wal-backup.sqlite"
+    with sqlite3.connect(source) as db:
+        assert db.execute("PRAGMA journal_mode=WAL").fetchone()[0].lower()=="wal"
+        db.execute("CREATE TABLE receipts (id INTEGER PRIMARY KEY, amount INTEGER)")
+        db.commit()
+        db.execute("INSERT INTO receipts(amount) VALUES (12345)")
+        db.commit()
+        outcome=backup_database(source,destination)
+        assert outcome["restore_verified"] is True
+        with sqlite3.connect(destination) as copy:
+            assert copy.execute("SELECT amount FROM receipts").fetchone()[0]==12345
