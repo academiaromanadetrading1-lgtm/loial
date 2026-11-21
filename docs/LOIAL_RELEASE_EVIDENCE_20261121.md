@@ -227,3 +227,13 @@ Public launch remains NO-GO while real restore, Stripe billing, device testing a
 - Regression tests cover missing, text-typed and cross-merchant identifiers. Isolated module fixtures and expenses integration were updated to issue valid business-scoped tokens. Full FastAPI smoke test checks CRM and loyalty audit authorization.
 - Railway production is online and unchanged at deployment 1bdeabfe-dc4b-473f-8b66-f3d19137feeb. Staging is idle-sleeping with persistent volume at deployment 8479fe18-8589-461b-a004-17e0ad09002b. No new deployment occurred.
 - Public release remains NO-GO pending off-volume backup and independent restore, billing/webhook validation, mobile QR/PWA and legal/operator sign-off.
+
+## 2026-11-21 Expense analytics entitlements and merchant scope
+
+- Verified source revision ae9083cdc976a4f1affca0b49ddcab6a5b508a16.
+- CI run: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44930431803
+- Automated results: 299 isolated tests PASS and 1 assembled FastAPI integration PASS; Python, JavaScript and PWA checks PASS.
+- Expense reports, categories, and invoice confirmation now require an exact business-scoped JWT and an effective paid/granted Business entitlement, instead of trusting the mutable business.plan label.
+- Tests deactivate the manual Business grant while retaining the old premium plan label; expense endpoints return 403. Additional tests reject missing, string-typed, cross-tenant and non-Business JWT scopes.
+- No deployment was performed. Staging remains idle-sleeping with persistent volume, production remains online on deployment 1bdeabfe-dc4b-473f-8b66-f3d19137feeb.
+- Public release NO-GO pending actual off-volume backup/restore, Stripe checkout/webhooks, mobile QR/PWA and legal/operator validation.
