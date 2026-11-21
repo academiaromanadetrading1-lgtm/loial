@@ -445,3 +445,47 @@ def test_refund_does_not_overwrite_balance_changed_after_read(setup_receipts):
     with factory() as db:
         assert db.execute(sql_text("SELECT stamps FROM customers WHERE id=1")).scalar_one()==5
         assert db.query(StampAward).filter(StampAward.source=="refund").count()==0
+
+
+def test_staff_approval_expires_between_read_and_atomic_confirmation(setup_receipts,monkeypatch):
+    """An approval that expires during the request must not award a stamp."""
+    from sqlalchemy import event
+    from loial_receipts import SmartReservation
+    from loial_scans import StampAward
+    import loial_receipts
+    client,factory,Receipt,token_a,_,owner,wallet=setup_receipts
+    captured=[]
+    monkeypatch.setattr(loial_receipts,"create_receipt_qr_png",
+                        lambda url: captured.append(url) or "test")
+    prefix="/api/loial-receipts/"
+    payload=receipt_payload("SMART-EXPIRY-RACE")
+    payload["requires_payment_confirmation"]=True
+    issued=client.post(prefix+"issue",headers=owner(),json=payload)
+    assert issued.status_code==200,issued.text
+    receipt_token=issued.json()["claim_url"].split("token=")[1]
+    reserved=client.post(prefix+"reserve",headers=wallet(token_a),
+                         json={"receipt_token":receipt_token})
+    assert reserved.status_code==200,reserved.text
+    approval_token=captured[-1].split("receipt_approval=")[1]
+    engine=factory.kw["bind"]
+    injected=[False]
+    def expire_before_atomic_update(conn,cursor,statement,parameters,context,executemany):
+        query=statement.lstrip().upper()
+        if not injected[0] and query.startswith(
+                "UPDATE LOIAL_SMART_RESERVATIONS SET CONFIRMED_AT"):
+            injected[0]=True
+            cursor.connection.execute(
+                "UPDATE loial_smart_reservations SET approval_expires="
+                "'2000-01-01T00:00:00+00:00' WHERE receipt_id=1")
+    event.listen(engine,"before_cursor_execute",expire_before_atomic_update)
+    try:
+        denied=client.post(prefix+"confirm-payment",json={
+            "business_id":1,"pin":"7826","approval_token":approval_token})
+    finally:
+        event.remove(engine,"before_cursor_execute",expire_before_atomic_update)
+    assert injected[0] is True
+    assert denied.status_code==409,denied.text
+    with factory() as db:
+        assert db.query(Receipt).one().status=="reserved"
+        assert db.query(SmartReservation).one().confirmed_at is None
+        assert db.query(StampAward).count()==0
