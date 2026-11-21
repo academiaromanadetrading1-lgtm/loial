@@ -15,7 +15,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from loial_winback import WinbackBase
-from loial_winback_campaigns import CampaignBase, install_winback_campaigns
+from loial_winback_campaigns import CampaignBase, install_winback_campaigns, attribute_confirmed_visit
 from loial_scans import ScanBase, StampAward
 from loial_inbox import InboxBase, InboxDelivery, InboxEntry, PURPOSE
 
@@ -183,12 +183,21 @@ class WinbackCampaignApiTests(unittest.TestCase):
         approved=self.client.post(
             f"/api/loial-winback/campaigns/{first['campaign_id']}/approve")
         self.assertEqual(approved.status_code,200,approved.text)
+        with self.Session() as db:
+            self.assertTrue(attribute_confirmed_visit(db,1,11,
+                "confirmed-scan-after-wallet-offer"))
+            db.commit()
         foreign=self.client.get("/api/loial-winback/campaigns/attributions",
             headers={"Authorization":"Bearer firm2"})
         own=self.client.get("/api/loial-winback/campaigns/attributions")
         self.assertEqual(foreign.status_code,200,foreign.text)
         self.assertEqual(own.status_code,200,own.text)
-        self.assertNotIn("wallet11",foreign.text)
+        self.assertEqual(foreign.json()["business_id"],2)
+        self.assertEqual(foreign.json()["confirmed_post_campaign_visits"],0)
+        self.assertEqual(own.json()["business_id"],1)
+        self.assertEqual(own.json()["confirmed_post_campaign_visits"],1)
+        self.assertIsNone(own.json()["revenue_confirmed_minor"])
+        self.assertFalse(own.json()["incremental_revenue_proven"])
 
     def test_invalid_campaign_id_fails_closed(self):
         response=self.client.post("/api/loial-winback/campaigns/999999/approve")
