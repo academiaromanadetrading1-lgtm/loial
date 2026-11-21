@@ -139,3 +139,15 @@ This evidence covers CI only; it **does not** certify the currently deployed pro
 - Railway production was checked online on deployment `1bdeabfe-dc4b-473f-8b66-f3d19137feeb`, untouched by these commits. Staging remains sleeping, with no mounted volume. The isolated CI database is not a substitute for real staging verification.
 
 **Release decision: NO-GO** until durable isolated staging storage, restore-tested backup, Stripe checkout/webhooks, real-device PWA/QR flows, and legal/operator approval are completed.
+
+
+## 2026-11-21 receipt API throttling
+
+- Verified source revision: `96866b05a1417aa8805799726ce0447356674490`.
+- CI: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44899297357
+- **290 isolated tests passed**; full FastAPI integration **1 passed**; Python compile, JavaScript and PWA validation passed.
+- Receipt QR endpoints have enforced application rate limits when wired to the installed SlowAPI limiter: anonymous preview 30/min, private claim 20/min, reservation 20/min, payment status 60/min, merchant issue 30/min, merchant refund 20/min. The existing staff payment confirmation limit of 20/min and integration issuance of 120/min remain.
+- An isolated FastAPI test makes 30 public receipt preview requests followed by the 31st and verifies HTTP 429. This is an application-layer abuse-control regression; real proxy and shared multi-instance behavior still requires operational testing.
+- Railway production remains on the unchanged prior deployment. Staging has **no persistent volume** and should not be redeployed onto an ephemeral SQLite path.
+
+**Public release remains NO-GO** pending real staging storage/rollout, verified backup restoration, Stripe payment/webhook tests, mobile QR/PWA checks and operator/legal sign-off.
