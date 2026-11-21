@@ -32,9 +32,16 @@ def verify_restorable(snapshot: str | Path) -> dict:
                 result=dst.execute("PRAGMA integrity_check").fetchone()
                 if not result or result[0]!="ok":
                     raise RuntimeError("Isolated restore integrity check failed")
+                # A zero-byte or uninitialized SQLite file can report "ok".
+                # It must never count as a valid customer database backup.
                 tables=dst.execute(
-                    "SELECT COUNT(*) FROM sqlite_master WHERE type='table'"
+                    "SELECT COUNT(*) FROM sqlite_master "
+                    "WHERE type='table' AND name NOT LIKE 'sqlite_%'"
                 ).fetchone()[0]
+                if tables<1:
+                    raise RuntimeError("Restored SQLite snapshot has no application tables")
+                if dst.execute("PRAGMA foreign_key_check").fetchone():
+                    raise RuntimeError("Restored SQLite snapshot has foreign key violations")
                 return {"restored":True,"integrity":"ok","tables":tables}
 
 
@@ -43,6 +50,8 @@ def backup_database(source: str | Path, destination: str | Path) -> dict:
     dst=Path(destination).expanduser().resolve(strict=False)
     if not src.is_file():
         raise ValueError("Source must be an existing database file")
+    if src.stat().st_size==0:
+        raise ValueError("Source SQLite file is empty; refusing false backup assurance")
     if src==dst or dst.exists():
         raise ValueError("Destination must be a new file, different from source")
     if not dst.parent.is_dir():
