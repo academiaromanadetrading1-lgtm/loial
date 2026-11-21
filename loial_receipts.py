@@ -407,7 +407,15 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
         now=utc_now()
         if any(datetime.fromisoformat(t)<now for t in (approval.approval_expires,rec.expires_at)):
             raise HTTPException(410,"Cod expirat; clientul poate regenera codul")
-        changed=db.execute(update(SmartReservation).where(SmartReservation.receipt_id==rec.id,SmartReservation.confirmed_at.is_(None),SmartReservation.approval_hash==sha256(req.approval_token)).values(confirmed_at=now.isoformat(),staff_id=staff.id if staff else None)).rowcount
+        # Validate expiry inside the same conditional UPDATE that consumes the
+        # staff approval. A ticket can expire after the preliminary read.
+        changed=db.execute(update(SmartReservation).where(
+            SmartReservation.receipt_id==rec.id,
+            SmartReservation.confirmed_at.is_(None),
+            SmartReservation.approval_hash==sha256(req.approval_token),
+            SmartReservation.approval_expires>now.isoformat()
+        ).values(confirmed_at=now.isoformat(),
+                 staff_id=staff.id if staff else None)).rowcount
         if changed!=1: db.rollback();raise HTTPException(409,"Confirmare deja procesata")
         if staff: staff.scans_count=(staff.scans_count or 0)+1
         return finalize(rec,approval.wallet_uuid,db,"reserved")
