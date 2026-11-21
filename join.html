@@ -360,7 +360,13 @@
   </div>
 
 <script>
-  const bizId = parseInt(location.pathname.split('/').pop()) || 1;
+  // A missing or malformed QR destination must never fall back to merchant 1.
+  const joinMatch = /^\\/join\\/([1-9]\\d*)\\/?$/.exec(location.pathname);
+  const bizId = joinMatch ? Number(joinMatch[1]) : null;
+  if (!Number.isSafeInteger(bizId) || bizId <= 0) {
+    location.replace('/');
+    throw new Error('Invalid merchant QR destination');
+  }
   let globalWalletUuid = localStorage.getItem('loial_universal_uuid');
   if (!globalWalletUuid) {
     const legacy = JSON.parse(localStorage.getItem('loial_card_' + bizId) || 'null');
