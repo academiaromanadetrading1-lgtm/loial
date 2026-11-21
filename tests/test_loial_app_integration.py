@@ -97,6 +97,28 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert sign_up.status_code == 200, sign_up.text
             business_id = sign_up.json()["business_id"]
             bearer = {"Authorization": "Bearer " + sign_up.json()["token"]}
+
+            # A valid non-Business JWT with the same email must never be
+            # accepted as merchant authentication on staff or settings APIs.
+            from jose import jwt as scoped_jwt
+            other_role_token=scoped_jwt.encode({
+                "sub":"owner.smoke@example.invalid","role":"customer"
+            },main.SECRET_KEY,algorithm=main.ALGORITHM)
+            wrong_scope_token=scoped_jwt.encode({
+                "sub":"owner.smoke@example.invalid","role":"business",
+                "business_id":999999
+            },main.SECRET_KEY,algorithm=main.ALGORITHM)
+            for token in (other_role_token,wrong_scope_token):
+                headers={"Authorization":"Bearer "+token}
+                assert client.get("/api/my-business",headers=headers).status_code==403
+                assert client.get("/api/my-business/staff",headers=headers).status_code==403
+                assert client.post("/api/my-business/staff",headers=headers,json={
+                    "name":"Unauthorized","pin":"8527"}).status_code==403
+                assert client.post("/api/my-business/settings",headers=headers,json={
+                    "reward_text":"Forged change"}).status_code==403
+                assert client.post("/api/my-business/rotate-pin",headers=headers).status_code==403
+            assert client.get("/api/my-business",headers=bearer).status_code==200
+
             # Legacy web login must issue the same scoped JWT needed by billing.
             login=client.post("/auth/login",json={
                 "email":"owner.smoke@example.invalid",
