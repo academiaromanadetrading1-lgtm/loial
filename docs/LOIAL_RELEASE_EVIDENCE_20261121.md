@@ -207,3 +207,14 @@ Public launch remains NO-GO while real restore, Stripe billing, device testing a
 - CI: 296 isolated tests PASS, 1 complete FastAPI integration PASS; JavaScript/PWA checks PASS.
 - Production unchanged. Staging has a persistent volume but is in sleep state and remains on the earlier deployed commit; no live deployment was attempted.
 - Public launch NO-GO until real operational backup/restore, payment/Stripe verification, real mobile PWA/QR testing and legal/operator sign-off.
+
+## 2026-11-21 strict merchant JWT scope and registration password bounds
+
+- Verified branch revision 393280b87a67ca42731a84ec8e03534a3ce8b47c. CI: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44926960419
+- **297 isolated tests passed** and **1 assembled FastAPI integration passed**, including Python, JavaScript and PWA checks.
+- Merchant dashboard, staff settings, receipt issuance/refunds and stamp history now require a business-role token with an exact integer business_id matching its authenticated BusinessAccount. A missing, wrong or string-typed ID cannot access the merchant API merely by having the same email.
+- New merchant registration enforces a UTF-8 byte length between 10 and 72 before bcrypt hashing, avoiding silent truncation / invalid overlong input.
+- Integration tests cover absent/forged IDs, a mis-typed business scope, and invalid merchant passwords. Receipt tests explicitly create correctly scoped merchant JWTs and reject unspecific or forged merchant identity.
+- A temporary failure of integration CI came from deliberately exceeding the existing five-signups-per-minute limiter; the isolated test resets its own rate-limit storage after the negative-input checks. Latest CI is green.
+- Railway staging still has its own mounted persistent volume and is idle-sleeping; production remains on the previous deployment. These GitHub changes were **not** deployed.
+- Release remains NO-GO pending real backup/restore, Stripe billing, real-device QR/PWA tests, and legal/operator sign-off.
