@@ -189,3 +189,25 @@ def test_recovery_refuses_unsafe_public_origin(fixture,monkeypatch,unsafe_origin
     assert "recovery_url" not in response.text
     with db() as session:
         assert session.query(RecoveryTicket).count()==0
+
+
+@pytest.mark.parametrize("wallet_id",[
+    "W-"+("X"*17)+"?invalid",
+    "W-"+("X"*17)+"/invalid",
+    "W-"+("X"*17)+"#invalid",
+    "W-"+("X"*17)+" invalid",
+    "W-"+("X"*17)+"@invalid",
+])
+def test_recovery_rejects_malformed_destination_without_using_ticket(fixture,wallet_id):
+    client,db,Customer,header=fixture
+    code=code_for(request(client,header(),1))
+    payload={"code":code,"new_wallet_uuid":wallet_id,"new_private_token":"S"*48}
+    denied=client.post("/api/loial-wallet-recovery/claim",json=payload)
+    assert denied.status_code==422,denied.text
+    with db() as session:
+        card=session.query(Customer).filter(Customer.id==1).one()
+        assert card.wallet_uuid=="W-LEGACY"
+        assert session.query(RecoveryTicket).first().status=="pending"
+    payload["new_wallet_uuid"]="W-VALID-RECOVERED-DEVICE-001"
+    valid=client.post("/api/loial-wallet-recovery/claim",json=payload)
+    assert valid.status_code==200,valid.text
