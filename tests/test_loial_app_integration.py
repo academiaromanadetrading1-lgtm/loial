@@ -825,7 +825,7 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                 "idempotency_key":"capped-out-merchant-scan"})
             assert capped_scan.status_code==403,capped_scan.text
             assert capped_scan.json()["detail"]=="LIMIT_REACHED"
-            # Admin-granted ProBusiness has no financial side effects.
+            # Admin-granted Business access has no payment side effects.
             admin_headers={"Authorization":"Bearer "+admin_token}
             recruited_id=firm_b.json()["business_id"]
             manual_url=f"/api/admin/business/{recruited_id}/manual-plan"
@@ -844,6 +844,10 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             profile_payload={"sector":"patiserie","description":"Patiserie cu 4 angajati si 120 clienti zilnic.","currency":"EUR"}
             saved=client.put("/api/loial-ai/profile",json=profile_payload,headers=second_auth)
             assert saved.status_code==200,saved.text
+            # The premium middleware must not inflate an active Business
+            # grant into the distinct EUR 270 ProBusiness plan.
+            with main.SessionLocal() as db:
+                assert db.get(main.BusinessAccount,recruited_id).plan=="business"
             assert saved.json()["status"]=="saved"
             assert saved.json()["industry"]["key"]=="patiserie"
             assert saved.json()["currency"]=="EUR"
