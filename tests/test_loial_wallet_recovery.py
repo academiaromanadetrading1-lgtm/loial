@@ -158,3 +158,32 @@ def test_recovery_requires_unpredictable_code(fixture):
     assert client.post("/api/loial-wallet-recovery/claim",json={
       "code":fake,"new_wallet_uuid":"W-OTHER-LONG-RANDOM-DEVICE","new_private_token":"S"*48
     }).status_code==404
+
+
+def test_recovery_url_stays_with_its_deployment_origin(fixture,monkeypatch):
+    client,db,Customer,header=fixture
+    monkeypatch.setenv("LOIAL_PUBLIC_ORIGIN",
+                       "https://loial-staging-staging.up.railway.app")
+    response=request(client,header(),1)
+    assert response.status_code==200,response.text
+    parsed=urlparse(response.json()["recovery_url"])
+    assert parsed.scheme=="https"
+    assert parsed.netloc=="loial-staging-staging.up.railway.app"
+    assert parsed.path=="/wallet-recovery.html"
+    assert code_for(response)
+
+
+@pytest.mark.parametrize("unsafe_origin", [
+    "http://loial.space",
+    "https://loial.space/path",
+    "https://user@loial.space",
+    "https://*.loial.space",
+    "https://loial.space?x=1",
+    "https://loial.space:99999",
+])
+def test_recovery_refuses_unsafe_public_origin(fixture,monkeypatch,unsafe_origin):
+    client,db,Customer,header=fixture
+    monkeypatch.setenv("LOIAL_PUBLIC_ORIGIN",unsafe_origin)
+    response=request(client,header(),1)
+    assert response.status_code==503,response.text
+    assert "recovery_url" not in response.text
