@@ -192,3 +192,20 @@ def test_public_origin_requires_exact_https_and_isolates_staging():
     ):
         with pytest.raises(ValueError):
             validated_public_origin(origin,"staging")
+
+
+def test_staging_preflight_accepts_its_own_origin_not_production(monkeypatch):
+    monkeypatch.setattr("loial_preflight.os.path.ismount",lambda path:path=="/data")
+    env=sample_env()
+    env["LOIAL_STRIPE_SECRET_KEY"]="sk_test_CI_ONLY_PLACEHOLDER_NEVER_USE_AS_A_KEY"
+    env["LOIAL_PUBLIC_ORIGIN"]="https://loial-staging-staging.up.railway.app"
+    env["ALLOWED_ORIGINS"]="https://loial-staging-staging.up.railway.app"
+    result=preflight(env,"staging")
+    assert "staging_origin_isolated" not in result["blockers"]
+    assert "loial_stripe_return_origin" not in result["blockers"]
+    assert "staging_durable_volume" not in result["blockers"]
+    env["LOIAL_PUBLIC_ORIGIN"]="https://loial.space"
+    env["ALLOWED_ORIGINS"]="https://loial.space"
+    wrong=preflight(env,"staging")
+    assert "staging_origin_isolated" in wrong["blockers"]
+    assert "staging_durable_volume" not in wrong["blockers"]
