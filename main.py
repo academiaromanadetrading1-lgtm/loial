@@ -3398,7 +3398,7 @@ install_loial_ai(app, engine, SessionLocal, BusinessAccount, Customer, Consent, 
 from loial_business_ai import AISale
 from loial_inbox import install_loial_inbox
 install_loial_inbox(app, engine, SessionLocal, BusinessAccount, Customer, Consent,
-                    AISale, SECRET_KEY, ALGORITHM)
+                    AISale, SECRET_KEY, ALGORITHM, require_billing=True)
 
 # Roluri independente: administratorul firmei poate fi si ambasador si client Loial.
 from loial_inbox import WalletInboxAccess, access_hash
