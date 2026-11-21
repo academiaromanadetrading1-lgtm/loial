@@ -192,8 +192,9 @@ def process_paid_invoice(db, invoice, state, business, Agent, price_id,
         state.last_paid_invoice=invoice_id
         state.status="active"
     state.updated_at=stamp
-    # Legacy flags are used by existing feature checks; commercial plan is derived from verified invoices.
-    business.plan="probusiness"
+    # Legacy display flags must reflect the verified invoice tier.
+    # In particular a EUR 67 payment never implies ProBusiness.
+    business.plan=plan.code
     business.max_customers=999999
     return {"credited":True,"first":first,"period":period}
 
@@ -554,7 +555,11 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
                                 state=db.query(LoialSubscription).filter(
                                     LoialSubscription.business_id==biz.id).first()
                                 access=effective_entitlements(db,biz.id,state)
-                                desired="probusiness" if access["active"] else "free"
+                                # Use verified entitlements, not a blanket premium
+                                # label that upgrades Business to ProBusiness.
+                                desired=access.get("plan","business") if access["active"] else "free"
+                                if desired not in ("business","probusiness","probusiness_member"):
+                                    desired="business" if access["active"] else "free"
                                 cap=999999 if access["active"] else 50
                                 if biz.plan!=desired or biz.max_customers!=cap:
                                     biz.plan=desired
