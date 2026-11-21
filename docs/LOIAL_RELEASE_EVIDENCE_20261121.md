@@ -277,3 +277,14 @@ Public launch remains NO-GO while real restore, Stripe billing, device testing a
 - This is a source-level guard for LOIAL's currently monthly recurring plans, not a substitute for Stripe signed webhook and actual checkout testing.
 - Railway staging is online with persistent storage still attached, deployment 8479fe18-8589-461b-a004-17e0ad09002b. Railway production remains online on 1bdeabfe-dc4b-473f-8b66-f3d19137feeb. No deployment was made in this batch.
 - Release remains NO-GO pending real independent backup/restore, Stripe TEST checkout/webhook, mobile QR/PWA and legal/operator approval.
+
+## 2026-11-21 Stripe checkout event ordering and binding protection
+
+- Verified source commit 83dcb75ff6f6e2032ed446006ae707795daa557c, CI https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44948499048
+- **305 isolated tests passed**, **1 full FastAPI integration passed**, plus Python compile, JavaScript and PWA checks.
+- Checkout subscription binding now uses the Stripe event timestamp and the existing subscription watermark to ignore older checkout events that try to replace a newer subscription. A delayed event for the same subscription is allowed without changing binding.
+- An invoice paid before a checkout event updates the timestamp watermark after verified credit, protecting later reconciliation from older foreign-subscription events.
+- Conflicting checkout client_reference_id and merchant metadata cause a 422 rather than selecting one merchant ID. Invalid missing/non-integer checkout timestamps fail closed for rebinding.
+- Tests explicitly cover timestamp ordering, missing/invalid timestamps, same-subscription duplicates, unbound-account initial binding and differing subscriptions. No real Stripe API calls were made, and these unit tests do not replace signed webhook TEST verification.
+- Staging is online with volume attached, deployment 8479fe18-8589-461b-a004-17e0ad09002b. Production remains online and unchanged on 1bdeabfe-dc4b-473f-8b66-f3d19137feeb. No new deployment occurred.
+- Public launch remains NO-GO pending actual staging off-volume backup/restore, end-to-end Stripe TEST, real-device QR/PWA and legal/operator sign-off.
