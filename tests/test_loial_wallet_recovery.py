@@ -187,3 +187,5 @@ def test_recovery_refuses_unsafe_public_origin(fixture,monkeypatch,unsafe_origin
     response=request(client,header(),1)
     assert response.status_code==503,response.text
     assert "recovery_url" not in response.text
+    with db() as session:
+        assert session.query(RecoveryTicket).count()==0
