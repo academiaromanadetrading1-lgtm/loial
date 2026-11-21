@@ -67,13 +67,19 @@ def setup_receipts(monkeypatch):
     GrantBase.metadata.create_all(engine)
     factory=sessionmaker(bind=engine)
     app=FastAPI()
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+    from slowapi.util import get_remote_address
+    limiter=Limiter(key_func=get_remote_address)
+    app.state.limiter=limiter
+    app.add_exception_handler(RateLimitExceeded,_rate_limit_exceeded_handler)
     from loial_business_ai import AIDocument, AISale
     from loial_crm import install_crm
     from loial_inbox import install_loial_inbox, record_offer_choice
     install_crm(app,engine,factory,Business,Customer,Consent,AISale,"secure-only-for-tests","HS256")
     install_loial_inbox(app,engine,factory,Business,Customer,Consent,AISale,"secure-only-for-tests","HS256")
     install_receipts(app,engine,factory,Business,Customer,AIDocument,AISale,
-                     "secure-only-for-tests","HS256")
+                     "secure-only-for-tests","HS256",limiter=limiter)
     install_loial_ai(app,engine,factory,Business,Customer,Consent,
                      "secure-only-for-tests","HS256")
     with factory() as db:
@@ -522,3 +528,12 @@ def test_smart_receipt_cannot_reserve_after_atomic_expiration(setup_receipts):
     with factory() as db:
         assert db.query(Receipt).one().status=="awaiting_payment"
         assert db.query(SmartReservation).count()==0
+
+
+def test_public_receipt_preview_is_rate_limited(setup_receipts):
+    client,factory,Receipt,token_a,token_b,owner,wallet=setup_receipts
+    for _ in range(30):
+        response=client.get("/api/loial-receipts/preview",params={"token":"Z"*43})
+        assert response.status_code==404,response.text
+    blocked=client.get("/api/loial-receipts/preview",params={"token":"Z"*43})
+    assert blocked.status_code==429,blocked.text
