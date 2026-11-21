@@ -2153,16 +2153,7 @@ def rotate_business_staff_pin(credentials: HTTPAuthorizationCredentials = Depend
                               db: Session = Depends(get_db)):
     if not credentials:
         raise HTTPException(status_code=401,detail="Autentificare obligatorie")
-    try:
-        claims=jwt.decode(credentials.credentials,SECRET_KEY,algorithms=[ALGORITHM])
-    except JWTError:
-        raise HTTPException(status_code=401,detail="Sesiune invalida")
-    if claims.get("role")!="business":
-        raise HTTPException(status_code=403,detail="Doar administratorul firmei poate schimba PIN-ul")
-    biz=db.query(BusinessAccount).filter(
-        BusinessAccount.email==claims.get("sub")).first()
-    if not biz:
-        raise HTTPException(status_code=403,detail="Firma nu a fost gasita")
+    biz=require_business_account_token(credentials,db)
     staff_pins={p.pin for p in db.query(StaffMember).filter(
         StaffMember.business_id==biz.id,StaffMember.active==1).all()}
     for _ in range(100):
