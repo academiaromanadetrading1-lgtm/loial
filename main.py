@@ -2262,7 +2262,22 @@ def get_business_qr_image(request: Request, business_id: int, db: Session = Depe
         raise HTTPException(status_code=404, detail="Business not found")
     color = biz.card_color if re.fullmatch(r"#[0-9a-fA-F]{6}", biz.card_color or "") else "#2d6a4f"
     initial = (biz.name or "L")[:1]
-    join_url = "https://loial.space/join/" + str(business_id)
+    # Never send staging QR users to production. The public origin must be
+    # explicit, HTTPS and syntactically safe (never trust an incoming Host).
+    from urllib.parse import urlsplit
+    origin = os.getenv("LOIAL_PUBLIC_ORIGIN", "https://loial.space").rstrip("/")
+    try:
+        parsed = urlsplit(origin)
+        valid_origin = (parsed.scheme == "https" and bool(parsed.hostname)
+                        and parsed.username is None and parsed.password is None
+                        and not parsed.path and not parsed.query and not parsed.fragment
+                        and not any(c.isspace() for c in origin)
+                        and (parsed.port is None or 1 <= parsed.port <= 65535))
+    except ValueError:
+        valid_origin = False
+    if not valid_origin:
+        raise HTTPException(status_code=503, detail="Public QR origin is not configured safely")
+    join_url = origin + "/join/" + str(business_id)
     png_bytes = create_premium_qr_bytes(join_url, color=color, initial=initial)
     b64 = base64.b64encode(png_bytes).decode()
     return {"qr_base64": f"data:image/png;base64,{b64}", "url": join_url}
