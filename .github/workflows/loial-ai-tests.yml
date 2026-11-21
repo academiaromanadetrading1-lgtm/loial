@@ -20,6 +20,12 @@ on:
       - 'manifest.json'
       - 'requirements.txt'
 
+
+# Supersede outdated runs from successive development commits to save runner time.
+concurrency:
+  group: loial-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
