@@ -219,6 +219,19 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert checkout_disabled.status_code==503
 
             assert stripe_state.json()["subscription"]["active"] is False
+
+            # A stale display plan must never bypass expired Stripe access.
+            with main.SessionLocal() as db:
+                business=db.get(main.BusinessAccount,business_id)
+                business.plan="probusiness"
+                db.commit()
+            stale_inbox=client.get("/api/loial-inbox/merchant/messages",headers=bearer)
+            assert stale_inbox.status_code==403,stale_inbox.text
+            with main.SessionLocal() as db:
+                business=db.get(main.BusinessAccount,business_id)
+                business.plan="free"
+                db.commit()
+
             assert client.get("/api/loial-stripe/me").status_code==401
             assert client.get("/api/loial-ai/context",headers=bearer).status_code==402
             identity = client.get("/api/loial-identity/me", headers=bearer)
