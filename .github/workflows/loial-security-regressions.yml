@@ -1,0 +1,43 @@
+name: LOIAL security regressions
+
+on:
+  pull_request:
+    paths:
+      - 'main.py'
+      - 'loial_stripe_billing.py'
+      - 'test_legacy_campaign_disabled.py'
+      - 'test_legacy_enrollment_disabled.py'
+      - 'test_merchant_token_isolation.py'
+      - 'test_platform_admin_isolation.py'
+      - 'test_principal_type_separation.py'
+      - 'test_public_feedback_throttle.py'
+      - 'test_stripe_business_token_isolation.py'
+      - '.github/workflows/loial-security-regressions.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check syntax
+        run: python -m py_compile main.py loial_stripe_billing.py
+      - name: Run isolated security regression tests
+        run: |
+          python -m unittest -v \
+            test_legacy_campaign_disabled \
+            test_legacy_enrollment_disabled \
+            test_merchant_token_isolation \
+            test_platform_admin_isolation \
+            test_principal_type_separation \
+            test_public_feedback_throttle \
+            test_stripe_business_token_isolation
