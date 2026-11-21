@@ -169,6 +169,19 @@ def test_refund_excludes_sale_and_reverses_latest_unredeemed_stamp(setup_receipt
     assert refund.json()["financial_data_excluded"] is True
     assert refund.json()["loyalty_review_required"] is False
     assert refund.json()["stamp_reversed"] is True
+    # The reversal must have an auditable single ledger entry and the new
+    # balance must reflect the latest committed database value.
+    from loial_scans import StampAward
+    with db_factory() as db:
+        rows=db.query(StampAward).filter(StampAward.source=="refund").all()
+        assert len(rows)==1
+        assert rows[0].stamps_after==1
+    second_refund=client.post("/api/loial-receipts/refund",headers=owner(),
+        json={"receipt_ref":"B-100","reason":"Returnare repetata"})
+    assert second_refund.status_code==200
+    assert second_refund.json()["status"]=="already_refunded"
+    with db_factory() as db:
+        assert db.query(StampAward).filter(StampAward.source=="refund").count()==1
     report=client.get("/api/loial-ai/report",headers=owner()).json()
     assert report["sales"]["total_revenue"]==0
     assert client.get("/api/loial-ai/customers/1/purchases",headers=owner()).json()["purchases"]==[]
