@@ -318,7 +318,12 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
         if expected_status!="reserved" and (customer.stamps or 0)>=target:
             raise HTTPException(status_code=409,detail="Revendica mai intai recompensa existenta")
         claimed=utc_now()
-        statement=(update(Receipt).where(Receipt.id==receipt.id,Receipt.status==expected_status)
+        # Expiry is checked as part of the same atomic claim transition, not
+        # solely before it (the ticket may expire during receipt processing).
+        statement=(update(Receipt).where(
+                    Receipt.id==receipt.id,
+                    Receipt.status==expected_status,
+                    Receipt.expires_at>claimed.isoformat())
                    .values(status="claimed",claimed_wallet=wallet_uuid,
                            claimed_at=claimed.isoformat()))
         if db.execute(statement).rowcount!=1:
