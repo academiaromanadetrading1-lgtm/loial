@@ -865,7 +865,7 @@ def register_agent(request: Request, name: str, email: str, password: str, phone
     if not 10 <= len(password.encode("utf-8")) <= 72:
         raise HTTPException(status_code=422, detail="Parola trebuie sa aiba intre 10 si 72 de octeti")
     email = email.strip().lower()
-    if len(email) > 254 or not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", email):
+    if len(email) > 254 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         raise HTTPException(status_code=422, detail="Adresa de email invalida")
     if not 1 <= len(name.strip()) <= 100:
         raise HTTPException(status_code=422, detail="Nume invalid")
