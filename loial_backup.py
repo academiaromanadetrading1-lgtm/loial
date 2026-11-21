@@ -9,8 +9,33 @@ from __future__ import annotations
 import argparse
 import os
 import sqlite3
+import tempfile
 import uuid
 from pathlib import Path
+
+
+
+def verify_restorable(snapshot: str | Path) -> dict:
+    """Prove the snapshot can be restored into a separate disposable SQLite DB.
+
+    Never copies data to a network destination and never opens the production
+    source for writing. Counts schema objects only; does not expose row data.
+    """
+    source=Path(snapshot).expanduser().resolve(strict=True)
+    if not source.is_file():
+        raise ValueError("Snapshot must be a regular file")
+    with tempfile.TemporaryDirectory(prefix="loial-restore-check-") as folder:
+        restored=Path(folder)/"restored.sqlite"
+        with sqlite3.connect(f"file:{source.as_posix()}?mode=ro",uri=True) as src:
+            with sqlite3.connect(restored) as dst:
+                src.backup(dst,pages=100,sleep=0.05)
+                result=dst.execute("PRAGMA integrity_check").fetchone()
+                if not result or result[0]!="ok":
+                    raise RuntimeError("Isolated restore integrity check failed")
+                tables=dst.execute(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type='table'"
+                ).fetchone()[0]
+                return {"restored":True,"integrity":"ok","tables":tables}
 
 
 def backup_database(source: str | Path, destination: str | Path) -> dict:
@@ -41,11 +66,12 @@ def backup_database(source: str | Path, destination: str | Path) -> dict:
         target=None
         conn.close()
         conn=None
+        restoration=verify_restorable(tmp)
         # Atomic hard-link creation refuses an existing destination. Unlike
         # os.replace this can never overwrite another operator's backup.
         os.link(tmp,dst)
         return {"backup_path":str(dst),"bytes":dst.stat().st_size,
-                "integrity":"ok","permissions":"0600"}
+                "integrity":"ok","permissions":"0600","restore_verified":restoration["restored"]}
     finally:
         if target is not None:target.close()
         if conn is not None:conn.close()
