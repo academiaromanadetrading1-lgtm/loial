@@ -8,6 +8,7 @@ merchant's card is transferred; other businesses remain untouched.
 """
 import hashlib
 import os
+import re
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -208,7 +209,7 @@ def install_wallet_recovery(app,engine,factory,BusinessAccount,Customer,
         if verified_wallet(db,prior_wallet):
             raise HTTPException(status_code=409,detail=
                 "Un dispozitiv privat este deja asociat; transferul nu este permis prin codul comerciantului.")
-        if not req.new_wallet_uuid.startswith("W-"):
+        if not re.fullmatch(r"W-[A-Za-z0-9_-]{17,117}",req.new_wallet_uuid):
             raise HTTPException(status_code=422,detail="Identificatorul portofelului nou este invalid")
         destination=verified_wallet(db,req.new_wallet_uuid)
         if destination and destination.token_hash!=access_hash(req.new_private_token):
