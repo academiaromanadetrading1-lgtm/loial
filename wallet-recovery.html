@@ -28,6 +28,11 @@ doar cardul firmei respective, nu istoricul altor afaceri.</p>
 </section></main>
 <script>
 const code=new URLSearchParams(location.search).get('code')||'';
+// Remove the one-time bearer ticket from the visible URL and browser history.
+// Keep it only in page memory for preview/claim. Never place it in third-party URLs.
+if(location.search.includes('code=')){
+  history.replaceState(history.state,'',location.pathname);
+}
 const $=id=>document.getElementById(id);
 let previewData=null;
 function status(text,bad=false){
