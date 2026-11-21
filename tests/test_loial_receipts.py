@@ -489,3 +489,36 @@ def test_staff_approval_expires_between_read_and_atomic_confirmation(setup_recei
         assert db.query(Receipt).one().status=="reserved"
         assert db.query(SmartReservation).one().confirmed_at is None
         assert db.query(StampAward).count()==0
+
+
+def test_smart_receipt_cannot_reserve_after_atomic_expiration(setup_receipts):
+    """A receipt expiring after its first read cannot be reserved."""
+    from sqlalchemy import event
+    from loial_receipts import SmartReservation
+    client,factory,Receipt,token_a,_,owner,wallet=setup_receipts
+    payload=receipt_payload("SMART-RESERVE-EXPIRY")
+    payload["requires_payment_confirmation"]=True
+    issued=client.post("/api/loial-receipts/issue",headers=owner(),json=payload)
+    assert issued.status_code==200,issued.text
+    token=issued.json()["claim_url"].split("token=")[1]
+    engine=factory.kw["bind"]
+    intervened=[False]
+    def expire_before_reserve(conn,cursor,statement,parameters,context,executemany):
+        sql=statement.lstrip().upper()
+        if (not intervened[0] and sql.startswith(
+                "UPDATE LOIAL_TRANSACTION_RECEIPTS SET STATUS")):
+            intervened[0]=True
+            cursor.connection.execute(
+                "UPDATE loial_transaction_receipts SET expires_at="
+                "'2000-01-01T00:00:00+00:00' WHERE id=1")
+    event.listen(engine,"before_cursor_execute",expire_before_reserve)
+    try:
+        denied=client.post("/api/loial-receipts/reserve",
+                           headers=wallet(token_a),json={"receipt_token":token})
+    finally:
+        event.remove(engine,"before_cursor_execute",expire_before_reserve)
+    assert intervened[0] is True
+    assert denied.status_code==409,denied.text
+    with factory() as db:
+        assert db.query(Receipt).one().status=="awaiting_payment"
+        assert db.query(SmartReservation).count()==0
