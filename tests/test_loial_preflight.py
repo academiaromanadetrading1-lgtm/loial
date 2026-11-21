@@ -120,3 +120,39 @@ def test_public_free_pilot_must_not_use_live_stripe_in_staging():
     result=preflight(env,"staging")
     assert "staging_no_live_stripe" in result["blockers"]
     assert "free_pilot_stripe_disabled" not in result["blockers"]  # warning in staging
+
+
+def test_staging_fails_closed_without_a_real_data_mount(monkeypatch):
+    monkeypatch.setattr("loial_preflight.os.path.ismount", lambda path: False)
+    env=sample_env()
+    env["LOIAL_STRIPE_SECRET_KEY"]="sk_test_CI_ONLY_PLACEHOLDER_NEVER_USE_AS_A_KEY"
+    result=preflight(env,"staging")
+    assert "staging_durable_volume" in result["blockers"]
+    assert not result["automatic_checks_passed"]
+
+
+def test_staging_requires_both_isolated_path_and_real_mount(monkeypatch):
+    checked=[]
+    def mounted(path):
+        checked.append(path)
+        return path=="/data"
+    monkeypatch.setattr("loial_preflight.os.path.ismount", mounted)
+    env=sample_env()
+    env["LOIAL_STRIPE_SECRET_KEY"]="sk_test_CI_ONLY_PLACEHOLDER_NEVER_USE_AS_A_KEY"
+    valid=preflight(env,"staging")
+    assert "staging_durable_volume" not in valid["blockers"]
+    assert checked==["/data"]
+    env["LOIAL_DATABASE_URL"]="sqlite:////tmp/loial.db"
+    invalid=preflight(env,"staging")
+    assert "staging_durable_volume" in invalid["blockers"]
+    env["LOIAL_DATABASE_URL"]="sqlite:////data/../tmp/loial.db"
+    escaped=preflight(env,"staging")
+    assert "staging_durable_volume" in escaped["blockers"]
+
+
+def test_production_preflight_does_not_claim_staging_volume_verification(monkeypatch):
+    monkeypatch.setattr("loial_preflight.os.path.ismount",
+                        lambda _: (_ for _ in ()).throw(AssertionError("unexpected mount check")))
+    report=preflight(sample_env(),"production")
+    assert "staging_durable_volume" not in report["blockers"]
+    assert not report["safe_to_deploy_automatically"]
