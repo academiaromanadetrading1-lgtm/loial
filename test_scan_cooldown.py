@@ -27,6 +27,10 @@ class ScanCooldownTests(unittest.TestCase):
     def test_recent_receipt_claim_blocks_duplicate_stamp(self):
         self.add("receipt:001","receipt",age=3)
         self.assertIsNotNone(recent_duplicate(self.db,1,5,now=NOW))
+    def test_receipt_visit_at_reward_cap_blocks_double_scan(self):
+        self.add("receipt:cap-001","receipt_visit",age=3)
+        self.assertIsNotNone(recent_duplicate(self.db,1,5,now=NOW))
+
     def test_refund_and_redeem_do_not_block_new_stamp(self):
         self.add("redeem:001","redeem",age=2)
         self.add("refund:001","refund",age=1)
