@@ -126,3 +126,16 @@ This evidence covers CI only; it **does not** certify the currently deployed pro
 - The Railway staging environment remains without any volume mounts; source-only improvements are not proof of a durable deployed service. Railway production remains online on the previous deployment.
 
 **Public launch remains NO-GO**. Do not deploy staging without confirming durable isolated storage, and do not deploy production without a verified backup/restore, operational Stripe checks, device tests and legal sign-off.
+
+
+## 2026-11-21 smart receipt race condition hardening
+
+- Verified development commit: `69b79ded26e12819d518a715c30e2afef1d230d2`.
+- GitHub Actions: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44898750153
+- Isolated test suite: **289 passed**, FastAPI integration: **1 passed**.
+- A staff's smart receipt payment approval is now consumed only by a conditional database UPDATE whose WHERE clause includes the approval's unexpired timestamp. The earlier in-memory expiry precheck remains as an early rejection.
+- An awaiting-payment receipt is now reserved only if its expiration still holds during the conditional database UPDATE.
+- Independent regression tests simulate expiration immediately before each atomic transition, verifying no unintended receipt claim, staff confirmation or loyalty stamp.
+- Railway production was checked online on deployment `1bdeabfe-dc4b-473f-8b66-f3d19137feeb`, untouched by these commits. Staging remains sleeping, with no mounted volume. The isolated CI database is not a substitute for real staging verification.
+
+**Release decision: NO-GO** until durable isolated staging storage, restore-tested backup, Stripe checkout/webhooks, real-device PWA/QR flows, and legal/operator approval are completed.
