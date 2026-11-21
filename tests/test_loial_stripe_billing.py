@@ -251,3 +251,49 @@ def test_refund_of_old_period_preserves_new_period_and_paid_commission():
             invoice_id=current.id,kind="recurring").one().status=="reversed"
     finally:
         db.close()
+
+
+def test_invoice_without_bound_subscription_cannot_activate_business():
+    db,state=db_fixture()
+    try:
+        missing=invoice("in_missing_subscription")
+        missing.pop("subscription")
+        assert book(db,state,missing)=={"review":"missing_subscription"}
+        missing["subscription"]=""
+        assert book(db,state,missing)=={"review":"missing_subscription"}
+        wrong=invoice("in_other_subscription")
+        wrong["subscription"]="sub_unrelated"
+        assert book(db,state,wrong)=={"review":"subscription_mismatch"}
+        assert db.query(PaidMerchantInvoice).count()==0
+        assert db.query(AmbassadorCommission).count()==0
+        assert state.paid_until is None
+        assert db.get(Business,11).plan=="free"
+    finally:
+        db.close()
+
+
+def test_late_business_invoice_cannot_downgrade_current_probusiness():
+    from loial_multilocation import direct_plan
+    db,state=db_fixture()
+    try:
+        current=invoice("in_pro_current",month=12)
+        current["amount_paid"]=27000
+        current["lines"]["data"][0]["price"]["id"]="price_loial_270"
+        result=process_paid_invoice(db,current,state,db.get(Business,11),Agent,
+            "price_loial_270",PaidMerchantInvoice,AmbassadorCommission,
+            SponsorRelationship,tier,recompute_recurring,expected_cents=27000)
+        assert result["credited"]
+        original_until=state.paid_until
+        assert state.last_paid_invoice=="in_pro_current"
+        assert db.get(Business,11).plan=="probusiness"
+
+        historical=invoice("in_business_old",month=11)
+        assert book(db,state,historical)["credited"]
+        assert state.paid_until==original_until
+        assert state.last_paid_invoice=="in_pro_current"
+        assert db.get(Business,11).plan=="probusiness"
+        state.paid_until=(datetime.now(timezone.utc)+timedelta(days=2)).isoformat()
+        assert direct_plan(db,11,state)=="probusiness"
+        assert db.query(PaidMerchantInvoice).count()==2
+    finally:
+        db.close()
