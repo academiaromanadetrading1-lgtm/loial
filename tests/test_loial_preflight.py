@@ -156,3 +156,23 @@ def test_production_preflight_does_not_claim_staging_volume_verification(monkeyp
     report=preflight(sample_env(),"production")
     assert "staging_durable_volume" not in report["blockers"]
     assert not report["safe_to_deploy_automatically"]
+
+
+def test_railway_staging_startup_rejects_ephemeral_sqlite():
+    import pytest
+    from loial_preflight import assert_staging_storage
+    with pytest.raises(RuntimeError,match="persistent isolated SQLite"):
+        assert_staging_storage("sqlite:////data/loial.db","staging",lambda _:False)
+    with pytest.raises(RuntimeError,match="persistent isolated SQLite"):
+        assert_staging_storage("sqlite:////tmp/loial.db","staging",lambda _:True)
+    with pytest.raises(RuntimeError,match="persistent isolated SQLite"):
+        assert_staging_storage("sqlite:////data/../tmp/loial.db","staging",lambda _:True)
+    assert_staging_storage("sqlite:////data/loial.db","staging",lambda path:path=="/data")
+
+
+def test_railway_production_startup_guard_does_not_probe_staging_mount():
+    from loial_preflight import assert_staging_storage
+    def forbidden(_):
+        raise AssertionError("Production must not be checked as staging")
+    assert_staging_storage("sqlite:////data/loial.db","production",forbidden)
+    assert_staging_storage("sqlite:////data/loial.db","",forbidden)
