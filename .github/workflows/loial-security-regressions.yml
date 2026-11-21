@@ -36,6 +36,8 @@ on:
       - 'loial_receipts.py'
       - 'test_winback_campaign_attribution.py'
       - 'test_winback_campaign_api.py'
+      - 'test_app_boot_smoke.py'
+      - 'requirements.txt'
       - 'test_winback_core.py'
       - '.github/workflows/loial-security-regressions.yml'
   workflow_dispatch:
@@ -46,7 +48,7 @@ permissions:
 jobs:
   security:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Checkout PR
         uses: actions/checkout@v4
@@ -56,6 +58,8 @@ jobs:
           python-version: '3.11'
       - name: Install isolated database test dependency
         run: python -m pip install 'sqlalchemy>=2,<3' 'fastapi>=0.100' 'pydantic>=2,<3' 'httpx>=0.25' 'python-jose[cryptography]>=3.3'
+      - name: Install app dependencies for real boot test
+        run: python -m pip install -r requirements.txt
       - name: Check syntax
         run: python -m py_compile main.py loial_stripe_billing.py loial_preflight.py loial_winback.py loial_winback_campaigns.py loial_receipts.py
       - name: Check inline JavaScript syntax
@@ -85,4 +89,5 @@ jobs:
             test_stripe_billing_rules \
             test_winback_core \
             test_winback_campaign_attribution \
-            test_winback_campaign_api
+            test_winback_campaign_api \
+            test_app_boot_smoke
