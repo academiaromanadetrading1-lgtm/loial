@@ -70,7 +70,7 @@ def test_legacy_qr_enrollment_has_rate_limit_and_full_uuid():
         if isinstance(n, ast.FunctionDef) and n.name == "qr_enroll"
     )
     decorator_text = ast.get_source_segment(source, handler.decorator_list[-1])
-    assert decorator_text == '@limiter.limit("10/minute")'
+    assert decorator_text == 'limiter.limit("10/minute")'
     assert any(arg.arg == "request" for arg in handler.args.args)
     handler_src = ast.get_source_segment(source, handler)
     assert "str(uuid.uuid4())" in handler_src
