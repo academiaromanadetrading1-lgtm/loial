@@ -74,7 +74,7 @@ def install_loial_identity(app, engine, session_factory, BusinessAccount,
             raise HTTPException(status_code=403, detail="Administratorul firmei trebuie autentificat")
         account=db.query(BusinessAccount).filter(
             BusinessAccount.email==payload.get("sub")).first()
-        if not account or (payload.get("business_id") and payload["business_id"]!=account.id):
+        if not account or type(payload.get("business_id")) is not int or payload["business_id"]!=account.id:
             raise HTTPException(status_code=403, detail="Firma nu este disponibila")
         return account
 
@@ -99,16 +99,17 @@ def install_loial_identity(app, engine, session_factory, BusinessAccount,
     def me(request:Request,db:Session=Depends(session)):
         payload=claims(request)
         if payload["role"]=="ambassador":
-            agent=db.query(SalesAgent).filter(SalesAgent.email==payload.get("sub"),
-                                               SalesAgent.active.is_(True)).first()
+            if type(payload.get("agent_id")) is not int:
+                raise HTTPException(status_code=403,detail="Identitate de ambasador invalida")
+            agent=db.query(SalesAgent).filter(
+                SalesAgent.id==payload["agent_id"],
+                SalesAgent.email==payload.get("sub"),
+                SalesAgent.active.is_(True)).first()
             if not agent:
                 raise HTTPException(status_code=403, detail="Ambasador inactiv")
             return {"roles":["ambassador"],"ambassador":public_ambassador(agent,db),
                     "business":None,"customer_wallet_linked":False}
-        account=db.query(BusinessAccount).filter(
-            BusinessAccount.email==payload.get("sub")).first()
-        if not account:
-            raise HTTPException(status_code=403,detail="Firma inexistenta")
+        account=business(request,db)
         link=db.query(BusinessAmbassadorLink).filter(
             BusinessAmbassadorLink.business_id==account.id).first()
         agent=db.query(SalesAgent).filter(
