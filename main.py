@@ -1925,7 +1925,11 @@ def get_business_public(business_id: int, db: Session = Depends(get_db)):
     }
 
 @app.get("/join/{business_id}")
-def join_qr_page(business_id: int):
+def join_qr_page(business_id: int, db: Session = Depends(get_db)):
+    # A malformed or deleted QR must never enroll a customer into another firm.
+    if business_id <= 0 or not db.query(BusinessAccount.id).filter(
+            BusinessAccount.id == business_id).first():
+        raise HTTPException(status_code=404, detail="Business not found")
     return FileResponse("join.html")
 
 def business_can_enroll_new_customers(db, business_id):
