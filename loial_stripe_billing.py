@@ -288,7 +288,9 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
         except JWTError:raise HTTPException(status_code=401,detail="Sesiune invalida")
         if claims.get("role")!="business":
             raise HTTPException(status_code=403,detail="Cont de firma necesar")
-        biz=db.query(Business).filter(Business.id==claims.get("business_id"),
+        if type(claims.get("business_id")) is not int or claims["business_id"] <= 0:
+            raise HTTPException(status_code=403,detail="Identificator de firma invalid")
+        biz=db.query(Business).filter(Business.id==claims["business_id"],
             Business.email==claims.get("sub")).first()
         if not biz:raise HTTPException(status_code=403,detail="Firma invalida")
         return biz
@@ -599,7 +601,9 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
             if header.startswith("Bearer "):
                 try:
                     claims=jwt.decode(header[7:],secret,algorithms=[algorithm])
-                    if claims.get("role")=="business":
+                    if (claims.get("role")=="business"
+                            and type(claims.get("business_id")) is int
+                            and claims["business_id"] > 0):
                         db=factory()
                         try:
                             biz=db.query(Business).filter(
