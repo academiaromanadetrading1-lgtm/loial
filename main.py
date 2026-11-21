@@ -2100,6 +2100,23 @@ def get_customer_status(
 # ==========================================
 # BUSINESS DASHBOARD ENDPOINTS
 # ==========================================
+def require_business_account_token(credentials, db: Session):
+    """Require a scoped Business JWT, never match a merchant by email alone."""
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Neautentificat")
+    try:
+        claims=jwt.decode(credentials.credentials,SECRET_KEY,algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401,detail="Sesiune invalida")
+    if claims.get("role")!="business":
+        raise HTTPException(status_code=403,detail="Doar administratorul firmei")
+    biz=db.query(BusinessAccount).filter(
+        BusinessAccount.email==claims.get("sub")).first()
+    if not biz or (claims.get("business_id") and claims["business_id"]!=biz.id):
+        raise HTTPException(status_code=403,detail="Firma nu este disponibila")
+    return biz
+
+
 class BusinessSettingsUpdate(BaseModel):
     google_review_url: Optional[str] = None
     staff_pin: Optional[str] = None
@@ -2109,13 +2126,7 @@ class BusinessSettingsUpdate(BaseModel):
 def get_my_business(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     if not credentials:
         raise HTTPException(status_code=401, detail="Neautentificat")
-    try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        email = payload.get("sub")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Token invalid")
-    
-    biz = db.query(BusinessAccount).filter(BusinessAccount.email == email).first()
+    biz = require_business_account_token(credentials,db)
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
     
@@ -2167,8 +2178,7 @@ def rotate_business_staff_pin(credentials: HTTPAuthorizationCredentials = Depend
 def update_my_business_settings(req: BusinessSettingsUpdate, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     if not credentials:
         raise HTTPException(status_code=401, detail="Neautentificat")
-    payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-    biz = db.query(BusinessAccount).filter(BusinessAccount.email == payload.get("sub")).first()
+    biz = require_business_account_token(credentials,db)
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
     if req.google_review_url is not None:
@@ -2301,8 +2311,7 @@ class StaffCreateRequest(BaseModel):
 def list_staff(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     if not credentials:
         raise HTTPException(status_code=401, detail="Neautentificat")
-    payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-    biz = db.query(BusinessAccount).filter(BusinessAccount.email == payload.get("sub")).first()
+    biz = require_business_account_token(credentials,db)
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
     staff = db.query(StaffMember).filter(StaffMember.business_id == biz.id, StaffMember.active == 1).all()
@@ -2312,8 +2321,7 @@ def list_staff(credentials: HTTPAuthorizationCredentials = Depends(security), db
 def add_staff_member(req: StaffCreateRequest, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     if not credentials:
         raise HTTPException(status_code=401, detail="Neautentificat")
-    payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-    biz = db.query(BusinessAccount).filter(BusinessAccount.email == payload.get("sub")).first()
+    biz = require_business_account_token(credentials,db)
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
     if not re.fullmatch(r"\d{4}",req.pin) or req.pin=="1234" or req.pin==biz.staff_pin:
@@ -2337,8 +2345,7 @@ def add_staff_member(req: StaffCreateRequest, credentials: HTTPAuthorizationCred
 def remove_staff_member(staff_id: int, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     if not credentials:
         raise HTTPException(status_code=401, detail="Neautentificat")
-    payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-    biz = db.query(BusinessAccount).filter(BusinessAccount.email == payload.get("sub")).first()
+    biz = require_business_account_token(credentials,db)
     member = db.query(StaffMember).filter(StaffMember.id == staff_id, StaffMember.business_id == biz.id).first()
     if member:
         member.active = 0
@@ -2354,8 +2361,7 @@ class FullBusinessSettings(BaseModel):
 def update_business_offer(req: FullBusinessSettings, credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     if not credentials:
         raise HTTPException(status_code=401, detail="Neautentificat")
-    payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-    biz = db.query(BusinessAccount).filter(BusinessAccount.email == payload.get("sub")).first()
+    biz = require_business_account_token(credentials,db)
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
     if req.reward_text:
