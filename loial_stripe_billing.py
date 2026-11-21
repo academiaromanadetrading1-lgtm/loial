@@ -111,6 +111,20 @@ def invoice_is_eligible(invoice,price_id,expected_cents=PRICE_CENTS):
     return (price.get("id")==price_id or
             (pricing.get("price_details") or {}).get("price")==price_id)
 
+def checkout_binding_is_stale(state, event_created, subscription):
+    """Reject an older checkout trying to replace a newer Stripe binding.
+
+    Signed Stripe event timestamps are seconds since the Unix epoch. A
+    delayed confirmation for the *same* subscription is harmless; an older
+    confirmation for another subscription must never rebind the customer.
+    """
+    if type(event_created) is not int or event_created<1:
+        return True
+    if not state or not state.subscription_id or state.subscription_id==subscription:
+        return False
+    return event_created <= (state.last_event_at or 0)
+
+
 def subscription_event_matches(state, customer, subscription):
     """Ignore delayed events belonging to another subscription or customer."""
     if isinstance(customer,dict):customer=customer.get("id")
@@ -389,7 +403,11 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
             return db.query(LoialSubscription).filter(
                 LoialSubscription.customer_id==cus).first()
         if typ=="checkout.session.completed" and obj.get("mode")=="subscription":
-            identifier=obj.get("client_reference_id") or (obj.get("metadata") or {}).get("loial_business_id")
+            supplied=obj.get("client_reference_id")
+            metadata_id=(obj.get("metadata") or {}).get("loial_business_id")
+            if supplied is not None and metadata_id is not None and str(supplied)!=str(metadata_id):
+                raise HTTPException(status_code=422,detail="Referinte Stripe contradictorii")
+            identifier=supplied or metadata_id
             if not str(identifier or "").isdigit():
                 raise HTTPException(status_code=422,detail="Referinta firma lipsa")
             business=db.query(Business).filter(Business.id==int(identifier)).first()
@@ -407,6 +425,12 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
                 state=LoialSubscription(business_id=business.id,status="pending",
                     updated_at=utc_iso(now_utc()))
                 db.add(state)
+            created=event.get("created")
+            if checkout_binding_is_stale(state,created,subscription):
+                outcome={"ignored":"stale_checkout_binding"}
+                db.add(StripeWebhookEvent(id=eid,type=typ,received_at=utc_iso(now_utc())))
+                db.commit()
+                return {"status":"recorded",**outcome}
             if state.subscription_id and state.subscription_id!=subscription and entitlements(state)["active"]:
                 raise HTTPException(status_code=409,detail="Alt abonament activ asociat firmei")
             if state.subscription_id!=subscription:
@@ -418,6 +442,7 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
                 state.last_paid_invoice=None
             state.customer_id=customer
             state.subscription_id=subscription
+            state.last_event_at=max(state.last_event_at or 0,created)
             state.updated_at=utc_iso(now_utc())
             outcome={"linked_business":business.id,"access_granted":False}
         elif typ=="invoice.paid":
