@@ -457,16 +457,25 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
                 if (customer and latest and latest.id==award.id and
                     (customer.stamps or 0)==award.stamps_after and
                     award.stamps_after>0):
-                    customer.stamps-=1
-                    record_award(db,biz.id,customer.id,
-                                 "refund:"+str(r.id),"refund",customer.stamps)
-                    queue_service_event(db,biz,customer,kind="reversal",
-                                        event_key=str(r.id))
-                    from loial_wallet_sync import queue_google_refresh
-                    from loial_apple_updates import mark_customer_pass_changed
-                    queue_google_refresh(db,biz.id,r.claimed_wallet)
-                    mark_customer_pass_changed(db,biz.id,r.claimed_wallet)
-                    reversed_stamp=True
+                    # A concurrent scan or redemption may change this
+                    # balance after the ORM read. Compare-and-swap prevents
+                    # overwriting the new balance during refund processing.
+                    changed=db.execute(update(Customer).where(
+                        Customer.id==customer.id,
+                        Customer.business_id==biz.id,
+                        Customer.stamps==award.stamps_after
+                    ).values(stamps=award.stamps_after-1)).rowcount
+                    if changed==1:
+                        db.refresh(customer)
+                        record_award(db,biz.id,customer.id,
+                                     "refund:"+str(r.id),"refund",customer.stamps)
+                        queue_service_event(db,biz,customer,kind="reversal",
+                                            event_key=str(r.id))
+                        from loial_wallet_sync import queue_google_refresh
+                        from loial_apple_updates import mark_customer_pass_changed
+                        queue_google_refresh(db,biz.id,r.claimed_wallet)
+                        mark_customer_pass_changed(db,biz.id,r.claimed_wallet)
+                        reversed_stamp=True
         if previously_claimed and r.claimed_wallet:
             from loial_friend_referrals import reverse_referral_for_refunded_receipt
             reverse_referral_for_refunded_receipt(
