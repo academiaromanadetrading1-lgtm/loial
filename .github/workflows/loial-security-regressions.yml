@@ -32,6 +32,8 @@ on:
       - 'test_stripe_billing_rules.py'
       - 'loial_scans.py'
       - 'loial_winback.py'
+      - 'loial_winback_campaigns.py'
+      - 'test_winback_campaign_attribution.py'
       - 'test_winback_core.py'
       - '.github/workflows/loial-security-regressions.yml'
   workflow_dispatch:
@@ -53,7 +55,7 @@ jobs:
       - name: Install isolated database test dependency
         run: python -m pip install 'sqlalchemy>=2,<3' 'fastapi>=0.100' 'pydantic>=2,<3'
       - name: Check syntax
-        run: python -m py_compile main.py loial_stripe_billing.py loial_preflight.py loial_winback.py
+        run: python -m py_compile main.py loial_stripe_billing.py loial_preflight.py loial_winback.py loial_winback_campaigns.py
       - name: Check inline JavaScript syntax
         run: python ci_check_inline_js.py join.html scan.html platform.html
       - name: Test scan idempotency in Node
@@ -79,4 +81,5 @@ jobs:
             test_stripe_business_token_isolation \
             test_stamp_ledger_sqlite \
             test_stripe_billing_rules \
-            test_winback_core
+            test_winback_core \
+            test_winback_campaign_attribution
