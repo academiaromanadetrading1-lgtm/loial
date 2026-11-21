@@ -3502,7 +3502,7 @@ install_stripe_billing(app,engine,SessionLocal,BusinessAccount,SalesAgent,
 # Recuperare izolata a cardurilor legacy, cu verificare in persoana si cod de unica folosinta.
 from loial_wallet_recovery import install_wallet_recovery
 install_wallet_recovery(app, engine, SessionLocal, BusinessAccount, Customer,
-                        AIDocument, AISale, SECRET_KEY, ALGORITHM)
+                        AIDocument, AISale, SECRET_KEY, ALGORITHM, limiter=limiter)
 
 @app.get("/wallet-recovery.html")
 def loial_wallet_recovery_page():
