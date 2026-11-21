@@ -388,3 +388,12 @@ def test_receipt_expiring_between_precheck_and_atomic_claim_cannot_issue_stamp(
         assert db.query(StampAward).count()==0
         from loial_inbox import InboxDelivery
         assert db.query(InboxDelivery).count()==0
+
+
+def test_receipt_page_does_not_keep_one_use_code_in_browser_url():
+    from pathlib import Path
+    page=(Path(__file__).resolve().parents[1]/"loial-receipt.html").read_text(encoding="utf-8")
+    assert "const token=new URLSearchParams(location.search).get('token')||'';" in page
+    assert "history.replaceState(history.state,'',location.pathname);" in page
+    assert page.index("history.replaceState(") < page.index("preview();")
+    assert '<meta name="referrer" content="no-referrer">' in page
