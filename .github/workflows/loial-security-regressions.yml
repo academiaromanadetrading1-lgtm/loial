@@ -11,6 +11,8 @@ on:
       - 'scan.html'
       - 'test_scan_idempotency.cjs'
       - 'test_wallet_storage_recovery.cjs'
+      - 'test_i18n_dictionary.cjs'
+      - 'loial-i18n.js'
       - 'platform.html'
       - 'ci_check_inline_js.py'
       - 'test_join_route_isolation.py'
@@ -47,6 +49,8 @@ jobs:
         run: node test_scan_idempotency.cjs
       - name: Test wallet storage recovery in Node
         run: node test_wallet_storage_recovery.cjs
+      - name: Validate translation dictionary
+        run: node test_i18n_dictionary.cjs
       - name: Run isolated security regression tests
         run: |
           python -m unittest -v \
