@@ -2178,6 +2178,13 @@ def update_my_business_settings(req: BusinessSettingsUpdate, credentials: HTTPAu
         pin=req.staff_pin.strip()
         if not re.fullmatch(r"\d{4}",pin) or pin=="1234":
             raise HTTPException(status_code=422,detail="Alege un PIN diferit de 1234, format din 4 cifre")
+        if db.query(StaffMember).filter(
+            StaffMember.business_id==biz.id,
+            StaffMember.pin==pin,
+            StaffMember.active==1
+        ).first():
+            raise HTTPException(status_code=409,
+                detail="Acest PIN este deja alocat unui angajat activ")
         biz.staff_pin=pin
     if req.reward_text:
         biz.reward_text = req.reward_text.strip()
