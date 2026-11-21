@@ -244,10 +244,17 @@ def install_premium_wallet(app,engine,session_factory,BusinessAccount,Customer,
         except JWTError:
             raise HTTPException(status_code=401,detail="Sesiune invalida")
         if claims.get("role")=="ambassador":
-            agent=db.query(SalesAgent).filter(SalesAgent.email==claims.get("sub"),
-                                             SalesAgent.active.is_(True)).first()
+            if type(claims.get("agent_id")) is not int:
+                raise HTTPException(status_code=403,detail="Identitate de ambasador invalida")
+            agent=db.query(SalesAgent).filter(
+                SalesAgent.id==claims["agent_id"],
+                SalesAgent.email==claims.get("sub"),
+                SalesAgent.active.is_(True)).first()
         elif claims.get("role")=="business":
+            if type(claims.get("business_id")) is not int:
+                raise HTTPException(status_code=403,detail="Identitate de firma invalida")
             biz=db.query(BusinessAccount).filter(
+                BusinessAccount.id==claims["business_id"],
                 BusinessAccount.email==claims.get("sub")).first()
             linked=db.query(identity_model).filter(
                 identity_model.business_id==biz.id).first() if biz else None
