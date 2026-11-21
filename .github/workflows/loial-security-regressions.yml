@@ -8,6 +8,9 @@ on:
       - 'loial_preflight.py'
       - 'test_launch_preflight.py'
       - 'join.html'
+      - 'scan.html'
+      - 'platform.html'
+      - 'ci_check_inline_js.py'
       - 'test_join_route_isolation.py'
       - 'test_legacy_campaign_disabled.py'
       - 'test_legacy_agent_signup_security.py'
@@ -36,6 +39,8 @@ jobs:
           python-version: '3.11'
       - name: Check syntax
         run: python -m py_compile main.py loial_stripe_billing.py loial_preflight.py
+      - name: Check inline JavaScript syntax
+        run: python ci_check_inline_js.py join.html scan.html platform.html
       - name: Run isolated security regression tests
         run: |
           python -m unittest -v \
