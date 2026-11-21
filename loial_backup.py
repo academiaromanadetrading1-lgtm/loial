@@ -50,10 +50,10 @@ def backup_database(source: str | Path, destination: str | Path) -> dict:
     dst=Path(destination).expanduser().resolve(strict=False)
     if not src.is_file():
         raise ValueError("Source must be an existing database file")
-    if src.stat().st_size==0:
-        raise ValueError("Source SQLite file is empty; refusing false backup assurance")
     if src==dst or dst.exists():
         raise ValueError("Destination must be a new file, different from source")
+    if src.stat().st_size==0:
+        raise ValueError("Source SQLite file is empty; refusing false backup assurance")
     if not dst.parent.is_dir():
         raise ValueError("Destination parent directory does not exist")
     tmp=dst.with_name("."+dst.name+"."+uuid.uuid4().hex+".tmp")
