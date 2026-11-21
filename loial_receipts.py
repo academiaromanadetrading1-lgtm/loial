@@ -368,6 +368,11 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
             from loial_friend_referrals import credit_after_valid_stamp
             credit_after_valid_stamp(db,wallet_uuid,biz.id,
                                      "receipt:"+str(receipt.id))
+        # A redeemed, single-use receipt is a confirmed visit even when the
+        # stamp target is already reached. Count it once, never infer revenue.
+        from loial_winback_campaigns import attribute_confirmed_visit
+        attribute_confirmed_visit(db,biz.id,customer.id,
+                                  "receipt:"+str(receipt.id),at=claimed)
         from loial_wallet_sync import queue_google_refresh
         queue_google_refresh(db,biz.id,wallet_uuid)
         from loial_apple_updates import mark_customer_pass_changed
