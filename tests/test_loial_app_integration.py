@@ -97,10 +97,38 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert sign_up.status_code == 200, sign_up.text
             business_id = sign_up.json()["business_id"]
             bearer = {"Authorization": "Bearer " + sign_up.json()["token"]}
+            from jose import jwt as scoped_jwt
+
+            # A legacy User row sharing the email cannot impersonate the
+            # separately authenticated BusinessAccount, even with role business.
+            with main.SessionLocal() as db:
+                colliding_user=main.User(
+                    email="owner.smoke@example.invalid",
+                    password=main.pwd_context.hash("legacy-only-password"),
+                    name="Legacy Collision",role="business",plan="starter")
+                db.add(colliding_user)
+                db.commit()
+            impersonated=client.post("/auth/login",json={
+                "email":"owner.smoke@example.invalid",
+                "password":"legacy-only-password"})
+            assert impersonated.status_code==401,impersonated.text
+            merchant_login=client.post("/auth/login",json={
+                "email":"owner.smoke@example.invalid",
+                "password":"strong-test-password-only"})
+            assert merchant_login.status_code==200,merchant_login.text
+            merchant_claims=scoped_jwt.decode(
+                merchant_login.json()["access_token"],
+                main.SECRET_KEY,algorithms=[main.ALGORITHM])
+            assert merchant_claims["role"]=="business"
+            assert merchant_claims["business_id"]==business_id
+            with main.SessionLocal() as db:
+                db.query(main.User).filter(
+                    main.User.email=="owner.smoke@example.invalid").delete()
+                db.commit()
+
 
             # A valid non-Business JWT with the same email must never be
             # accepted as merchant authentication on staff or settings APIs.
-            from jose import jwt as scoped_jwt
             other_role_token=scoped_jwt.encode({
                 "sub":"owner.smoke@example.invalid","role":"customer"
             },main.SECRET_KEY,algorithm=main.ALGORITHM)
