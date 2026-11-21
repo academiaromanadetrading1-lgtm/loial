@@ -1918,16 +1918,26 @@ class QREnrollRequest(BaseModel):
     email: Optional[str] = None
 
 @app.post("/api/enroll")
-def qr_enroll(req: QREnrollRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def qr_enroll(request: Request, req: QREnrollRequest, db: Session = Depends(get_db)):
+    # Public QR registration is subject to throttling and bounded input size.
+    name = req.name.strip()
+    if not 1 <= len(name) <= 120:
+        raise HTTPException(status_code=422, detail="Invalid customer name")
+    if req.phone is not None and len(req.phone) > 40:
+        raise HTTPException(status_code=422, detail="Invalid phone length")
+    if req.email is not None and len(req.email) > 254:
+        raise HTTPException(status_code=422, detail="Invalid email length")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Business not found")
-    if not business_can_enroll_new_customers(db,req.business_id):
+    if not business_can_enroll_new_customers(db, req.business_id):
         raise HTTPException(status_code=403, detail="LIMIT_REACHED")
-    new_uuid = str(uuid.uuid4())[:8]
+    # Full UUID avoids the collision and enumeration risk of 8-character IDs.
+    new_uuid = str(uuid.uuid4())
     customer = Customer(
         uuid=new_uuid,
-        name=req.name,
+        name=name,
         phone=req.phone,
         email=req.email,
         stamps=0,
