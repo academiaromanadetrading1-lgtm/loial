@@ -77,7 +77,7 @@ def verified_wallet(db, wallet_uuid):
         WalletInboxAccess.wallet_uuid==wallet_uuid).first()
 
 def install_wallet_recovery(app,engine,factory,BusinessAccount,Customer,
-                            AIDocument,AISale,secret,algorithm):
+                            AIDocument,AISale,secret,algorithm,limiter=None):
     RecoveryBase.metadata.create_all(bind=engine)
     router=APIRouter(prefix="/api/loial-wallet-recovery",
                      tags=["Loial legacy wallet migration"])
@@ -115,7 +115,8 @@ def install_wallet_recovery(app,engine,factory,BusinessAccount,Customer,
         return result
 
     @router.get("/eligible")
-    def eligible_clients(q:str="",limit:int=50,biz=Depends(owner),
+    @((limiter.limit("60/minute")) if limiter else (lambda f:f))
+    def eligible_clients(request:Request,q:str="",limit:int=50,biz=Depends(owner),
                          db:Session=Depends(database)):
         # Scoped lookup of legacy cards only. No emails, phone numbers or QR secrets.
         result=db.query(Customer).filter(Customer.business_id==biz.id)
@@ -135,7 +136,8 @@ def install_wallet_recovery(app,engine,factory,BusinessAccount,Customer,
         return {"items":items,"business_id":biz.id}
 
     @router.post("/request")
-    def request_recovery(req:RecoveryRequest,biz=Depends(owner),
+    @((limiter.limit("5/minute")) if limiter else (lambda f:f))
+    def request_recovery(request:Request,req:RecoveryRequest,biz=Depends(owner),
                          db:Session=Depends(database)):
         public_origin=recovery_public_origin()
         customer=db.query(Customer).filter(
@@ -170,7 +172,8 @@ def install_wallet_recovery(app,engine,factory,BusinessAccount,Customer,
                 "notice":"Verifica titularul in persoana. Codul transfera doar cardul acestei firme."}
 
     @router.get("/preview")
-    def preview(code:str,db:Session=Depends(database)):
+    @((limiter.limit("30/minute")) if limiter else (lambda f:f))
+    def preview(request:Request,code:str,db:Session=Depends(database)):
         if not (32<=len(code)<=180):
             raise HTTPException(status_code=422,detail="Cod invalid")
         ticket=ticket_by_code(db,code)
@@ -183,7 +186,8 @@ def install_wallet_recovery(app,engine,factory,BusinessAccount,Customer,
                 "notice":"Transferul nu acorda acces la mesajele sau cardurile altor firme."}
 
     @router.post("/claim")
-    def claim(req:RecoveryClaim,db:Session=Depends(database)):
+    @((limiter.limit("15/minute")) if limiter else (lambda f:f))
+    def claim(request:Request,req:RecoveryClaim,db:Session=Depends(database)):
         ticket=db.query(RecoveryTicket).filter(
             RecoveryTicket.ticket_hash==sha(req.code)).first()
         if ticket and ticket.status=="used":
