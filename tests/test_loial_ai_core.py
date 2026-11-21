@@ -145,6 +145,14 @@ def test_business_scoping_and_premium_entitlement(app_client):
     assert client.get("/api/loial-ai/context").status_code == 401
     assert client.get("/api/loial-ai/context",headers=auth("owner1@test.invalid")).json()["industry"]["key"] == "rideshare"
     assert client.get("/api/loial-ai/context",headers=auth("owner2@test.invalid")).json()["industry"]["key"] == "atelier_auto"
+    for claims in (
+        {"sub":"owner1@test.invalid","role":"business"},
+        {"sub":"owner1@test.invalid","role":"business","business_id":"1"},
+        {"sub":"owner1@test.invalid","role":"business","business_id":2}
+    ):
+        forged=jwt.encode(claims,"test-secret",algorithm="HS256")
+        assert client.get("/api/loial-ai/context",headers={
+            "Authorization":"Bearer "+forged}).status_code==403
 
 def test_sales_confirmation_cannot_cross_tenant(app_client):
     client, auth = app_client
