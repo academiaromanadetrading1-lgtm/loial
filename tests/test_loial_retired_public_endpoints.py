@@ -60,3 +60,21 @@ def test_public_pages_do_not_depend_on_retired_apis():
         html = (root / page).read_text(encoding="utf-8")
         for fragment in retired:
             assert fragment not in html, f"{page} calls retired API {fragment}"
+
+
+def test_legacy_qr_enrollment_has_rate_limit_and_full_uuid():
+    source = Path(__file__).resolve().parents[1].joinpath("main.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    handler = next(
+        n for n in tree.body
+        if isinstance(n, ast.FunctionDef) and n.name == "qr_enroll"
+    )
+    decorator_text = ast.get_source_segment(source, handler.decorator_list[-1])
+    assert decorator_text == '@limiter.limit("10/minute")'
+    assert any(arg.arg == "request" for arg in handler.args.args)
+    handler_src = ast.get_source_segment(source, handler)
+    assert "str(uuid.uuid4())" in handler_src
+    assert "str(uuid.uuid4())[:8]" not in handler_src
+    assert "len(name) <= 120" in handler_src
+    assert "len(req.email) > 254" in handler_src
+    assert "len(req.phone) > 40" in handler_src
