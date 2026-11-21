@@ -100,3 +100,17 @@ This evidence covers CI only; it **does not** certify the currently deployed pro
 - Railway production remains on its earlier release and staging remains sleeping without a persistent volume. These changes were not deployed.
 
 **Public release status: NO-GO.** Durable staging, real-data backup/restore, paid Stripe testing, real-device PWA/QR checks and legal/operator approval remain outstanding.
+
+
+## 2026-11-21 QR origin and staging isolation
+
+- CI-tested revision: `878f39dbd40f37f2e57c478e93c6edd08f19ef58`.
+- GitHub Actions: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44897403616
+- Python isolated tests: **285 passed**; assembled FastAPI integration: **1 passed**.
+- `validated_public_origin` rejects missing, malformed, wildcard, userinfo, HTTP or non-root HTTPS origins. Railway staging is forbidden from silently pointing QR links to `loial.space`.
+- Receipt QR issuance consumes the validated per-environment HTTPS origin rather than the raw environment variable.
+- Staging startup refuses a missing or production origin; production launch checks still demand the exact official production origin.
+- Preflight accepts a dedicated staging checkout-return origin instead of incorrectly requiring `https://loial.space` in every environment.
+- Production Railway remains **online on the prior deployment**. Staging remains **sleeping without a persistent volume**. These changes were not deployed.
+
+**Release status: NO-GO.** Dedicated durable staging storage, hands-on QR/PWA device tests, Stripe staging verification, verified production backup/restore and legal/operator sign-off remain outstanding.
