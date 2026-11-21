@@ -21,6 +21,28 @@ class Check:
     severity: str
     message: str
 
+def validated_public_origin(value, environment_name=""):
+    """Return an exact HTTPS origin, with staging never pointing to production."""
+    from urllib.parse import urlsplit
+    raw=(value or "").strip()
+    if not raw or raw!=raw.rstrip("/") or any(c.isspace() or c in "*\\\\?#" for c in raw):
+        raise ValueError("LOIAL_PUBLIC_ORIGIN must be an exact HTTPS origin")
+    try:
+        parts=urlsplit(raw)
+        valid=(parts.scheme=="https" and bool(parts.hostname)
+               and parts.username is None and parts.password is None
+               and not parts.path and not parts.query and not parts.fragment
+               and (parts.port is None or 1<=parts.port<=65535))
+    except ValueError:
+        valid=False
+    if not valid:
+        raise ValueError("LOIAL_PUBLIC_ORIGIN must be an exact HTTPS origin")
+    if (environment_name or "").lower()=="staging" and parts.hostname.lower() in (
+        "loial.space","www.loial.space"):
+        raise ValueError("Railway staging cannot issue production QR links")
+    return raw
+
+
 def assert_staging_storage(database_url, environment_name, mount_checker=None):
     """Fail closed only on Railway staging; never probe or touch production data.
 
