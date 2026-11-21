@@ -65,3 +65,14 @@ This evidence covers CI only; it **does not** certify the currently deployed pro
 - All changes remain **source-only** on the development branch; production Railway deployment is unchanged.
 
 **NO-GO remains in force** pending isolated persistent staging, real-device verification, live-system backup/restore proof, Stripe validation and legal/operator sign-off.
+
+
+## 2026-11-21 canonical universal wallet alias regression
+- Tested revision: `471d7bdb6eec7463f9fed7a62ab180dc7beb2e5c`.
+- CI: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44895711773
+- Isolated tests: **281 passed**; FastAPI integration: **1 passed**.
+- Customer enrollment now resolves merchant-specific card identifiers to the canonical `wallet_uuid` before checking the private device token. This prevents rejecting legitimate re-enrollment or silently returning no token when a user presents a valid business-specific card ID.
+- Regression exercises a universal wallet enrolled across three separate businesses, authorized alias retry, unauthorized alias retry and correct per-business wallet association.
+- Railway production remains on its existing deployment; staging remains sleeping with **no persistent volume**. No production changes or real-customer data operations were performed.
+
+**NO-GO** for public launch remains until staging storage, field device tests, real backup/restore, payment integration and legal checks have been verified.
