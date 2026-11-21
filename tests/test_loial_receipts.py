@@ -364,3 +364,26 @@ def test_crm_campaign_full_flow_and_optout(setup_receipts):
     assert client.post(q+"preferences",headers=wallet(a),json={"business_id":1,"enabled":False}).status_code==200
     assert client.post(q+"send",headers=owner(),json=payload).json()["sent"]==0
     assert client.post(q+"crm-audience",headers=owner(),json={"segment":{"min_inactive_days":30,"max_inactive_days":10}}).status_code==422
+
+
+def test_receipt_expiring_between_precheck_and_atomic_claim_cannot_issue_stamp(
+        setup_receipts,monkeypatch):
+    from datetime import timedelta
+    import loial_receipts
+    client,factory,Receipt,token_a,_,owner,wallet=setup_receipts
+    response=client.post("/api/loial-receipts/issue",
+                         headers=owner(),json=receipt_payload("EXP-RACE"))
+    assert response.status_code==200,response.text
+    qr_token=response.json()["claim_url"].split("token=")[1]
+    with factory() as db:
+        expiry=datetime.fromisoformat(db.query(Receipt).one().expires_at)
+    moments=iter([expiry-timedelta(seconds=1),expiry+timedelta(seconds=1)])
+    monkeypatch.setattr(loial_receipts,"utc_now",lambda:next(moments))
+    denied=client.post("/api/loial-receipts/claim",headers=wallet(token_a),
+                       json={"receipt_token":qr_token})
+    assert denied.status_code==409,denied.text
+    with factory() as db:
+        assert db.query(Receipt).one().status=="issued"
+        from loial_scans import StampAward
+        assert db.query(StampAward).count()==0
+        from loial_inbox import InboxDelivery\n        assert db.query(InboxDelivery).count()==0
