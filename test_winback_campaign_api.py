@@ -120,6 +120,19 @@ class WinbackCampaignApiTests(unittest.TestCase):
         with self.Session() as db:
             self.assertEqual(db.query(InboxDelivery).count(),0)
 
+    def test_customer_returning_after_draft_is_not_targeted(self):
+        draft=self.draft()
+        with self.Session() as db:
+            db.add(StampAward(business_id=1,customer_id=11,
+                   operation_key="recent-return",source="manual",stamps_after=2,
+                   created_at=datetime.now(timezone.utc).isoformat()))
+            db.commit()
+        response=self.client.post("/api/loial-winback/campaigns/%s/approve"%draft["campaign_id"])
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json()["delivered_to_wallet_inbox"],0)
+        with self.Session() as db:
+            self.assertEqual(db.query(InboxDelivery).count(),0)
+
     def test_invalid_campaign_id_fails_closed(self):
         response=self.client.post("/api/loial-winback/campaigns/999999/approve")
         self.assertEqual(response.status_code,404)
