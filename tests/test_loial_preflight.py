@@ -96,3 +96,27 @@ def test_unknown_deployment_stage_is_rejected():
     import pytest
     with pytest.raises(ValueError):
         preflight(sample_env(),"prodution")
+
+
+def test_staging_rejects_live_stripe_credentials():
+    env=sample_env()
+    result=preflight(env,"staging")
+    assert "staging_no_live_stripe" in result["blockers"]
+    assert result["automatic_checks_passed"] is False
+    assert result["safe_to_deploy_automatically"] is False
+
+
+def test_staging_allows_test_stripe_key_without_claiming_launch_approval():
+    env=sample_env()
+    env["LOIAL_STRIPE_SECRET_KEY"]="sk_test_CI_ONLY_PLACEHOLDER_NEVER_USE_AS_A_KEY"
+    result=preflight(env,"staging")
+    assert "staging_no_live_stripe" not in result["blockers"]
+    assert result["safe_to_deploy_automatically"] is False
+
+
+def test_public_free_pilot_must_not_use_live_stripe_in_staging():
+    env=sample_env()
+    env["LOIAL_PUBLIC_FREE_PILOT"]="1"
+    result=preflight(env,"staging")
+    assert "staging_no_live_stripe" in result["blockers"]
+    assert "free_pilot_stripe_disabled" not in result["blockers"]  # warning in staging
