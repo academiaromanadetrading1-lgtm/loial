@@ -176,3 +176,19 @@ def test_railway_production_startup_guard_does_not_probe_staging_mount():
         raise AssertionError("Production must not be checked as staging")
     assert_staging_storage("sqlite:////data/loial.db","production",forbidden)
     assert_staging_storage("sqlite:////data/loial.db","",forbidden)
+
+
+def test_public_origin_requires_exact_https_and_isolates_staging():
+    import pytest
+    from loial_preflight import validated_public_origin
+    assert validated_public_origin("https://loial.space","production")=="https://loial.space"
+    assert validated_public_origin("https://staging-loial.example","staging")=="https://staging-loial.example"
+    for origin in (
+        "", "http://staging-loial.example", "https://staging-loial.example/path",
+        "https://user@staging-loial.example", "https://*.example",
+        "https://staging-loial.example?code=x", "https://staging-loial.example/",
+        "https://staging-loial.example:99999", "https://loial.space",
+        "https://www.loial.space"
+    ):
+        with pytest.raises(ValueError):
+            validated_public_origin(origin,"staging")
