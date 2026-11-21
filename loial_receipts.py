@@ -383,8 +383,14 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
         raw=secrets.token_urlsafe(32)
         deadline=min(now+timedelta(minutes=3),datetime.fromisoformat(rec.expires_at))
         if rec.status=="awaiting_payment":
-            if db.execute(update(Receipt).where(Receipt.id==rec.id,Receipt.status=="awaiting_payment").values(status="reserved")).rowcount!=1:
-                db.rollback();raise HTTPException(409,"Tichet deja rezervat")
+            # The precheck alone is insufficient: expiry may change while
+            # preparing the reservation. Only reserve an unexpired receipt.
+            if db.execute(update(Receipt).where(
+                Receipt.id==rec.id,
+                Receipt.status=="awaiting_payment",
+                Receipt.expires_at>now.isoformat()
+            ).values(status="reserved")).rowcount!=1:
+                db.rollback();raise HTTPException(409,"Tichet expirat sau deja rezervat")
             db.add(SmartReservation(receipt_id=rec.id,business_id=rec.business_id,wallet_uuid=access.wallet_uuid,approval_hash=sha256(raw),approval_expires=deadline.isoformat()))
         else:
             changed=db.execute(update(SmartReservation).where(SmartReservation.receipt_id==rec.id,SmartReservation.wallet_uuid==access.wallet_uuid,SmartReservation.confirmed_at.is_(None)).values(approval_hash=sha256(raw),approval_expires=deadline.isoformat())).rowcount
