@@ -62,7 +62,11 @@ def test_67_euro_invoice_and_one_direct_recruiter():
     db,state=db_fixture()
     result=book(db,state,invoice("in_loial1"))
     assert result["credited"] and result["first"]
-    assert db.get(Business,11).plan=="probusiness"
+    assert db.get(Business,11).plan=="business"
+    from loial_multilocation import direct_plan
+    # Paid Business grants single-location features, never ProBusiness.
+    state.paid_until=(datetime.now(timezone.utc)+timedelta(days=1)).isoformat()
+    assert direct_plan(db,11,state)=="business"
     entries=db.query(AmbassadorCommission).all()
     assert sorted((x.agent_id,x.kind,x.amount_cents) for x in entries)==[
         (1,"sponsor",1000),(2,"activation",2000)]
@@ -177,6 +181,7 @@ def test_verified_probusiness_activation_and_renewal():
         row=db.query(PaidMerchantInvoice).filter_by(
             external_invoice_id="in_pro_renew").one()
         assert row.review_reason=="stripe_verified_probusiness"
+        assert db.get(Business,11).plan=="probusiness"
         assert state.last_paid_invoice=="in_pro_renew"
         # Move the paid period relative to the test clock, not real billing.
         state.paid_until=(datetime.now(timezone.utc)+timedelta(days=1)).isoformat()
