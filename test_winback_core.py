@@ -6,8 +6,8 @@ import unittest
 from loial_winback import summarize_inactive, SettingsInput
 
 
-def scan(customer, day):
-    return SimpleNamespace(customer_id=customer, created_at=day)
+def scan(customer, day, source="manual"):
+    return SimpleNamespace(customer_id=customer, created_at=day, source=source)
 
 
 class WinbackCoreTests(unittest.TestCase):
@@ -56,6 +56,22 @@ class WinbackCoreTests(unittest.TestCase):
         result = summarize_inactive([scan(2, "2026-10-23")], [2], 30,
                                     as_of=self.today)
         self.assertEqual(result["at_risk_customers"], 0)
+
+    def test_reward_redemption_and_refund_are_not_customer_visits(self):
+        rows=[scan(2,"2026-10-01","manual"),
+              scan(2,"2026-11-21","redeem"),
+              scan(3,"2026-10-02","refund"),
+              scan(4,"2026-10-01","receipt")]
+        result=summarize_inactive(rows,[2,3,4],30,as_of=self.today)
+        self.assertEqual(result["confirmed_visit_customers"],2)
+        self.assertEqual(result["at_risk_customers"],2)
+
+    def test_only_bookkeeping_events_do_not_create_retention_candidates(self):
+        rows=[scan(2,"2026-10-01","redeem"),
+              scan(2,"2026-10-02","refund")]
+        result=summarize_inactive(rows,[2],3,as_of=self.today)
+        self.assertEqual(result["confirmed_visit_customers"],0)
+        self.assertEqual(result["at_risk_customers"],0)
 
     def test_settings_reject_unsafe_financial_assumptions(self):
         from pydantic import ValidationError
