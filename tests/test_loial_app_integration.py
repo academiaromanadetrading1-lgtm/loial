@@ -98,6 +98,10 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             with main.SessionLocal() as db:
                 assert db.query(main.BusinessAccount).filter_by(
                     email="invalid-password@example.invalid").count()==0
+            # The isolated test exercised three extra rejected signup requests.
+            # Reset only its in-process rate-limit backend so that the existing
+            # five legitimate registration tests still verify their own flows.
+            main.limiter._storage.reset()
 
             sign_up = client.post("/api/register", json={
                 "email": "owner.smoke@example.invalid",
