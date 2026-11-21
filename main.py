@@ -3593,6 +3593,12 @@ install_growth(app, INDUSTRIES)
 from loial_multilocation import install_multilocation
 install_multilocation(app,engine,SessionLocal,BusinessAccount,Customer,SECRET_KEY,ALGORITHM)
 
+# Read-only retention insights: only confirmed scans; no automatic marketing.
+from loial_winback import install_winback
+from loial_scans import StampAward
+install_winback(app,engine,get_db,BusinessAccount,Customer,StampAward,
+                require_business_account_token,security)
+
 
 from loial_acquisition import AcquisitionBase, pilot_snapshot
 AcquisitionBase.metadata.create_all(bind=engine)
