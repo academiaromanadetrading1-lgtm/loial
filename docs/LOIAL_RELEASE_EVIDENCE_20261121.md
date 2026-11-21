@@ -39,3 +39,16 @@
 - CI branch concurrency cancels superseded workflows, limiting redundant runner consumption.
 
 This evidence covers CI only; it **does not** certify the currently deployed production commit or close real-device, billing, storage, legal or recovery testing gates.
+
+
+## 2026-11-21 customer-data and merchant-messaging gate
+
+- CI-tested commit: `780ea4c1eceec194e0defa0906c0ee96856ff890`.
+- Verified run: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44894812288
+- Isolated Python suite: **272 passed**; assembled FastAPI integration: **1 passed**.
+- The anonymous `/health` probe now uses `SELECT 1` and returns `{"status":"healthy"}` without the count of customers or the SQLite backend identifier.
+- The deployed LOIAL inbox installation now requires active billing entitlements before permitting merchant messaging, rather than trusting the mutable `business.plan` label. The global subscription gate can return HTTP 402 before the inbox's own HTTP 403.
+- A regression test simulates an unpaid merchant whose display plan is erroneously marked `probusiness`; access remains denied.
+- This is source and CI validation **only**: the live Railway production service still runs its previously deployed image. Do not claim the fix is live before a separately approved staged rollout.
+
+**Release remains NO-GO** pending a persistent isolated staging datastore, full device testing, Stripe validation, production backup/restore verification and legal review.
