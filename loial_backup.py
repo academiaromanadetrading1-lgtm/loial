@@ -26,7 +26,7 @@ def verify_restorable(snapshot: str | Path) -> dict:
         raise ValueError("Snapshot must be a regular file")
     with tempfile.TemporaryDirectory(prefix="loial-restore-check-") as folder:
         restored=Path(folder)/"restored.sqlite"
-        with sqlite3.connect(f"file:{source.as_posix()}?mode=ro",uri=True) as src:
+        with sqlite3.connect(source.as_uri()+"?mode=ro",uri=True) as src:
             with sqlite3.connect(restored) as dst:
                 src.backup(dst,pages=100,sleep=0.05)
                 result=dst.execute("PRAGMA integrity_check").fetchone()
@@ -55,7 +55,7 @@ def backup_database(source: str | Path, destination: str | Path) -> dict:
         # Restrict access before any customer data is written.
         handle=os.open(tmp,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
         os.close(handle)
-        conn=sqlite3.connect(f"file:{src.as_posix()}?mode=ro",uri=True,timeout=20)
+        conn=sqlite3.connect(src.as_uri()+"?mode=ro",uri=True,timeout=20)
         target=sqlite3.connect(str(tmp))
         conn.backup(target,pages=100,sleep=0.05)
         check=target.execute("PRAGMA integrity_check").fetchone()
