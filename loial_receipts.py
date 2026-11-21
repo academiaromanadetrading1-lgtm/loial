@@ -210,8 +210,9 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
         return issue_record(payload,biz,db,integrated=True)
 
     @router.post("/issue")
-    def issue(request:IssueReceipt,biz=Depends(owner),db:Session=Depends(database)):
-        return issue_record(request,biz,db)
+    @((limiter.limit("30/minute")) if limiter else (lambda f:f))
+    def issue(request:Request,payload:IssueReceipt,biz=Depends(owner),db:Session=Depends(database)):
+        return issue_record(payload,biz,db)
 
     def issue_record(request,biz,db,integrated=False):
         ref=request.receipt_ref.strip()
@@ -278,7 +279,8 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
                 "notice":"QR Loial unic. Se poate imprima separat sau prin POS compatibil. Nu inlocuieste bonul fiscal."}
 
     @router.get("/preview")
-    def preview(token:str,db:Session=Depends(database)):
+    @((limiter.limit("30/minute")) if limiter else (lambda f:f))
+    def preview(request:Request,token:str,db:Session=Depends(database)):
         if not (32<=len(token)<=200):
             raise HTTPException(status_code=422,detail="Cod de bon invalid")
         record=receipt_for_token(db,token)
@@ -287,7 +289,8 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
         return receipt_info(db,record)
 
     @router.post("/claim")
-    def claim(req:ReceiptClaim,access=Depends(wallet),db:Session=Depends(database)):
+    @((limiter.limit("20/minute")) if limiter else (lambda f:f))
+    def claim(request:Request,req:ReceiptClaim,access=Depends(wallet),db:Session=Depends(database)):
         receipt=receipt_for_token(db,req.receipt_token)
         if receipt.status in ("awaiting_payment","reserved"):
             raise HTTPException(409,"Nota necesita confirmarea incasarii de catre angajat")
@@ -375,7 +378,8 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
                 "linked_products":len(matching),"business":biz.name}
 
     @router.post("/reserve")
-    def reserve(req:ReceiptClaim,access=Depends(wallet),db:Session=Depends(database)):
+    @((limiter.limit("20/minute")) if limiter else (lambda f:f))
+    def reserve(request:Request,req:ReceiptClaim,access=Depends(wallet),db:Session=Depends(database)):
         rec=receipt_for_token(db,req.receipt_token)
         now=utc_now()
         if rec.status not in ("awaiting_payment","reserved"): raise HTTPException(409,"Tichet indisponibil")
@@ -427,7 +431,8 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
         return finalize(rec,approval.wallet_uuid,db,"reserved")
 
     @router.get("/payment-status")
-    def payment_status(token:str,access=Depends(wallet),db:Session=Depends(database)):
+    @((limiter.limit("60/minute")) if limiter else (lambda f:f))
+    def payment_status(request:Request,token:str,access=Depends(wallet),db:Session=Depends(database)):
         rec=receipt_for_token(db,token)
         if rec.status not in ("reserved","claimed","refunded"): return {"status":rec.status}
         reservation=db.get(SmartReservation,rec.id)
@@ -440,7 +445,8 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
         return {"status":rec.status}
 
     @router.post("/refund")
-    def refund(req:ReceiptRefund,biz=Depends(owner),db:Session=Depends(database)):
+    @((limiter.limit("20/minute")) if limiter else (lambda f:f))
+    def refund(request:Request,req:ReceiptRefund,biz=Depends(owner),db:Session=Depends(database)):
         r=db.query(Receipt).filter(Receipt.business_id==biz.id,
                                    Receipt.receipt_ref==req.receipt_ref.strip()).first()
         if not r:
