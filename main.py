@@ -1865,8 +1865,9 @@ def quick_register(request: Request, req: QuickRegisterRequest, db: Session = De
         raise HTTPException(status_code=422,
             detail="Cod de recomandare invalid sau inactiv. Verifica linkul ambasadorului.")
 
-    if len(req.password)<10:
-        raise HTTPException(status_code=422,detail="Parola trebuie sa aiba minimum 10 caractere")
+    if not 10 <= len(req.password.encode("utf-8")) <= 72:
+        raise HTTPException(status_code=422,
+                            detail="Parola trebuie sa aiba intre 10 si 72 de octeti")
     if not req.business_name.strip() or len(req.business_name)>150:
         raise HTTPException(status_code=422,detail="Denumire firma invalida")
 
@@ -2116,7 +2117,9 @@ def require_business_account_token(credentials, db: Session):
         raise HTTPException(status_code=403,detail="Doar administratorul firmei")
     biz=db.query(BusinessAccount).filter(
         BusinessAccount.email==claims.get("sub")).first()
-    if not biz or (claims.get("business_id") and claims["business_id"]!=biz.id):
+    # Merchant tokens must be scoped to exactly one business. A missing,
+    # forged or stale business_id cannot gain access by matching email alone.
+    if not biz or type(claims.get("business_id")) is not int or claims["business_id"]!=biz.id:
         raise HTTPException(status_code=403,detail="Firma nu este disponibila")
     return biz
 
