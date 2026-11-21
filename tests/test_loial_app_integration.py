@@ -430,6 +430,53 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             })
             assert second_business.status_code==200,second_business.text
             other_bearer={"Authorization":"Bearer "+second_business.json()["token"]}
+
+            # A universal wallet can hold a merchant-specific card ID. Its
+            # private credential must still resolve to the canonical wallet.
+            alias_card=client.post("/api/enroll-sync",json={
+                "business_id":second_business.json()["business_id"],
+                "uuid":"W-INTEGRATION-TEST-001","name":"Client Test",
+                "wallet_claim_token":"T"*48
+            })
+            assert alias_card.status_code==200,alias_card.text
+            assert alias_card.json()["inbox_access"]=="T"*48
+            with main.SessionLocal() as db:
+                alias=db.query(main.Customer).filter(
+                    main.Customer.business_id==second_business.json()["business_id"],
+                    main.Customer.wallet_uuid=="W-INTEGRATION-TEST-001").one()
+                alias_uuid=alias.uuid
+                assert alias_uuid!="W-INTEGRATION-TEST-001"
+            alias_retry=client.post("/api/enroll-sync",json={
+                "business_id":second_business.json()["business_id"],
+                "uuid":alias_uuid,"name":"Client Test",
+                "wallet_claim_token":"T"*48
+            })
+            assert alias_retry.status_code==200,alias_retry.text
+            assert alias_retry.json()["status"]=="exists"
+            assert alias_retry.json()["inbox_access"]=="T"*48
+            without_proof=client.post("/api/enroll-sync",json={
+                "business_id":second_business.json()["business_id"],
+                "uuid":alias_uuid,"name":"Client Test"
+            })
+            assert without_proof.status_code==401,without_proof.text
+            third_business=client.post("/api/register",json={
+                "email":"third.smoke@example.invalid",
+                "password":"another-strong-test-password",
+                "business_name":"Floraria Test",
+            })
+            assert third_business.status_code==200,third_business.text
+            via_alias=client.post("/api/enroll-sync",json={
+                "business_id":third_business.json()["business_id"],
+                "uuid":alias_uuid,"name":"Client Test",
+                "wallet_claim_token":"T"*48
+            })
+            assert via_alias.status_code==200,via_alias.text
+            assert via_alias.json()["inbox_access"]=="T"*48
+            with main.SessionLocal() as db:
+                third_card=db.query(main.Customer).filter(
+                    main.Customer.business_id==third_business.json()["business_id"]).one()
+                assert third_card.wallet_uuid=="W-INTEGRATION-TEST-001"
+
             # Cross-tenant access to merchant-private data must be denied in both directions.
             other_business_id = second_business.json()["business_id"]
             for owner_headers, foreign_id in ((bearer, other_business_id), (other_bearer, business_id)):
