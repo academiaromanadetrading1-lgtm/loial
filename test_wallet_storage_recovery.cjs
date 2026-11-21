@@ -18,7 +18,8 @@ const sandbox = {
   crypto: { randomUUID: () => 'e7f01d1a-3f19-4bea-bfee-987e178dc383' },
 };
 function run() {
-  const ctx = vm.createContext(sandbox);
+  // Each run models a fresh browser navigation with shared persistent storage.
+  const ctx = vm.createContext({ ...sandbox });
   vm.runInContext(bootstrap + ';globalThis.result={wallet:globalWalletUuid,profile:savedProfile};', ctx);
   return ctx.result;
 }
