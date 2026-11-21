@@ -433,16 +433,16 @@ def install_stripe_billing(app,engine,factory,Business,Agent,
                 raise HTTPException(status_code=409,detail="Stripe customer asociat altei firme")
             state=db.query(LoialSubscription).filter(
                 LoialSubscription.business_id==business.id).first()
-            if not state:
-                state=LoialSubscription(business_id=business.id,status="pending",
-                    updated_at=utc_iso(now_utc()))
-                db.add(state)
             created=event.get("created")
             if checkout_binding_is_stale(state,created,subscription):
                 outcome={"ignored":"stale_checkout_binding"}
                 db.add(StripeWebhookEvent(id=eid,type=typ,received_at=utc_iso(now_utc())))
                 db.commit()
                 return {"status":"recorded",**outcome}
+            if not state:
+                state=LoialSubscription(business_id=business.id,status="pending",
+                    updated_at=utc_iso(now_utc()))
+                db.add(state)
             if state.subscription_id and state.subscription_id!=subscription and entitlements(state)["active"]:
                 raise HTTPException(status_code=409,detail="Alt abonament activ asociat firmei")
             if state.subscription_id!=subscription:
