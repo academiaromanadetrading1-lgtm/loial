@@ -2562,7 +2562,18 @@ class InstantEnrollRequest(BaseModel):
     friend_referral_code: Optional[str] = None
 
 @app.post("/api/enroll-sync")
-def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db)):
+@limiter.limit("30/minute")
+def enroll_customer_sync(request: Request, req: InstantEnrollRequest, db: Session = Depends(get_db)):
+    # The wallet UUID is public identity, not proof of ownership. Bound and
+    # validate it before database queries; wallet access still requires a token.
+    wallet_id = req.uuid.strip()
+    name = req.name.strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{8,120}", wallet_id):
+        raise HTTPException(status_code=422, detail="Identificatorul portofelului este invalid")
+    if not 1 <= len(name) <= 80:
+        raise HTTPException(status_code=422, detail="Numele clientului este invalid")
+    if req.email is not None and len(req.email) > 160:
+        raise HTTPException(status_code=422, detail="Adresa de email depaseste limita")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == req.business_id).first()
     if not biz:
         raise HTTPException(status_code=404, detail="Afacere negăsită")
@@ -2572,10 +2583,6 @@ def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db
         raise HTTPException(status_code=422, detail="Adresa de email nu este valida")
     if (req.consent_marketing_email or req.consent_personalized_ads) and not email_clean:
         raise HTTPException(status_code=422, detail="Pentru comunicari este necesara o adresa de email")
-    wallet_id = req.uuid.strip()
-    if not wallet_id:
-        raise HTTPException(status_code=400, detail="Codul portofelului lipsește")
-
     existing = db.query(Customer).filter(
         (Customer.uuid == wallet_id) | (Customer.wallet_uuid == wallet_id)
     ).first()
@@ -2621,7 +2628,7 @@ def enroll_customer_sync(req: InstantEnrollRequest, db: Session = Depends(get_db
         customer = Customer(
             uuid=wallet_id,
             wallet_uuid=wallet_id,
-            name=sanitize_input(req.name, 80),
+            name=sanitize_input(name, 80),
             email=email_clean or None,
             stamps=0,
             business_id=req.business_id,
