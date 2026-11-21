@@ -9,7 +9,7 @@ from sqlalchemy import Column, Integer, String, UniqueConstraint, update
 from sqlalchemy.orm import declarative_base
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from loial_winback import summarize_inactive, parse_visit_date, WinbackSettings
+from loial_winback import parse_visit_date, WinbackSettings, CONFIRMED_VISIT_SOURCES, is_confirmed_visit
 
 CampaignBase = declarative_base()
 
@@ -56,7 +56,7 @@ def at_risk_ids(award_rows, customer_ids, threshold, as_of):
     histories = defaultdict(set)
     customer_ids = set(customer_ids)
     for row in award_rows:
-        if row.customer_id in customer_ids:
+        if is_confirmed_visit(row) and row.customer_id in customer_ids:
             day = parse_visit_date(row.created_at)
             if day is not None and day <= as_of:
                 histories[row.customer_id].add(day)
@@ -114,7 +114,8 @@ def install_winback_campaigns(app, engine, get_db, BusinessAccount, Customer,
         settings=db.get(WinbackSettings,business_id)
         threshold=settings.default_return_days if settings else 30
         ids=at_risk_ids(db.query(StampAward).filter(
-            StampAward.business_id==business_id).all(),
+            StampAward.business_id==business_id,
+            StampAward.source.in_(CONFIRMED_VISIT_SOURCES)).all(),
             [c.id for c in customers],threshold,datetime.now(timezone.utc).date())
         return [c for c in customers if c.id in ids and
                 latest_offer_choice(db,Consent,c.id)]
