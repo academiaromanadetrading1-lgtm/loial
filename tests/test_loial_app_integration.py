@@ -515,7 +515,7 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             state=pilot.json()
             assert state["goal_active_businesses"]==100
             assert state["businesses_with_recorded_stamp_awards"]==1
-            assert state["businesses_registered"]==2
+            assert state["businesses_registered"]==3  # Includes the wallet-alias merchant fixture
             assert state["google_wallet"]["publishing_approved"]=="not_verified"
             assert state["apple_wallet"]["in_pilot"] is False
             # Legacy wallet demo links must not impersonate official signed Google passes.
