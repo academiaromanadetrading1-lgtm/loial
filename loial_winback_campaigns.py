@@ -169,11 +169,14 @@ def install_winback_campaigns(app, engine, get_db, BusinessAccount, Customer,
         candidates=db.query(WinbackRecipient).filter(
             WinbackRecipient.campaign_id==campaign.id,
             WinbackRecipient.business_id==biz.id).all()
+        # The customer may have returned since the draft was prepared.
+        # Recheck current inactivity and consent at the moment of approval.
+        current_eligible={customer.id for customer in eligible(db,biz.id)}
         allowed=[]
         for recipient in candidates:
             customer=db.query(Customer).filter(
                 Customer.id==recipient.customer_id,Customer.business_id==biz.id).first()
-            if customer and latest_offer_choice(db,Consent,customer.id):
+            if customer and customer.id in current_eligible and latest_offer_choice(db,Consent,customer.id):
                 allowed.append(recipient)
         stamp=datetime.now(timezone.utc).isoformat()
         event="winback:"+str(campaign.id)
