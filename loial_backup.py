@@ -13,9 +13,15 @@ import tempfile
 import uuid
 from pathlib import Path
 
+# Presence of these tables distinguishes a LOIAL database from an arbitrary
+# but valid SQLite file. Validate before certifying an operational backup.
+LOIAL_REQUIRED_TABLES=frozenset({
+    "business_accounts", "customers", "users", "loial_stamp_awards"
+})
 
 
-def verify_restorable(snapshot: str | Path) -> dict:
+
+def verify_restorable(snapshot: str | Path, *, require_loial_schema: bool = False) -> dict:
     """Prove the snapshot can be restored into a separate disposable SQLite DB.
 
     Never copies data to a network destination and never opens the production
@@ -42,10 +48,20 @@ def verify_restorable(snapshot: str | Path) -> dict:
                     raise RuntimeError("Restored SQLite snapshot has no application tables")
                 if dst.execute("PRAGMA foreign_key_check").fetchone():
                     raise RuntimeError("Restored SQLite snapshot has foreign key violations")
+                if require_loial_schema:
+                    names={row[0] for row in dst.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'"
+                    )}
+                    missing=LOIAL_REQUIRED_TABLES-names
+                    if missing:
+                        raise RuntimeError(
+                            "Restored database is missing required LOIAL tables: "
+                            + ", ".join(sorted(missing))
+                        )
                 return {"restored":True,"integrity":"ok","tables":tables}
 
 
-def backup_database(source: str | Path, destination: str | Path) -> dict:
+def backup_database(source: str | Path, destination: str | Path, *, require_loial_schema: bool = False) -> dict:
     src=Path(source).expanduser().resolve(strict=True)
     dst=Path(destination).expanduser().resolve(strict=False)
     if not src.is_file():
@@ -75,7 +91,7 @@ def backup_database(source: str | Path, destination: str | Path) -> dict:
         target=None
         conn.close()
         conn=None
-        restoration=verify_restorable(tmp)
+        restoration=verify_restorable(tmp,require_loial_schema=require_loial_schema)
         # Atomic hard-link creation refuses an existing destination. Unlike
         # os.replace this can never overwrite another operator's backup.
         os.link(tmp,dst)
@@ -91,8 +107,11 @@ def main() -> None:
     parser=argparse.ArgumentParser(description="Back up an existing LOIAL SQLite file")
     parser.add_argument("--source",required=True,help="Existing LOIAL SQLite database path")
     parser.add_argument("--output",required=True,help="NEW output file; never overwrite")
+    parser.add_argument("--allow-generic-sqlite",action="store_true",
+                        help="For fixture/testing use only; skip LOIAL schema verification")
     args=parser.parse_args()
-    result=backup_database(args.source,args.output)
+    result=backup_database(args.source,args.output,
+                           require_loial_schema=not args.allow_generic_sqlite)
     print(f"Verified backup: {result['backup_path']} ({result['bytes']} bytes)")
 
 
