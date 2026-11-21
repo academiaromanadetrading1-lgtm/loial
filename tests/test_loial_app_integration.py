@@ -315,6 +315,18 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert identity.status_code == 200, identity.text
             assert identity.headers["cache-control"] == "no-store"
             assert identity.json()["roles"] == ["business"]
+            # Identity overview and role linking must not accept a Business
+            # JWT without an exact account ID even when the email matches.
+            for claims in (
+                {"sub":"owner.smoke@example.invalid","role":"business"},
+                {"sub":"owner.smoke@example.invalid","role":"business","business_id":"1"},
+                {"sub":"owner.smoke@example.invalid","role":"business","business_id":999999}
+            ):
+                forged=scoped_jwt.encode(claims,main.SECRET_KEY,algorithm=main.ALGORITHM)
+                headers={"Authorization":"Bearer "+forged}
+                assert client.get("/api/loial-identity/me",headers=headers).status_code==403
+                assert client.post("/api/loial-identity/ambassador/activate",
+                    headers=headers,json={"display_name":"Unauthorized"}).status_code==403
 
             # Reject oversized or malformed public identifiers before
             # touching a merchant's customer records.
@@ -859,6 +871,18 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert client.post("/api/ambassador/activate-invite",
                 json={"activation_token":token,"password":"new-ambassador-test-password"}).status_code==400
             invited_headers={"Authorization":"Bearer "+claim.json()["access_token"]}
+            invited_claims=scoped_jwt.decode(claim.json()["access_token"],
+                main.SECRET_KEY,algorithms=[main.ALGORITHM])
+            assert client.get("/api/loial-identity/me",headers=invited_headers).status_code==200
+            for missing_agent_id in (None,999999,"invalid"):
+                forged_claims=dict(invited_claims)
+                if missing_agent_id is None:
+                    forged_claims.pop("agent_id",None)
+                else:
+                    forged_claims["agent_id"]=missing_agent_id
+                forged=scoped_jwt.encode(forged_claims,main.SECRET_KEY,algorithm=main.ALGORITHM)
+                assert client.get("/api/loial-identity/me",headers={
+                    "Authorization":"Bearer "+forged}).status_code==403
             assert client.get("/api/loial-revenue/ambassador/me",headers=invited_headers).status_code==200
             assert client.get("/api/my-business",headers=second_auth).status_code==200
             with main.SessionLocal() as db:
