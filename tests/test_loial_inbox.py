@@ -123,6 +123,14 @@ def test_business_scoping_and_free_plan(env):
     assert client.get("/api/loial-inbox/sent", headers=boss("boss1@example.test", role="admin")).status_code == 403
     assert client.get("/api/loial-inbox/sent", headers=boss("boss3@example.test")).status_code == 403
     assert client.get("/api/loial-inbox/sent", headers=boss("boss1@example.test")).status_code == 200
+    for claims in (
+        {"sub":"boss1@example.test","role":"business"},
+        {"sub":"boss1@example.test","role":"business","business_id":"1"},
+        {"sub":"boss1@example.test","role":"business","business_id":2}
+    ):
+        forged=jwt.encode(claims,"test-inbox-jwt-signing-key",algorithm="HS256")
+        assert client.get("/api/loial-inbox/sent",headers={
+            "Authorization":"Bearer "+forged}).status_code==403
 
 def test_send_in_loial_directly_without_email_or_approval(env):
     client, _, _, _, _, tokens, boss, wallet = env
