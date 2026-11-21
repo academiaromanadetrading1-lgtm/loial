@@ -52,3 +52,16 @@ This evidence covers CI only; it **does not** certify the currently deployed pro
 - This is source and CI validation **only**: the live Railway production service still runs its previously deployed image. Do not claim the fix is live before a separately approved staged rollout.
 
 **Release remains NO-GO** pending a persistent isolated staging datastore, full device testing, Stripe validation, production backup/restore verification and legal review.
+
+
+## 2026-11-21 recovery-wallet hardening
+
+- GitHub Actions verified commit `cde3d9f4a8e87b0ceb78cb529e7fe05af7b55de1`.
+- Run: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44895098346
+- **278** isolated tests passed; **1** assembled FastAPI integration passed.
+- Recovery claim destination wallet IDs now require the bounded `W-` identifier format, rejecting URL punctuation and whitespace before consuming a single-use ticket.
+- Regression tests confirm malformed destination values cannot migrate a customer or consume the outstanding recovery ticket.
+- Recovery page removes its one-use code from the browser address using `history.replaceState` immediately after reading it; no-referrer is retained.
+- All changes remain **source-only** on the development branch; production Railway deployment is unchanged.
+
+**NO-GO remains in force** pending isolated persistent staging, real-device verification, live-system backup/restore proof, Stripe validation and legal/operator sign-off.
