@@ -6,6 +6,7 @@ on:
       - 'main.py'
       - 'loial_stripe_billing.py'
       - 'test_legacy_campaign_disabled.py'
+      - 'test_legacy_agent_signup_security.py'
       - 'test_legacy_enrollment_disabled.py'
       - 'test_merchant_token_isolation.py'
       - 'test_platform_admin_isolation.py'
@@ -35,6 +36,7 @@ jobs:
         run: |
           python -m unittest -v \
             test_legacy_campaign_disabled \
+            test_legacy_agent_signup_security \
             test_legacy_enrollment_disabled \
             test_merchant_token_isolation \
             test_platform_admin_isolation \
