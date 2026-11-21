@@ -5,6 +5,8 @@ on:
     paths:
       - 'main.py'
       - 'loial_stripe_billing.py'
+      - 'loial_preflight.py'
+      - 'test_launch_preflight.py'
       - 'test_legacy_campaign_disabled.py'
       - 'test_legacy_agent_signup_security.py'
       - 'test_legacy_enrollment_disabled.py'
@@ -31,11 +33,12 @@ jobs:
         with:
           python-version: '3.11'
       - name: Check syntax
-        run: python -m py_compile main.py loial_stripe_billing.py
+        run: python -m py_compile main.py loial_stripe_billing.py loial_preflight.py
       - name: Run isolated security regression tests
         run: |
           python -m unittest -v \
             test_legacy_campaign_disabled \
+            test_launch_preflight \
             test_legacy_agent_signup_security \
             test_legacy_enrollment_disabled \
             test_merchant_token_isolation \
