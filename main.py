@@ -2909,6 +2909,10 @@ def scan_universal_card(request: Request, req: UniversalScanRequest, db: Session
     queue_service_event(db, biz, customer, kind="stamp", returning=was_away,
                         event_key=operation)
     record_award(db,biz.id,customer.id,operation,"manual",customer.stamps)
+    # Attribution is transactionally tied to a new confirmed manual stamp.
+    # Retried scan operations return early above, so they cannot be counted twice.
+    from loial_winback_campaigns import attribute_confirmed_visit
+    attribute_confirmed_visit(db,biz.id,customer.id,operation)
     from loial_friend_referrals import credit_after_valid_stamp
     credit_after_valid_stamp(db,wallet_id,biz.id,"scan:"+operation)
     from loial_wallet_sync import queue_google_refresh
@@ -3598,6 +3602,11 @@ from loial_winback import install_winback
 from loial_scans import StampAward
 install_winback(app,engine,get_db,BusinessAccount,Customer,StampAward,
                 require_business_account_token,security)
+
+# Merchant approval is required before marketing reaches the private wallet inbox.
+from loial_winback_campaigns import install_winback_campaigns
+install_winback_campaigns(app,engine,get_db,BusinessAccount,Customer,
+                         StampAward,Consent,require_business_account_token,security)
 
 
 from loial_acquisition import AcquisitionBase, pilot_snapshot
