@@ -135,6 +135,28 @@ def test_admin_can_be_ambassador_without_losing_business_role(app_env):
     assert "business" in second["roles"] and "ambassador" in second["roles"]
     assert "customer" not in second["roles"]
     assert client.get("/api/premium-wallet/ambassador/card",headers=headers()).status_code==200
+    for claims in (
+        {"sub":"owner@demo.invalid","role":"business"},
+        {"sub":"owner@demo.invalid","role":"business","business_id":"1"},
+        {"sub":"owner@demo.invalid","role":"business","business_id":2},
+    ):
+        token=jwt.encode(claims,"test-only-identity-secret-strong-enough",algorithm="HS256")
+        unauthorized={"Authorization":"Bearer "+token}
+        assert client.get("/api/premium-wallet/ambassador/card",headers=unauthorized).status_code==403
+        assert client.get("/api/loial-identity/me",headers=unauthorized).status_code==403
+    with Session() as db:
+        ambassador=db.query(Agent).filter(Agent.email=="owner@demo.invalid").one()
+        agent_id=ambassador.id
+    valid_agent={"Authorization":"Bearer "+jwt.encode(
+        {"sub":"owner@demo.invalid","role":"ambassador","agent_id":agent_id},
+        "test-only-identity-secret-strong-enough",algorithm="HS256")}
+    assert client.get("/api/premium-wallet/ambassador/card",headers=valid_agent).status_code==200
+    for forged_id in (None,"1",999999):
+        claims={"sub":"owner@demo.invalid","role":"ambassador"}
+        if forged_id is not None:claims["agent_id"]=forged_id
+        forged={"Authorization":"Bearer "+jwt.encode(
+            claims,"test-only-identity-secret-strong-enough",algorithm="HS256")}
+        assert client.get("/api/premium-wallet/ambassador/card",headers=forged).status_code==403
 
 def test_wallet_link_requires_private_token_not_public_qr(app_env):
     client,Session,Agent,ctx,headers,token=app_env
