@@ -2400,6 +2400,10 @@ def require_business_owner_or_admin(business_id: int, credentials, db: Session):
     if not email:
         raise HTTPException(status_code=403, detail="Acces interzis")
     if claims.get("role") == "business":
+        # A merchant JWT is bound to its original business ID, not just an email.
+        # This prevents stale tokens gaining access after account recreation.
+        if type(claims.get("business_id")) is not int or claims["business_id"] != business_id:
+            raise HTTPException(status_code=403, detail="Tokenul nu apartine acestei firme")
         account = db.query(BusinessAccount).filter(BusinessAccount.id == business_id,
                           BusinessAccount.email == email).first()
         if account:
