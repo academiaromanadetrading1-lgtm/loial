@@ -76,9 +76,23 @@ class CampaignAttributionTests(unittest.TestCase):
         self.db.rollback()
 
     def test_at_risk_selection_requires_audited_visits(self):
-        rows=[SimpleNamespace(customer_id=42,created_at="2026-10-01T12:00:00+00:00"),
-              SimpleNamespace(customer_id=43,created_at="2026-10-02T12:00:00+00:00")]
+        rows=[SimpleNamespace(customer_id=42,created_at="2026-10-01T12:00:00+00:00",source="manual"),
+              SimpleNamespace(customer_id=43,created_at="2026-10-02T12:00:00+00:00",source="receipt")]
         self.assertEqual(at_risk_ids(rows,[42],30,date(2026,11,22)),{42})
+
+    def test_non_visit_ledger_rows_never_make_winback_eligible(self):
+        rows=[
+            SimpleNamespace(customer_id=42,source="manual",
+                created_at="2026-10-01T12:00:00+00:00"),
+            SimpleNamespace(customer_id=42,source="redeem",
+                created_at="2026-11-21T12:00:00+00:00"),
+            SimpleNamespace(customer_id=43,source="refund",
+                created_at="2026-10-01T12:00:00+00:00"),
+            SimpleNamespace(customer_id=44,source="receipt",
+                created_at="2026-10-02T12:00:00+00:00")
+        ]
+        self.assertEqual(at_risk_ids(rows,[42,43,44],30,date(2026,11,22)),
+                         {42,44})
 
 if __name__=="__main__":
     unittest.main()
