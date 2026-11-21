@@ -33,6 +33,7 @@ const pages=['index.html','login.html','register.html','join.html','scan.html','
 for(const page of pages){
  const html=fs.readFileSync(page,'utf8');
  if(!html.includes('/loial-i18n.js'))errors.push(page+' lacks translation loader');
+ if(!/<html\s+lang="en"/i.test(html))errors.push(page+' does not declare English default');
 }
 console.log('Languages: '+langs.join(', '));
 console.log('Translation rows: '+rows.length+'; distinct keys: '+duplicate.size);
