@@ -160,6 +160,35 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert own_profile.status_code==200,own_profile.text
             assert own_profile.json()["name"]=="Client Test"
             assert own_profile.json()["cards"][0]["business_name"]=="Service Auto Test"
+            # Retired endpoints must not expose loyalty data by public UUID
+            # or let strangers change settings by supplying somebody's email.
+            for legacy_get in (
+                "/preferences?email=owner.smoke@example.invalid",
+                f"/api/presence/{business_id}",
+                "/api/customer-status/W-INTEGRATION-TEST-001",
+            ):
+                retired=client.get(legacy_get)
+                assert retired.status_code==410,(legacy_get,retired.text)
+                assert "Client Test" not in retired.text
+            assert client.put("/preferences",params={
+                "email":"owner.smoke@example.invalid","language":"es"
+            }).status_code==410
+            assert client.post(
+                f"/api/presence/{business_id}/W-INTEGRATION-TEST-001"
+            ).status_code==410
+            # Even with a known valid customer ID, a private card is available
+            # only through its wallet-specific proof token.
+            assert client.get(profile_url,headers={
+                "X-Loial-Wallet-Token":"wrong-token"
+            }).status_code==401
+            assert client.get("/api/qr-raw/abc",params={
+                "color":"not-a-color"
+            }).status_code==422
+            assert client.get("/api/qr-raw/"+("A"*513)).status_code==422
+            qr_image=client.get("/api/qr-raw/valid-short-code")
+            assert qr_image.status_code==200,qr_image.text
+            assert qr_image.headers["content-type"]=="image/png"
+            assert qr_image.content.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
             # New firms no longer inherit a publicly predictable primary PIN.
             account=client.get("/api/my-business",headers=bearer)
             assert account.status_code==200,account.text
