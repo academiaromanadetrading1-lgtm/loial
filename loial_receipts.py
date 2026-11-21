@@ -368,6 +368,13 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
             from loial_friend_referrals import credit_after_valid_stamp
             credit_after_valid_stamp(db,wallet_uuid,biz.id,
                                      "receipt:"+str(receipt.id))
+        if not stamp_granted:
+            # A valid purchased receipt is still a visit when the customer's
+            # reward is already unlocked. Keep the audited visit ledger accurate
+            # without awarding an extra stamp or issuing a referral reward.
+            from loial_scans import record_award
+            record_award(db,biz.id,customer.id,"receipt:"+str(receipt.id),
+                         "receipt_visit",customer.stamps)
         # A redeemed, single-use receipt is a confirmed visit even when the
         # stamp target is already reached. Count it once, never infer revenue.
         from loial_winback_campaigns import attribute_confirmed_visit
