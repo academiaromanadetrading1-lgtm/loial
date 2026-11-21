@@ -61,8 +61,9 @@ def env():
         doc_id=db.query(AIDocument).first().id
     def auth(id=1):
         sub=f"owner{id}@example.invalid"
-        return {"Authorization":"Bearer "+jwt.encode({"sub":sub,"role":"business"},
-                                              "expense-test-key",algorithm="HS256")}
+        return {"Authorization":"Bearer "+jwt.encode(
+            {"sub":sub,"role":"business","business_id":id},
+            "expense-test-key",algorithm="HS256")}
     return TestClient(app),factory,auth,doc_id
 
 def payload(doc=None,ref="INV-100",basis="gross",amount=119):
