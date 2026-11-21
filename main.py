@@ -2271,7 +2271,7 @@ def get_business_qr_image(request: Request, business_id: int, db: Session = Depe
         valid_origin = (parsed.scheme == "https" and bool(parsed.hostname)
                         and parsed.username is None and parsed.password is None
                         and not parsed.path and not parsed.query and not parsed.fragment
-                        and not any(c.isspace() for c in origin)
+                        and not any(c.isspace() or c in "*\\\\?#" for c in origin)
                         and (parsed.port is None or 1 <= parsed.port <= 65535))
     except ValueError:
         valid_origin = False
