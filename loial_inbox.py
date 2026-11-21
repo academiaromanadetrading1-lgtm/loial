@@ -214,7 +214,7 @@ def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent
             raise HTTPException(status_code=403, detail="Doar administratorul firmei")
         account = db.query(BusinessAccount).filter(
             BusinessAccount.email == claims.get("sub")).first()
-        if not account or (claims.get("business_id") and claims["business_id"] != account.id):
+        if not account or type(claims.get("business_id")) is not int or claims["business_id"] != account.id:
             raise HTTPException(status_code=403, detail="Acces refuzat")
         if require_billing:
             # In deployed LOIAL, mutable plan labels are not proof of payment.
