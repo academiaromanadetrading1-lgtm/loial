@@ -116,7 +116,11 @@ def app_env(monkeypatch):
         token=issue_wallet_access(db,"w100",True)
         db.commit()
     def headers(email="owner@demo.invalid",role="business"):
-        return {"Authorization":"Bearer "+jwt.encode({"sub":email,"role":role},secret,algorithm="HS256")}
+        claims={"sub":email,"role":role}
+        if role=="business":
+            claims["business_id"]={"owner@demo.invalid":1,
+                                   "other@demo.invalid":2}.get(email,999)
+        return {"Authorization":"Bearer "+jwt.encode(claims,secret,algorithm="HS256")}
     return TestClient(app),Session,Agent,ctx,headers,token
 
 def test_admin_can_be_ambassador_without_losing_business_role(app_env):
