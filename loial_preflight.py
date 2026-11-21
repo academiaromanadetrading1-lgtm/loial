@@ -21,6 +21,23 @@ class Check:
     severity: str
     message: str
 
+def assert_staging_storage(database_url, environment_name, mount_checker=None):
+    """Fail closed only on Railway staging; never probe or touch production data.
+
+    Staging SQLite must live below a real /data mount, not on a disposable
+    container filesystem. The Railway environment name is supplied by Railway,
+    not by user requests or HTTP headers.
+    """
+    if (environment_name or "").lower() != "staging":
+        return
+    checker = mount_checker or os.path.ismount
+    path = (database_url or "")[len("sqlite:///"):] if (
+        database_url or "").startswith("sqlite:///") else ""
+    normalized = os.path.normpath(path) if path else ""
+    if not normalized.startswith("/data/") or not checker("/data"):
+        raise RuntimeError("LOIAL staging requires persistent isolated SQLite storage mounted at /data")
+
+
 def preflight(env=None,stage="production"):
     env=dict(os.environ if env is None else env)
     if stage not in ("production", "staging"):
