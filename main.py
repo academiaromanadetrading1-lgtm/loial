@@ -668,6 +668,7 @@ def get_stats(current_user: User = Depends(get_current_user), db: Session = Depe
 @app.get("/campaign")
 @app.post("/campaign")
 def generate_campaign(lang: str = "en", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410, detail="Campaniile legacy fara izolare pe firma au fost retrase. Foloseste campaniile din panoul firmei.")
     campaigns = {
         "en": "Hi Andrei, we noticed you love cappuccinos. Come this week and get double stamps + a free croissant.",
         "ro": "Bună Andrei, am observat că iubești cappuccino. Vino săptămâna asta și primești ștampile duble + un croissant gratis.",
