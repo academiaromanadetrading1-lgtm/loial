@@ -386,4 +386,5 @@ def test_receipt_expiring_between_precheck_and_atomic_claim_cannot_issue_stamp(
         assert db.query(Receipt).one().status=="issued"
         from loial_scans import StampAward
         assert db.query(StampAward).count()==0
-        from loial_inbox import InboxDelivery\n        assert db.query(InboxDelivery).count()==0
+        from loial_inbox import InboxDelivery
+        assert db.query(InboxDelivery).count()==0
