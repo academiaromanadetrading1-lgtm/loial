@@ -410,3 +410,38 @@ def test_receipt_page_does_not_keep_one_use_code_in_browser_url():
     assert "history.replaceState(history.state,'',location.pathname);" in page
     assert page.index("history.replaceState(") < page.index("preview();")
     assert '<meta name="referrer" content="no-referrer">' in page
+
+
+def test_refund_does_not_overwrite_balance_changed_after_read(setup_receipts):
+    """A concurrent balance change must force manual review, not a lost update."""
+    from sqlalchemy import event, text as sql_text
+    from loial_scans import StampAward
+    client,factory,Receipt,token_a,_,owner,wallet=setup_receipts
+    issued=client.post("/api/loial-receipts/issue",headers=owner(),
+                       json=receipt_payload("RACE-REFUND"))
+    assert issued.status_code==200,issued.text
+    token=issued.json()["claim_url"].split("token=")[1]
+    claimed=client.post("/api/loial-receipts/claim",headers=wallet(token_a),
+                        json={"receipt_token":token})
+    assert claimed.status_code==200,claimed.text
+    engine=factory.kw["bind"]
+    injected=[False]
+    def intervene(conn,cursor,statement,parameters,context,executemany):
+        if not injected[0] and statement.lstrip().upper().startswith("UPDATE CUSTOMERS SET STAMPS"):
+            injected[0]=True
+            # SQLite DBAPI executes this inside the pending transaction,
+            # simulating a newer committed customer balance.
+            cursor.connection.execute("UPDATE customers SET stamps=5 WHERE id=1")
+    event.listen(engine,"before_cursor_execute",intervene)
+    try:
+        refund=client.post("/api/loial-receipts/refund",headers=owner(),
+             json={"receipt_ref":"RACE-REFUND","reason":"Returnare cu sold modificat"})
+    finally:
+        event.remove(engine,"before_cursor_execute",intervene)
+    assert injected[0] is True
+    assert refund.status_code==200,refund.text
+    assert refund.json()["stamp_reversed"] is False
+    assert refund.json()["loyalty_review_required"] is True
+    with factory() as db:
+        assert db.execute(sql_text("SELECT stamps FROM customers WHERE id=1")).scalar_one()==5
+        assert db.query(StampAward).filter(StampAward.source=="refund").count()==0
