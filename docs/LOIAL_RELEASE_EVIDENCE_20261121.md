@@ -114,3 +114,15 @@ This evidence covers CI only; it **does not** certify the currently deployed pro
 - Production Railway remains **online on the prior deployment**. Staging remains **sleeping without a persistent volume**. These changes were not deployed.
 
 **Release status: NO-GO.** Dedicated durable staging storage, hands-on QR/PWA device tests, Stripe staging verification, verified production backup/restore and legal/operator sign-off remain outstanding.
+
+
+## 2026-11-21 refund concurrency and recovery throttling
+
+- CI verified revision `1f3ee4b5831d55043a583c45e16eb43c60076103`: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44898136022
+- **287** isolated tests passed; **1** assembled FastAPI integration passed.
+- Refunding the latest loyalty receipt now uses a conditional SQL update that only reverses the expected current stamp balance. When the balance changes before the write, the receipt is refunded financially but the loyalty reversal is withheld for manual review; this avoids overwriting a newer customer balance.
+- Tests cover exactly-once refund ledger recording, duplicate refund idempotence, and an injected concurrent customer balance change immediately before the conditional UPDATE.
+- Legacy wallet recovery endpoints now have application-enforced SlowAPI rate limits: eligible 60/min, ticket requests 5/min, previews 30/min, claims 15/min. The isolated test verifies a sixth ticket request is rejected with HTTP 429.
+- The Railway staging environment remains without any volume mounts; source-only improvements are not proof of a durable deployed service. Railway production remains online on the previous deployment.
+
+**Public launch remains NO-GO**. Do not deploy staging without confirming durable isolated storage, and do not deploy production without a verified backup/restore, operational Stripe checks, device tests and legal sign-off.
