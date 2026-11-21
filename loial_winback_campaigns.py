@@ -5,7 +5,7 @@ Attribution counts verified scan visits, not incremental sales or receipt revenu
 """
 from datetime import datetime, timedelta, timezone
 from secrets import token_urlsafe
-from sqlalchemy import Column, Integer, String, UniqueConstraint
+from sqlalchemy import Column, Integer, String, UniqueConstraint, update
 from sqlalchemy.orm import declarative_base
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -156,6 +156,15 @@ def install_winback_campaigns(app, engine, get_db, BusinessAccount, Customer,
             raise HTTPException(status_code=404,detail="Campanie negăsită")
         if campaign.status!="draft":
             raise HTTPException(status_code=409,detail="Campania a fost deja aprobată")
+        # Atomic status transition prevents simultaneous approval requests
+        # from generating two wallet deliveries for one campaign.
+        claimed=db.execute(update(WinbackCampaign).where(
+            WinbackCampaign.id==campaign_id,
+            WinbackCampaign.business_id==biz.id,
+            WinbackCampaign.status=="draft").values(status="dispatching")).rowcount
+        if claimed!=1:
+            db.rollback()
+            raise HTTPException(status_code=409,detail="Campania este deja în curs de aprobare")
         # Recheck current consent and that each recipient still belongs to this firm.
         candidates=db.query(WinbackRecipient).filter(
             WinbackRecipient.campaign_id==campaign.id,
