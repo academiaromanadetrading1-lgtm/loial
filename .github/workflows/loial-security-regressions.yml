@@ -16,6 +16,10 @@ on:
       - 'test_wallet_storage_recovery.cjs'
       - 'test_i18n_dictionary.cjs'
       - 'test_language_switching.cjs'
+      - 'test_pwa_install_contract.cjs'
+      - 'loial-pwa-install.js'
+      - 'sw.js'
+      - 'manifest.json'
       - 'loial-i18n.js'
       - 'platform.html'
       - 'ci_check_inline_js.py'
@@ -72,6 +76,8 @@ jobs:
         run: node test_i18n_dictionary.cjs
       - name: Test language preferences and switching
         run: node test_language_switching.cjs
+      - name: Validate PWA installation contract and privacy
+        run: node test_pwa_install_contract.cjs
       - name: Run isolated security regression tests
         run: |
           python -m unittest -v \
