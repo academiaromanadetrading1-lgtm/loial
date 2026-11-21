@@ -2598,8 +2598,11 @@ def enroll_customer_sync(request: Request, req: InstantEnrollRequest, db: Sessio
     ).first()
     if card_at_business:
         from loial_inbox import issue_wallet_access
+        # A merchant-specific card UUID is only an alias for the universal
+        # wallet. Verify ownership against the canonical private wallet ID.
+        canonical_id = card_at_business.wallet_uuid or card_at_business.uuid
         try:
-            verified_token = issue_wallet_access(db, wallet_id, False, req.wallet_claim_token)
+            verified_token = issue_wallet_access(db, canonical_id, False, req.wallet_claim_token)
         except ValueError as exc:
             raise HTTPException(status_code=422,detail=str(exc))
         if not verified_token:
@@ -2653,8 +2656,9 @@ def enroll_customer_sync(request: Request, req: InstantEnrollRequest, db: Sessio
         db.add(Consent(customer_id=customer.id, purpose="personalized_ads",
                        granted=1, date=consent_time, ip="join_form"))
     from loial_inbox import issue_wallet_access, record_offer_choice, queue_service_event
+    canonical_id = customer.wallet_uuid or customer.uuid
     try:
-        inbox_token = issue_wallet_access(db, wallet_id, is_new_wallet=(existing is None),
+        inbox_token = issue_wallet_access(db, canonical_id, is_new_wallet=(existing is None),
                                          proposed_token=req.wallet_claim_token)
     except ValueError as exc:
         db.rollback()
