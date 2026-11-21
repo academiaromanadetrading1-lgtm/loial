@@ -163,3 +163,15 @@ This evidence covers CI only; it **does not** certify the currently deployed pro
 - Production Railway remains online at the prior deployment, with no new code installed. Railway staging remains sleeping without persistent volume. No volume was created and no live database modified.
 
 **Release status: NO-GO.** Staging durable storage creation/attachment remains an explicit approval-required infrastructure change due to possible cost and redeployment; backup/restore, Stripe, device and legal/operator checks remain pending.
+
+
+## 2026-11-21 PIN collision and cross-merchant staff isolation
+
+- Verified source revision `fe87618e13372fd66b5f89ac6ba7ca553fe8d520`.
+- CI: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44901290883
+- Isolated Python tests **290 passed** and assembled FastAPI integration **1 passed**; Python compilation, inline JavaScript and PWA checks passed.
+- Manually setting a merchant's primary staff PIN now refuses any PIN assigned to an active employee of the same merchant (HTTP 409). The primary PIN remains unchanged after the rejected attempt.
+- Cross-merchant regression tests exercise employee deactivation attempts by another Business JWT, including the direct business-ID route. The foreign request leaves the protected employee active; only the real business owner can deactivate it.
+- Railway production remained online at `1bdeabfe-dc4b-473f-8b66-f3d19137feeb`; staging remains sleeping without persistent volume. No deployment or volume mutation was performed.
+
+**Release decision: NO-GO** until persistent isolated staging, backup and restore, paid billing validation, on-device PWA/QR trials and legal/operator review are completed.
