@@ -2596,6 +2596,9 @@ def enroll_customer_sync(request: Request, req: InstantEnrollRequest, db: Sessio
             verified_token = issue_wallet_access(db, wallet_id, False, req.wallet_claim_token)
         except ValueError as exc:
             raise HTTPException(status_code=422,detail=str(exc))
+        if not verified_token:
+            raise HTTPException(status_code=401,
+                detail="Portofelul existent necesita autorizarea dispozitivului")
         return {"status": "exists", "inbox_access": verified_token}
 
     # A new card for this merchant counts toward the free-tier limit even
