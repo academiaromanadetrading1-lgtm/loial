@@ -78,3 +78,21 @@ def test_legacy_qr_enrollment_has_rate_limit_and_full_uuid():
     assert "len(name) <= 120" in handler_src
     assert "len(req.email) > 254" in handler_src
     assert "len(req.phone) > 40" in handler_src
+
+
+def test_public_qr_generator_rejects_unbounded_payloads():
+    source = Path(__file__).resolve().parents[1].joinpath("main.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    handlers = [node for node in tree.body
+                if isinstance(node, ast.FunctionDef)
+                and node.name == "generate_raw_qr_png"]
+    assert len(handlers) == 1
+    handler = handlers[0]
+    assert any(arg.arg == "request" for arg in handler.args.args)
+    assert any(ast.get_source_segment(source, dec) == 'limiter.limit("30/minute")'
+               for dec in handler.decorator_list)
+    body = ast.get_source_segment(source, handler)
+    assert "len(code_text) <= 512" in body
+    assert 're.fullmatch(r"#[0-9a-fA-F]{6}", color)' in body
+    assert "len(initial) > 32" in body
+    assert body.index("len(code_text) <= 512") < body.index("create_premium_qr_bytes(")
