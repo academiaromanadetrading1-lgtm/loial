@@ -37,8 +37,15 @@ def fixture():
         meta.create_all(engine)
     factory=sessionmaker(bind=engine)
     app=FastAPI()
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+    from slowapi.util import get_remote_address
+    limiter=Limiter(key_func=get_remote_address)
+    app.state.limiter=limiter
+    app.add_exception_handler(RateLimitExceeded,_rate_limit_exceeded_handler)
     install_wallet_recovery(app,engine,factory,Business,Customer,
-                            AIDocument,AISale,"strong-test-secret-only","HS256")
+                            AIDocument,AISale,"strong-test-secret-only","HS256",
+                            limiter=limiter)
     with factory() as db:
         db.add_all([
             Business(id=1,email="owner1@loial.invalid",name="Service Auto"),
@@ -245,3 +252,15 @@ def test_recovery_claim_cannot_cross_expiration_during_atomic_update(fixture, mo
         assert session.query(WalletInboxAccess).filter(
             WalletInboxAccess.wallet_uuid == "W-VALID-DEVICE-EXPIRED-001"
         ).count() == 0
+
+
+def test_recovery_ticket_issuance_is_rate_limited(fixture):
+    client,db,Customer,header=fixture
+    for _ in range(5):
+        response=request(client,header(),1)
+        assert response.status_code==200,response.text
+    blocked=request(client,header(),1)
+    assert blocked.status_code==429,blocked.text
+    with db() as session:
+        assert session.query(RecoveryTicket).count()==5
+        assert session.query(RecoveryTicket).filter_by(status="pending").count()==1
