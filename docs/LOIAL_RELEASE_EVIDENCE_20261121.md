@@ -175,3 +175,15 @@ This evidence covers CI only; it **does not** certify the currently deployed pro
 - Railway production remained online at `1bdeabfe-dc4b-473f-8b66-f3d19137feeb`; staging remains sleeping without persistent volume. No deployment or volume mutation was performed.
 
 **Release decision: NO-GO** until persistent isolated staging, backup and restore, paid billing validation, on-device PWA/QR trials and legal/operator review are completed.
+
+
+## 2026-11-21 staging storage deployed; backup validation strengthened
+
+- Staging received its own 500 MB persistent SQLite volume, loial-staging-sqlite (ID 8a041c39-3f75-42d5-b1be-a21e9e0eeb36), mounted at /data only in the staging environment. Database URL: sqlite:////data/loial.db. Dedicated public and allowed origin: https://loial-staging-staging.up.railway.app.
+- Staging deployment 8479fe18-8589-461b-a004-17e0ad09002b completed SUCCESS with /health HTTP 200, on source e04648a8cd8daf043fae1587e7b1accff57da999. Railway later reports sleeping due to idle policy, volume still attached, no warnings/criticals.
+- Production remains on deployment 1bdeabfe-dc4b-473f-8b66-f3d19137feeb, not redeployed or reconfigured.
+- Backup helper now rejects empty SQLite source databases and isolated restores with no application tables or broken foreign-key relationships; retains overwrite prevention.
+- CI revision e349ce80965d1082349219f37f572cca5bc3886c passed 292 isolated tests and 1 full FastAPI integration. https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44902572553
+- CI fixtures do not prove a real staging/production backup or persistence across restart; no legacy ephemeral data migration was verified.
+
+Public release NO-GO until isolated real backup/restore, billing verification, mobile QR/PWA tests and legal/operator acceptance are completed.
