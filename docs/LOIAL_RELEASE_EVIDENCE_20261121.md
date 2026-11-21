@@ -257,3 +257,13 @@ Public launch remains NO-GO while real restore, Stripe billing, device testing a
 - Tests establish EUR 67 payment yields Business, EUR 270 verified payment yields ProBusiness, and an active manually granted Business account does not silently become ProBusiness after a premium endpoint request. Paid access is still derived from verified entitlements, not the mutable display flag.
 - No Railway deployment or database changes were performed. Staging remains idle-sleeping with mounted volume at 8479fe18-8589-461b-a004-17e0ad09002b; production is online on 1bdeabfe-dc4b-473f-8b66-f3d19137feeb.
 - Public release NO-GO pending live-equivalent Stripe test checkout/webhook, off-volume backup/independent restore, real-device QR/PWA, operator/legal sign-off.
+
+## 2026-11-21 late Stripe invoice and subscription-binding protection
+
+- CI-tested source revision 2356fa2c4773bfe80d95224e89f800241c13306a: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44947460836
+- Tests: **301 isolated Python tests passed**, **1 full FastAPI integration passed**, Python compilation, JS syntax and PWA checks passed.
+- Stripe paid invoice processing now requires an explicit subscription reference that exactly matches the currently bound subscription. A missing or unrelated subscription cannot grant access or create commissions, even if the customer ID and paid amount match.
+- A verified late/historical invoice may be recorded for audit, but only an invoice extending the paid coverage period changes the current plan display flag. In particular, a late EUR 67 invoice cannot downgrade an already-current EUR 270 ProBusiness period.
+- Regression tests cover absent/empty/wrong subscription IDs, zero billing side effects, and out-of-order ProBusiness followed by historical Business invoices.
+- Railway: staging remains idle-sleeping with its dedicated persistent volume and deployment 8479fe18-8589-461b-a004-17e0ad09002b. Production remains online and unchanged at 1bdeabfe-dc4b-473f-8b66-f3d19137feeb. New code was not deployed.
+- Public release remains NO-GO until staging has been updated to a verified revision and real backup/restore, Stripe TEST checkout/webhook, mobile QR/PWA and legal/operator verification are completed.
