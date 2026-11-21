@@ -1755,8 +1755,8 @@ def detect_language(accept_language: str = None, country: str = None):
 def change_password(request: Request, old_password: str, new_password: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not pwd_context.verify(old_password, current_user.password):
         raise HTTPException(status_code=400, detail="Parola veche e incorectă")
-    if len(new_password) < 6:
-        raise HTTPException(status_code=400, detail="Parola nouă trebuie să aibă minim 6 caractere")
+    if len(new_password) < 10:
+        raise HTTPException(status_code=422, detail="Parola nouă trebuie să aibă minimum 10 caractere")
     current_user.password = pwd_context.hash(new_password)
     db.commit()
     return {"status": "changed", "message": "Parola a fost schimbată"}
@@ -2672,8 +2672,8 @@ class ChangePasswordRequest(BaseModel):
 @limiter.limit("5/minute")
 def change_any_password(request: Request, req: ChangePasswordRequest, db: Session = Depends(get_db)):
     email = sanitize_input(req.email, 100)
-    if len(req.new_password) < 6:
-        raise HTTPException(status_code=400, detail="Parola nouă trebuie să aibă minim 6 caractere")
+    if len(req.new_password) < 10:
+        raise HTTPException(status_code=422, detail="Parola nouă trebuie să aibă minimum 10 caractere")
     matching_accounts = []
     for model in [User, BusinessAccount, SalesAgent]:
         acc = db.query(model).filter(model.email == email).first()
