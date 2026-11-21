@@ -179,16 +179,18 @@ def install_winback_campaigns(app, engine, get_db, BusinessAccount, Customer,
             if customer and customer.id in current_eligible and latest_offer_choice(db,Consent,customer.id):
                 allowed.append(recipient)
         stamp=datetime.now(timezone.utc).isoformat()
-        event="winback:"+str(campaign.id)
-        entry=InboxEntry(business_id=biz.id,title=campaign.title,
-            body=campaign.message,category="marketing",
-            source_event=event,created_at=stamp)
-        db.add(entry)
-        db.flush()
-        for recipient in allowed:
-            db.add(InboxDelivery(entry_id=entry.id,business_id=biz.id,
-                customer_id=recipient.customer_id,created_at=stamp))
-            recipient.delivered_at=stamp
+        # Zero eligible recipients means zero inbox objects, not an empty offer.
+        if allowed:
+            event="winback:"+str(campaign.id)
+            entry=InboxEntry(business_id=biz.id,title=campaign.title,
+                body=campaign.message,category="marketing",
+                source_event=event,created_at=stamp)
+            db.add(entry)
+            db.flush()
+            for recipient in allowed:
+                db.add(InboxDelivery(entry_id=entry.id,business_id=biz.id,
+                    customer_id=recipient.customer_id,created_at=stamp))
+                recipient.delivered_at=stamp
         campaign.status="sent"
         campaign.approved_at=stamp
         campaign.sent_count=len(allowed)
