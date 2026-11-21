@@ -136,6 +136,7 @@ def install_wallet_recovery(app,engine,factory,BusinessAccount,Customer,
     @router.post("/request")
     def request_recovery(req:RecoveryRequest,biz=Depends(owner),
                          db:Session=Depends(database)):
+        public_origin=recovery_public_origin()
         customer=db.query(Customer).filter(
             Customer.id==req.customer_id,Customer.business_id==biz.id).first()
         if not customer:
@@ -161,7 +162,7 @@ def install_wallet_recovery(app,engine,factory,BusinessAccount,Customer,
             verification_note=req.verification_note.strip())
         db.add(ticket)
         db.commit()
-        return {"recovery_url":recovery_public_origin()+"/wallet-recovery.html?code="+raw,
+        return {"recovery_url":public_origin+"/wallet-recovery.html?code="+raw,
                 "expires_in_minutes":TTL_MINUTES,
                 "business":biz.name,
                 "customer":customer.name,
