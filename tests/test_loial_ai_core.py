@@ -128,8 +128,12 @@ def app_client(monkeypatch):
     app = FastAPI()
     install_loial_ai(app, engine, factory, Biz, Customer, Consent, "test-secret", "HS256")
     def headers(email, role="business"):
+        bid={"owner1@test.invalid":1,"owner2@test.invalid":2,
+             "free@test.invalid":3,"expired@test.invalid":4,
+             "grant@test.invalid":5}.get(email,999)
         return {"Authorization": "Bearer " + jwt.encode(
-            {"sub":email,"role":role}, "test-secret", algorithm="HS256")}
+            {"sub":email,"role":role,"business_id":bid},
+            "test-secret", algorithm="HS256")}
     return TestClient(app), headers
 
 def test_business_scoping_and_premium_entitlement(app_client):
