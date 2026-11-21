@@ -29,6 +29,7 @@ on:
       - 'test_public_feedback_throttle.py'
       - 'test_stripe_business_token_isolation.py'
       - 'test_stamp_ledger_sqlite.py'
+      - 'test_stripe_billing_rules.py'
       - 'loial_scans.py'
       - '.github/workflows/loial-security-regressions.yml'
   workflow_dispatch:
@@ -74,4 +75,5 @@ jobs:
             test_principal_type_separation \
             test_public_feedback_throttle \
             test_stripe_business_token_isolation \
-            test_stamp_ledger_sqlite
+            test_stamp_ledger_sqlite \
+            test_stripe_billing_rules
