@@ -137,10 +137,12 @@ def process_paid_invoice(db, invoice, state, business, Agent, price_id,
     if isinstance(invoice_customer,dict):invoice_customer=invoice_customer.get("id")
     if not state.customer_id or invoice_customer!=state.customer_id:
         return {"review":"customer_mismatch"}
-    if invoice_sub and state.subscription_id and invoice_sub!=state.subscription_id:
-        return {"review":"subscription_mismatch"}
-    if not invoice_sub and not state.subscription_id:
+    # A paid invoice must explicitly belong to the *current* Stripe
+    # subscription. Missing subscription IDs must not inherit the bound ID.
+    if not invoice_sub or not state.subscription_id:
         return {"review":"missing_subscription"}
+    if invoice_sub!=state.subscription_id:
+        return {"review":"subscription_mismatch"}
     prior=db.query(PaidMerchantInvoice).filter(
         PaidMerchantInvoice.business_id==business.id,
         PaidMerchantInvoice.eligible==1).count()
@@ -191,11 +193,11 @@ def process_paid_invoice(db, invoice, state, business, Agent, price_id,
         state.grace_until=None
         state.last_paid_invoice=invoice_id
         state.status="active"
+        # Historical/late invoices may be recorded for audit, but only the
+        # invoice extending coverage can change the current display tier.
+        business.plan=plan.code
+        business.max_customers=999999
     state.updated_at=stamp
-    # Legacy display flags must reflect the verified invoice tier.
-    # In particular a EUR 67 payment never implies ProBusiness.
-    business.plan=plan.code
-    business.max_customers=999999
     return {"credited":True,"first":first,"period":period}
 
 def apply_full_subscription_refund(db, record, Agent, recompute_recurring):
