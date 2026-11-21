@@ -139,7 +139,7 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
             raise HTTPException(status_code=403,detail="Doar administratorul firmei")
         biz=db.query(BusinessAccount).filter(
             BusinessAccount.email==payload.get("sub")).first()
-        if not biz or (payload.get("business_id") and biz.id!=payload["business_id"]):
+        if not biz or type(payload.get("business_id")) is not int or biz.id!=payload["business_id"]:
             raise HTTPException(status_code=403,detail="Firma nu este disponibila")
         return biz
 
