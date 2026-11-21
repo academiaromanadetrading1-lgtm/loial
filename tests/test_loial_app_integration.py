@@ -88,6 +88,17 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert unauthorized.status_code == 401
             assert unauthorized.headers["cache-control"] == "no-store"
 
+            # UTF-8 byte length, not character count, must be bounded
+            # before bcrypt hashes merchant credentials.
+            for invalid in ("x"*73, "é"*37, "short"):
+                rejected=client.post("/api/register",json={
+                    "email":"invalid-password@example.invalid",
+                    "password":invalid,"business_name":"Never Created"})
+                assert rejected.status_code==422,rejected.text
+            with main.SessionLocal() as db:
+                assert db.query(main.BusinessAccount).filter_by(
+                    email="invalid-password@example.invalid").count()==0
+
             sign_up = client.post("/api/register", json={
                 "email": "owner.smoke@example.invalid",
                 "password": "strong-test-password-only",
@@ -136,7 +147,15 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                 "sub":"owner.smoke@example.invalid","role":"business",
                 "business_id":999999
             },main.SECRET_KEY,algorithm=main.ALGORITHM)
-            for token in (other_role_token,wrong_scope_token):
+            missing_scope_token=scoped_jwt.encode({
+                "sub":"owner.smoke@example.invalid","role":"business"
+            },main.SECRET_KEY,algorithm=main.ALGORITHM)
+            string_scope_token=scoped_jwt.encode({
+                "sub":"owner.smoke@example.invalid","role":"business",
+                "business_id":str(business_id)
+            },main.SECRET_KEY,algorithm=main.ALGORITHM)
+            for token in (other_role_token,wrong_scope_token,missing_scope_token,
+                          string_scope_token):
                 headers={"Authorization":"Bearer "+token}
                 assert client.get("/api/my-business",headers=headers).status_code==403
                 assert client.get("/api/my-business/staff",headers=headers).status_code==403
