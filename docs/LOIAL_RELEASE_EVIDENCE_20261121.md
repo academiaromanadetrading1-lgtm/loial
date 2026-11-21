@@ -187,3 +187,14 @@ This evidence covers CI only; it **does not** certify the currently deployed pro
 - CI fixtures do not prove a real staging/production backup or persistence across restart; no legacy ephemeral data migration was verified.
 
 Public release NO-GO until isolated real backup/restore, billing verification, mobile QR/PWA tests and legal/operator acceptance are completed.
+
+## 2026-11-21 operational LOIAL backup schema validation
+
+- CI tested revision d3d03d8516fe1c1ee644edcc43cc6f3cb8764334; https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44903302657
+- All **296 isolated Python tests** passed and **1 assembled FastAPI integration** passed.
+- The operational backup CLI requires genuine core LOIAL tables AND minimum key columns (business_accounts, customers, users, loial_stamp_awards). An unrelated or structurally incomplete but otherwise valid SQLite file now fails. The generic SQLite option is explicit and only for test fixtures.
+- The disposable test suite checks strict acceptance, absence of output on failure, and CLI fail-closed behavior. This does NOT certify any real staging/production backup.
+- A separate staged maintenance runbook was created: docs/LOIAL_STAGING_BACKUP_RESTORE_RUNBOOK.md. Real backup, encrypted off-volume copy and independent restoration are NOT yet verified.
+- Staging Railway volume remains attached (service idle-sleeping); production has not been modified.
+
+Public launch remains NO-GO while real restore, Stripe billing, device testing and legal/operator sign-off remain open.
