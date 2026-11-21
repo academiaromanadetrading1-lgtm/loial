@@ -129,12 +129,16 @@ def test_operational_backup_rejects_unrelated_sqlite_schema(tmp_path):
 
 
 def test_operational_backup_accepts_loial_core_schema(tmp_path):
-    from loial_backup import LOIAL_REQUIRED_TABLES
+    from loial_backup import LOIAL_REQUIRED_COLUMNS
     source=tmp_path/"loial.sqlite"
     dest=tmp_path/"verified-loial.sqlite"
     with sqlite3.connect(source) as db:
-        for name in sorted(LOIAL_REQUIRED_TABLES):
-            db.execute(f'CREATE TABLE "{name}" (id INTEGER PRIMARY KEY)')
+        for name,columns in sorted(LOIAL_REQUIRED_COLUMNS.items()):
+            ddl=", ".join(
+                f'"{col}" '+("INTEGER PRIMARY KEY" if col=="id" else "TEXT")
+                for col in sorted(columns)
+            )
+            db.execute(f'CREATE TABLE "{name}" ({ddl})')
         db.execute("INSERT INTO business_accounts(id) VALUES (3)")
         db.execute("INSERT INTO customers(id) VALUES (7)")
         db.commit()
@@ -165,3 +169,16 @@ def test_backup_cli_requires_loial_schema_by_default(tmp_path,monkeypatch):
     ])
     main()
     assert destination.exists()
+
+
+def test_operational_backup_rejects_misleading_table_names(tmp_path):
+    from loial_backup import LOIAL_REQUIRED_TABLES
+    source=tmp_path/"incomplete-loial.sqlite"
+    dest=tmp_path/"not-complete.sqlite"
+    with sqlite3.connect(source) as db:
+        for name in sorted(LOIAL_REQUIRED_TABLES):
+            db.execute(f'CREATE TABLE "{name}" (id INTEGER PRIMARY KEY)')
+        db.commit()
+    with pytest.raises(RuntimeError,match="lacks required columns"):
+        backup_database(source,dest,require_loial_schema=True)
+    assert not dest.exists()
