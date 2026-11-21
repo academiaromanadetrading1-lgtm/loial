@@ -112,3 +112,56 @@ def test_restore_checker_rejects_foreign_key_violations(tmp_path):
     with pytest.raises(RuntimeError,match="foreign key violations"):
         backup_database(snapshot,tmp_path/"unusable-backup.sqlite")
     assert not (tmp_path/"unusable-backup.sqlite").exists()
+
+
+def test_operational_backup_rejects_unrelated_sqlite_schema(tmp_path):
+    source=tmp_path/"foreign.sqlite"
+    dest=tmp_path/"not-loial-backup.sqlite"
+    with sqlite3.connect(source) as db:
+        db.execute("CREATE TABLE unrelated (id INTEGER PRIMARY KEY)")
+        db.commit()
+    with pytest.raises(RuntimeError,match="missing required LOIAL tables"):
+        backup_database(source,dest,require_loial_schema=True)
+    assert not dest.exists()
+    # The original source is still valid and unchanged.
+    with sqlite3.connect(source) as db:
+        assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+
+
+def test_operational_backup_accepts_loial_core_schema(tmp_path):
+    from loial_backup import LOIAL_REQUIRED_TABLES
+    source=tmp_path/"loial.sqlite"
+    dest=tmp_path/"verified-loial.sqlite"
+    with sqlite3.connect(source) as db:
+        for name in sorted(LOIAL_REQUIRED_TABLES):
+            db.execute(f'CREATE TABLE "{name}" (id INTEGER PRIMARY KEY)')
+        db.execute("INSERT INTO business_accounts(id) VALUES (3)")
+        db.execute("INSERT INTO customers(id) VALUES (7)")
+        db.commit()
+    result=backup_database(source,dest,require_loial_schema=True)
+    assert result["restore_verified"] is True
+    assert verify_restorable(dest,require_loial_schema=True)["restored"] is True
+    with sqlite3.connect(dest) as db:
+        assert db.execute("SELECT id FROM customers").fetchone()[0]==7
+        assert db.execute("SELECT id FROM business_accounts").fetchone()[0]==3
+
+
+def test_backup_cli_requires_loial_schema_by_default(tmp_path,monkeypatch):
+    import sys
+    from loial_backup import main
+    source=tmp_path/"generic.sqlite"
+    destination=tmp_path/"cli-backup.sqlite"
+    with sqlite3.connect(source) as db:
+        db.execute("CREATE TABLE generic_test (id INTEGER)")
+    monkeypatch.setattr(sys,"argv",[
+        "loial_backup.py","--source",str(source),"--output",str(destination)
+    ])
+    with pytest.raises(RuntimeError,match="missing required LOIAL tables"):
+        main()
+    assert not destination.exists()
+    monkeypatch.setattr(sys,"argv",[
+        "loial_backup.py","--source",str(source),"--output",str(destination),
+        "--allow-generic-sqlite"
+    ])
+    main()
+    assert destination.exists()
