@@ -57,7 +57,8 @@ class WinbackCampaignApiTests(unittest.TestCase):
                 yield db
         security=HTTPBearer(auto_error=False)
         def merchant_auth(credentials,db):
-            return db.get(Firm,1)
+            # In-memory merchant principals only: independent tenant contexts.
+            return db.get(Firm,2 if getattr(credentials,"credentials",None)=="firm2" else 1)
         install_winback_campaigns(app,self.engine,get_db,Firm,Customer,StampAward,
                                   Consent,merchant_auth,security)
         self.client=TestClient(app)
@@ -131,6 +132,37 @@ class WinbackCampaignApiTests(unittest.TestCase):
         response=self.client.post("/api/loial-winback/campaigns/%s/approve"%draft["campaign_id"])
         self.assertEqual(response.status_code,200,response.text)
         self.assertEqual(response.json()["delivered_to_wallet_inbox"],0)
+        with self.Session() as db:
+            self.assertEqual(db.query(InboxDelivery).count(),0)
+            self.assertEqual(db.query(InboxEntry).count(),0)
+
+    def test_other_merchant_cannot_list_or_approve_campaign(self):
+        first=self.draft()
+        foreign={"Authorization":"Bearer firm2"}
+        seen=self.client.get("/api/loial-winback/campaigns",headers=foreign)
+        self.assertEqual(seen.status_code,200,seen.text)
+        self.assertEqual(seen.json(),[])
+        denied=self.client.post(
+            f"/api/loial-winback/campaigns/{first['campaign_id']}/approve",
+            headers=foreign)
+        self.assertEqual(denied.status_code,404,denied.text)
+        own=self.client.post(
+            f"/api/loial-winback/campaigns/{first['campaign_id']}/approve")
+        self.assertEqual(own.status_code,200,own.text)
+        self.assertEqual(own.json()["delivered_to_wallet_inbox"],1)
+
+    def test_other_merchant_draft_uses_only_own_customers(self):
+        foreign={"Authorization":"Bearer firm2"}
+        draft=self.client.post("/api/loial-winback/campaigns/draft",
+            headers=foreign,json={"title":"Second firm",
+                "message":"Return to the other business, please."})
+        self.assertEqual(draft.status_code,200,draft.text)
+        self.assertEqual(draft.json()["eligible_with_marketing_consent"],0)
+        approved=self.client.post(
+            f"/api/loial-winback/campaigns/{draft.json()['campaign_id']}/approve",
+            headers=foreign)
+        self.assertEqual(approved.status_code,200,approved.text)
+        self.assertEqual(approved.json()["delivered_to_wallet_inbox"],0)
         with self.Session() as db:
             self.assertEqual(db.query(InboxDelivery).count(),0)
             self.assertEqual(db.query(InboxEntry).count(),0)
