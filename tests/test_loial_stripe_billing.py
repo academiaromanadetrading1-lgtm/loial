@@ -369,3 +369,44 @@ def test_checkout_binding_guard_does_not_confuse_an_unbound_account_with_stale_e
         assert not checkout_binding_is_stale(None,1732000100,"sub_new")
     finally:
         db.close()
+
+
+def test_stale_failed_payment_cannot_override_newer_paid_invoice():
+    from loial_stripe_billing import lifecycle_event_is_stale
+    db,state=db_fixture()
+    try:
+        assert book(db,state,invoice("in_new_paid"))["credited"]
+        state.last_event_at=1732250000
+        state.status="active"
+        state.grace_until=None
+        paid_until=state.paid_until
+        for value in (1732249999,1732250000,None,"1732250001",True,-1):
+            assert lifecycle_event_is_stale(state,value) is True
+            # The webhook must skip record_payment_failure for these cases.
+            assert state.status=="active"
+            assert state.grace_until is None
+            assert state.paid_until==paid_until
+        assert lifecycle_event_is_stale(state,1732250001) is False
+        result=record_payment_failure(state,datetime(2026,11,22,tzinfo=timezone.utc))
+        state.last_event_at=1732250001
+        assert result["grace_until"]
+        assert state.status=="past_due"
+        assert lifecycle_event_is_stale(state,1732250000) is True
+    finally:
+        db.close()
+
+
+def test_subscription_lifecycle_watermark_handles_new_and_missing_state():
+    from loial_stripe_billing import lifecycle_event_is_stale
+    db,state=db_fixture()
+    try:
+        state.last_event_at=1732250000
+        assert lifecycle_event_is_stale(state,1732250000)
+        assert lifecycle_event_is_stale(state,1732249999)
+        assert not lifecycle_event_is_stale(state,1732250100)
+        state.last_event_at=1732250100
+        assert lifecycle_event_is_stale(state,1732250000)
+        assert lifecycle_event_is_stale(None,0)
+        assert not lifecycle_event_is_stale(None,1732250100)
+    finally:
+        db.close()
