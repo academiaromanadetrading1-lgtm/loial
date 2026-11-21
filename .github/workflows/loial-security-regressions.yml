@@ -34,6 +34,7 @@ on:
       - 'loial_winback.py'
       - 'loial_winback_campaigns.py'
       - 'test_winback_campaign_attribution.py'
+      - 'test_winback_campaign_api.py'
       - 'test_winback_core.py'
       - '.github/workflows/loial-security-regressions.yml'
   workflow_dispatch:
@@ -53,7 +54,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install isolated database test dependency
-        run: python -m pip install 'sqlalchemy>=2,<3' 'fastapi>=0.100' 'pydantic>=2,<3'
+        run: python -m pip install 'sqlalchemy>=2,<3' 'fastapi>=0.100' 'pydantic>=2,<3' 'httpx>=0.25' 'python-jose[cryptography]>=3.3'
       - name: Check syntax
         run: python -m py_compile main.py loial_stripe_billing.py loial_preflight.py loial_winback.py loial_winback_campaigns.py
       - name: Check inline JavaScript syntax
@@ -82,4 +83,5 @@ jobs:
             test_stamp_ledger_sqlite \
             test_stripe_billing_rules \
             test_winback_core \
-            test_winback_campaign_attribution
+            test_winback_campaign_attribution \
+            test_winback_campaign_api
