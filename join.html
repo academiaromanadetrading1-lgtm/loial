@@ -367,15 +367,27 @@
     location.replace('/');
     throw new Error('Invalid merchant QR destination');
   }
+  function readSavedObject(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      const value = raw ? JSON.parse(raw) : null;
+      return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+    } catch (error) {
+      // Keep the existing value intact so the user may recover their wallet.
+      return null;
+    }
+  }
   let globalWalletUuid = localStorage.getItem('loial_universal_uuid');
   if (!globalWalletUuid) {
-    const legacy = JSON.parse(localStorage.getItem('loial_card_' + bizId) || 'null');
-    // 122+ biți de entropie: UUID public nu este credențial, dar evităm coliziunile.
-    globalWalletUuid = (legacy && legacy.uuid) ? legacy.uuid : ('W-' + crypto.randomUUID());
+    const legacy = readSavedObject('loial_card_' + bizId);
+    // The universal UUID is a public card identifier, never a login secret.
+    globalWalletUuid = (legacy && typeof legacy.uuid === 'string' &&
+      /^[A-Za-z0-9_-]{8,120}$/.test(legacy.uuid))
+      ? legacy.uuid : ('W-' + crypto.randomUUID());
     localStorage.setItem('loial_universal_uuid', globalWalletUuid);
   }
 
-  let savedProfile = JSON.parse(localStorage.getItem('loial_universal_profile') || 'null');
+  let savedProfile = readSavedObject('loial_universal_profile');
   let knownStamps = 0;
   let targetStamps = 6;
   let currentBizName = 'Card Loial';
