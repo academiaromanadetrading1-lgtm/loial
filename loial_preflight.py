@@ -31,7 +31,16 @@ def preflight(env=None,stage="production"):
         checks.append(Check(key,bool(passed),severity,message))
     url=env.get("LOIAL_DATABASE_URL","sqlite:////data/loial.db")
     db_isolation=url.startswith("sqlite:///") and ":memory:" not in url
-    add("persistent_database",db_isolation,"SQLite persistent database configured")
+    add("persistent_database",db_isolation,"SQLite database URL configured (not proof of durable storage)")
+    if stage=="staging":
+        # A SQLite path by itself is not durable on Railway's ephemeral container
+        # filesystem. Staging must use the isolated /data volume. ismount()
+        # checks the runtime mount, rather than trusting configuration text.
+        sqlite_path=url[len("sqlite:///"):] if db_isolation else ""
+        isolated_path=(sqlite_path.startswith("/data/") and
+                       os.path.normpath(sqlite_path).startswith("/data/"))
+        add("staging_durable_volume",isolated_path and os.path.ismount("/data"),
+            "Staging SQLite must reside on a mounted, isolated /data volume")
     secret=env.get("JWT_SECRET_KEY","")
     add("jwt_secret",len(secret)>=48 and len(set(secret))>=16
         and not any(x in secret.lower() for x in ("test","demo","example","1234")),
