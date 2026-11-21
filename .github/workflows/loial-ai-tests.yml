@@ -12,6 +12,13 @@ on:
       - chatgpt/loial-premium-ui-20261119
     paths:
       - '.github/workflows/loial-ai-tests.yml'
+      - '**/*.py'
+      - '*.py'
+      - '*.html'
+      - '*.js'
+      - '*.css'
+      - 'manifest.json'
+      - 'requirements.txt'
 
 permissions:
   contents: read
