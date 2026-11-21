@@ -113,7 +113,12 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
                      jwt_secret,jwt_algorithm,StaffMember=None,limiter=None,can_enroll=None):
     ReceiptBase.metadata.create_all(bind=engine)
     router=APIRouter(prefix="/api/loial-receipts",tags=["Loial verified receipt QR"])
-    public_origin=os.getenv("LOIAL_PUBLIC_ORIGIN","https://loial.space").rstrip("/")
+    # Receipt QR URLs must never point to a malformed external origin or
+    # accidentally leave a staging deployment for the production domain.
+    from loial_preflight import validated_public_origin
+    public_origin=validated_public_origin(
+        os.getenv("LOIAL_PUBLIC_ORIGIN","https://loial.space"),
+        os.getenv("RAILWAY_ENVIRONMENT_NAME",""))
 
     def database():
         db=factory()
