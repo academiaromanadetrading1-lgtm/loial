@@ -61,6 +61,7 @@ assert.equal(installed.button.hidden,true,'Do not offer install when already in 
 // Exercise SW fetch handler: private routes must never be cached/intercepted.
 const swListeners={};
 const sw={
+  URL,
   self:{
     location:{origin:'https://example.org'},
     addEventListener(name,callback){swListeners[name]=callback},
