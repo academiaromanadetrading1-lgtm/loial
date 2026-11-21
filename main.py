@@ -2251,11 +2251,18 @@ def create_premium_qr_bytes(data: str, color: str = "#2d6a4f", initial: str = "L
     return buf.getvalue()
 
 @app.get("/api/qr-image/{business_id}")
-def get_business_qr_image(business_id: int, db: Session = Depends(get_db)):
+@limiter.limit("30/minute")
+def get_business_qr_image(request: Request, business_id: int, db: Session = Depends(get_db)):
+    # Public QR codes must point to an existing merchant; avoid CPU work on
+    # invalid IDs and do not fabricate enrollment links for absent businesses.
+    if business_id <= 0:
+        raise HTTPException(status_code=404, detail="Business not found")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
-    color = biz.card_color if (biz and biz.card_color) else "#2d6a4f"
-    initial = biz.name if (biz and biz.name) else "L"
-    join_url = "https://" + "loial.space" + "/join/" + str(business_id)
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found")
+    color = biz.card_color if re.fullmatch(r"#[0-9a-fA-F]{6}", biz.card_color or "") else "#2d6a4f"
+    initial = (biz.name or "L")[:1]
+    join_url = "https://loial.space/join/" + str(business_id)
     png_bytes = create_premium_qr_bytes(join_url, color=color, initial=initial)
     b64 = base64.b64encode(png_bytes).decode()
     return {"qr_base64": f"data:image/png;base64,{b64}", "url": join_url}
