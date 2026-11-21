@@ -135,3 +135,29 @@ def test_rounding_category_and_future_date_validation(env):
         assert client.post("/api/loial-expenses/confirm",headers=auth(),
                            json=req).status_code==422
     assert money_minor(Decimal("1.20"))==120
+
+def test_expenses_deny_mutable_plan_without_paid_or_granted_access(env):
+    client,factory,auth,doc=env
+    from loial_manual_admin import ManualBusinessGrant
+    with factory() as db:
+        grant=db.query(ManualBusinessGrant).filter(
+            ManualBusinessGrant.business_id==1).one()
+        grant.active=0
+        db.commit()
+    assert client.get("/api/loial-expenses/summary",headers=auth()).status_code==403
+    assert client.post("/api/loial-expenses/confirm",headers=auth(),
+                       json=payload(doc)).status_code==403
+    assert client.get("/api/loial-expenses/categories",headers=auth()).status_code==403
+
+
+def test_expenses_deny_forged_or_missing_merchant_scope(env):
+    client,factory,auth,doc=env
+    for claims in (
+        {"sub":"owner1@example.invalid","role":"business"},
+        {"sub":"owner1@example.invalid","role":"business","business_id":"1"},
+        {"sub":"owner1@example.invalid","role":"business","business_id":2},
+        {"sub":"owner1@example.invalid","role":"customer","business_id":1},
+    ):
+        token=jwt.encode(claims,"expense-test-key",algorithm="HS256")
+        assert client.get("/api/loial-expenses/summary",headers={
+            "Authorization":"Bearer "+token}).status_code==403
