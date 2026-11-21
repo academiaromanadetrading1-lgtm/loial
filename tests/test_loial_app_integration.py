@@ -516,6 +516,26 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
 
             # Cross-tenant access to merchant-private data must be denied in both directions.
             other_business_id = second_business.json()["business_id"]
+            # One merchant cannot delete another merchant's employee by ID.
+            staff_to_protect=client.post("/api/my-business/staff",headers=bearer,json={
+                "name":"Protected Employee","pin":"8527" if staff_pin!="8527" else "9462"
+            })
+            assert staff_to_protect.status_code==200,staff_to_protect.text
+            protected_id=staff_to_protect.json()["id"]
+            foreign_delete=client.delete(
+                "/api/my-business/staff/"+str(protected_id),headers=other_bearer)
+            assert foreign_delete.status_code==200,foreign_delete.text
+            foreign_direct=client.delete(
+                f"/api/biz-full/{business_id}/staff/{protected_id}",
+                headers=other_bearer)
+            assert foreign_direct.status_code==403,foreign_direct.text
+            with main.SessionLocal() as db:
+                assert db.get(main.StaffMember,protected_id).active==1
+            own_delete=client.delete(
+                "/api/my-business/staff/"+str(protected_id),headers=bearer)
+            assert own_delete.status_code==200,own_delete.text
+            with main.SessionLocal() as db:
+                assert db.get(main.StaffMember,protected_id).active==0
             for owner_headers, foreign_id in ((bearer, other_business_id), (other_bearer, business_id)):
                 assert client.get("/api/biz-full/" + str(foreign_id), headers=owner_headers).status_code == 403
             assert client.get("/api/biz-full/" + str(business_id), headers=bearer).status_code == 200
