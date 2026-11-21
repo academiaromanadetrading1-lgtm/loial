@@ -76,3 +76,16 @@ This evidence covers CI only; it **does not** certify the currently deployed pro
 - Railway production remains on its existing deployment; staging remains sleeping with **no persistent volume**. No production changes or real-customer data operations were performed.
 
 **NO-GO** for public launch remains until staging storage, field device tests, real backup/restore, payment integration and legal checks have been verified.
+
+
+## 2026-11-21 atomic stamp and receipt transitions
+
+- Verified run: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44896387211
+- Tested revision: `f4fd67a66fc8b8c63d5a2d78a5cfd29ab9494cf2`.
+- Isolated tests: **282 passed**; full assembled FastAPI integration: **1 passed**.
+- Universal manual scan now increments the current customer stamp counter using a bounded SQL conditional update; it no longer overwrites a potentially stale ORM counter under concurrent requests. A regression exercise reaches the reward limit exactly and refuses an excess scan.
+- Receipt claiming now checks the original ticket expiration in the same conditional SQL update that switches its state to claimed. The test moves simulated time across the expiry between the preliminary check and atomic transition and confirms the receipt remains unclaimed and no stamp is recorded.
+- Production Railway was verified online on its prior deployment; the latest source revision has NOT been deployed.
+- Staging still lacks its required persistent volume; DO NOT bypass the staging boot guard or proceed with a pilot there until persistent isolated storage is confirmed.
+
+**Release decision: NO-GO**; additional real-device, payment, backup/restore, staging isolation, and legal checks remain mandatory.
