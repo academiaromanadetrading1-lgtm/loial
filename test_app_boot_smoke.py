@@ -70,6 +70,37 @@ class ApplicationBootSmokeTests(unittest.TestCase):
                 self.assertIn(response.status_code,(401,403),response.text)
                 self.assertEqual(response.headers.get("Cache-Control"),"no-store")
 
+    def test_core_customer_and_merchant_pages_serve_successfully(self):
+        for path in ("/", "/login.html", "/register.html", "/join.html",
+                     "/scan.html", "/platform.html", "/loial-i18n.js"):
+            with self.subTest(path=path):
+                response=self.client.get(path)
+                self.assertEqual(response.status_code,200,response.text[:150])
+
+    def test_pwa_assets_and_language_dictionary_are_accessible(self):
+        manifest=self.client.get("/manifest.json")
+        self.assertEqual(manifest.status_code,200,manifest.text)
+        self.assertIn("name",manifest.json())
+        worker=self.client.get("/sw.js")
+        self.assertEqual(worker.status_code,200,worker.text[:150])
+        self.assertIn("javascript",worker.headers.get("content-type",""))
+        language=self.client.get("/loial-i18n.js")
+        self.assertEqual(language.status_code,200,language.text[:150])
+        self.assertIn("const langs=",language.text)
+
+    def test_unauthenticated_merchant_data_is_not_public(self):
+        for path in ("/api/biz-full/1",
+                     "/api/loial-scans/history",
+                     "/api/loial-winback/campaigns"):
+            with self.subTest(path=path):
+                response=self.client.get(path)
+                self.assertIn(response.status_code,(401,403),response.text[:150])
+                self.assertEqual(response.headers.get("Cache-Control"),"no-store")
+
+    def test_new_customer_joins_require_existing_merchant(self):
+        response=self.client.get("/join/987654321")
+        self.assertEqual(response.status_code,404,response.text)
+
     def test_join_for_nonexistent_firm_fails_closed(self):
         response = self.client.get("/join/987654321")
         self.assertEqual(response.status_code,404,response.text)
