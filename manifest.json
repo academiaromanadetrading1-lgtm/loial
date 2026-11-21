@@ -1,8 +1,8 @@
 {
   "id": "/wallet",
-  "name": "Loial Black Metal • Portofelul meu",
+  "name": "LOIAL Black Metal • My Wallet",
   "short_name": "Loial",
-  "description": "Cardurile mele de fidelitate, ștampile, recompense și mesaje, direct pe ecranul telefonului.",
+  "description": "My loyalty cards, stamps, rewards and messages, directly on my phone.",
   "start_url": "/wallet?source=pwa",
   "scope": "/",
   "display": "standalone",
@@ -27,8 +27,8 @@
   ],
   "shortcuts": [
     {
-      "name": "Cardurile mele",
-      "short_name": "Carduri",
+      "name": "My cards",
+      "short_name": "Cards",
       "url": "/wallet?tab=cards",
       "icons": [
         {
@@ -39,8 +39,8 @@
       ]
     },
     {
-      "name": "Mesaje Loial",
-      "short_name": "Mesaje",
+      "name": "LOIAL Messages",
+      "short_name": "Messages",
       "url": "/wallet?tab=inbox",
       "icons": [
         {
