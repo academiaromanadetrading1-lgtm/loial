@@ -154,8 +154,17 @@ def preflight(env=None,stage="production"):
     add("loial_stripe_price",bool(re.fullmatch(r"price_[A-Za-z0-9]{8,}",price_id)),
         "Dedicated LOIAL recurring EUR 67 price ID required",
         severity=stripe_severity)
-    add("loial_stripe_return_origin",origin=="https://loial.space",
-        "Checkout return URLs restricted to https://loial.space",
+    try:
+        configured_origin=validated_public_origin(origin,stage)
+        isolated_origin=True
+    except ValueError:
+        configured_origin=""
+        isolated_origin=False
+    add("staging_origin_isolated",stage!="staging" or isolated_origin,
+        "Staging QR links must use an explicit, isolated HTTPS origin")
+    add("loial_stripe_return_origin",
+        (configured_origin=="https://loial.space" if strict else isolated_origin),
+        "Checkout return origin must match production in production and an isolated HTTPS origin in staging",
         severity=stripe_severity)
     add("public_origin_https",exact_https_origin(origin),
         "Public origin must be an exact HTTPS origin")
