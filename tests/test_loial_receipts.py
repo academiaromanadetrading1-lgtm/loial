@@ -106,8 +106,10 @@ def setup_receipts(monkeypatch):
         token_b=issue_wallet_access(db,"wallet-2",True)
         db.commit()
     def biz_headers(email="owner1@test.invalid"):
+        biz_id={"owner1@test.invalid":1,"owner2@test.invalid":2}.get(email,999)
         return {"Authorization":"Bearer "+jwt.encode(
-            {"sub":email,"role":"business"},"secure-only-for-tests",algorithm="HS256")}
+            {"sub":email,"role":"business","business_id":biz_id},
+            "secure-only-for-tests",algorithm="HS256")}
     def wallet_headers(token):
         return {"X-Loial-Wallet-Token":token}
     return TestClient(app),factory,Receipt,token_a,token_b,biz_headers,wallet_headers
@@ -116,6 +118,23 @@ def receipt_payload(ref="B-100"):
     return {"receipt_ref":ref,"lines":[
         {"product":"Revizie auto","quantity":1,"unit_price":200.0,"unit_variable_cost":85.0},
         {"product":"Filtru","quantity":2,"unit_price":25.0,"unit_variable_cost":9.0}]}
+
+def test_receipt_owner_requires_explicit_matching_business_scope(setup_receipts):
+    client,_,_,_,_,owner,_=setup_receipts
+    for claims in (
+        {"sub":"owner1@test.invalid","role":"business"},
+        {"sub":"owner1@test.invalid","role":"business","business_id":"1"},
+        {"sub":"owner1@test.invalid","role":"business","business_id":2},
+        {"sub":"owner1@test.invalid","role":"customer","business_id":1},
+    ):
+        token=jwt.encode(claims,"secure-only-for-tests",algorithm="HS256")
+        blocked=client.post("/api/loial-receipts/issue",
+            headers={"Authorization":"Bearer "+token},json=receipt_payload())
+        assert blocked.status_code==403,blocked.text
+    valid=client.post("/api/loial-receipts/issue",
+        headers=owner(),json=receipt_payload())
+    assert valid.status_code==200,valid.text
+
 
 def test_receipt_is_once_per_firm_and_requires_owner(setup_receipts):
     client,_,_,a,b,owner,wallet=setup_receipts
