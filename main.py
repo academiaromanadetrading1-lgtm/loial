@@ -1764,8 +1764,11 @@ def change_password(request: Request, old_password: str, new_password: str, curr
 
 @app.get("/health")
 def health(db: Session = Depends(get_db)):
-    count = db.query(func.count(Customer.id)).scalar()
-    return {"status": "healthy", "db": "sqlite", "customers": count, "timestamp": datetime.now().isoformat()}
+    # Public availability probe: avoid leaking customer counts or business data.
+    # SELECT 1 verifies the SQLite connection without scanning customer rows.
+    from sqlalchemy import text as sql_text
+    db.execute(sql_text("SELECT 1")).scalar_one()
+    return {"status": "healthy"}
 
 @app.get("/setup-admin", include_in_schema=False)
 def setup_admin():
