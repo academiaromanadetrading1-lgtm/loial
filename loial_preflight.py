@@ -75,6 +75,8 @@ def preflight(env=None,stage="production"):
     # Stripe credentials belong to LOIAL, not to another connected project.
     stripe_key=env.get("LOIAL_STRIPE_SECRET_KEY","")
     webhook_key=env.get("LOIAL_STRIPE_WEBHOOK_SECRET","")
+    add("staging_no_live_stripe",stage!="staging" or not stripe_key.startswith("sk_live_"),
+        "Never configure live Stripe secret keys in staging")
     price_id=env.get("LOIAL_STRIPE_PRICE_ID","")
     origin=env.get("LOIAL_PUBLIC_ORIGIN","https://loial.space").rstrip("/")
     public_free_pilot=env.get("LOIAL_PUBLIC_FREE_PILOT","0")=="1"
