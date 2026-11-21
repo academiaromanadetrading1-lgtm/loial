@@ -365,6 +365,21 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             assert account.status_code==200,account.text
             staff_pin=account.json()["staff_pin"]
             assert staff_pin.isdigit() and len(staff_pin)==4 and staff_pin!="1234"
+
+            # A manual primary PIN cannot equal an active employee PIN.
+            employee_pin="8527" if staff_pin!="8527" else "9462"
+            employee=client.post("/api/my-business/staff",headers=bearer,json={
+                "name":"Employee Collision Test","pin":employee_pin})
+            assert employee.status_code==200,employee.text
+            duplicate_primary=client.post("/api/my-business/settings",
+                headers=bearer,json={"staff_pin":employee_pin})
+            assert duplicate_primary.status_code==409,duplicate_primary.text
+            unchanged=client.get("/api/my-business",headers=bearer)
+            assert unchanged.json()["staff_pin"]==staff_pin
+            removed=client.delete(
+                "/api/my-business/staff/"+str(employee.json()["id"]),headers=bearer)
+            assert removed.status_code==200,removed.text
+
             scan_payload={"business_id":business_id,"customer_uuid":"W-INTEGRATION-TEST-001",
                           "pin":"1234"}
             assert client.post("/api/scan-universal",json=scan_payload).status_code==401
