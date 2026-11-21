@@ -47,7 +47,9 @@ class ApplicationBootSmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200,response.text)
 
     def test_winback_routes_registered(self):
-        paths = {r.path for r in self.application.app.routes}
+        # Some mounted routers expose an ASGI route wrapper without .path.
+        paths = {r.path for r in self.application.app.routes
+                 if isinstance(getattr(r,"path",None),str)}
         for path in ("/api/loial-winback/insights",
                      "/api/loial-winback/settings",
                      "/api/loial-winback/campaigns/draft",
