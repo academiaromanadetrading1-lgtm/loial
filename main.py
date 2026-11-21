@@ -1936,6 +1936,9 @@ class QREnrollRequest(BaseModel):
 @app.post("/api/enroll")
 @limiter.limit("10/minute")
 def qr_enroll(request: Request, req: QREnrollRequest, db: Session = Depends(get_db)):
+    # This legacy endpoint minted a card without a device-bound wallet secret.
+    # The live join page uses /api/enroll-sync with wallet possession checks.
+    raise HTTPException(status_code=410, detail="Legacy QR enrollment retired; use /api/enroll-sync.")
     # Public QR registration is subject to throttling and bounded input size.
     name = req.name.strip()
     if not 1 <= len(name) <= 120:
