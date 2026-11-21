@@ -112,6 +112,26 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             merchant_payload=merchant_qr.json()
             assert merchant_payload["url"]==f"https://loial.space/join/{business_id}"
             assert merchant_payload["qr_base64"].startswith("data:image/png;base64,")
+
+            # Staging QR must stay on staging; never route to production.
+            with monkeypatch.context() as scope:
+                scope.setenv("LOIAL_PUBLIC_ORIGIN",
+                             "https://loial-staging-staging.up.railway.app")
+                staging_qr=client.get(f"/api/qr-image/{business_id}")
+                assert staging_qr.status_code==200,staging_qr.text
+                assert staging_qr.json()["url"]==(
+                    f"https://loial-staging-staging.up.railway.app/join/{business_id}"
+                )
+            for invalid_origin in (
+                "http://loial.space", "https://evil.example/path",
+                "https://user@evil.example", "https://*.example",
+                "https://loial.space?bad=1", "https://loial.space:99999",
+            ):
+                with monkeypatch.context() as scope:
+                    scope.setenv("LOIAL_PUBLIC_ORIGIN",invalid_origin)
+                    denied_qr=client.get(f"/api/qr-image/{business_id}")
+                    assert denied_qr.status_code==503,(invalid_origin,denied_qr.text)
+
             public = client.get("/api/business-public/" + str(business_id))
             assert public.status_code == 200
             assert public.json()["name"] == "Service Auto Test"
