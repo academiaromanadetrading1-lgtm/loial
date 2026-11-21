@@ -461,7 +461,7 @@ def install_loial_ai(app, engine, session_factory, BusinessAccount, Customer,
         if payload.get("role") != "business" or not payload.get("sub"):
             raise HTTPException(status_code=403, detail="Doar administratorul firmei")
         biz = db.query(BusinessAccount).filter(BusinessAccount.email == payload["sub"]).first()
-        if not biz or (payload.get("business_id") and payload["business_id"] != biz.id):
+        if not biz or type(payload.get("business_id")) is not int or payload["business_id"] != biz.id:
             raise HTTPException(status_code=403, detail="Acces interzis")
         # A cached plan label is not proof of an active subscription or grant.
         from loial_stripe_billing import effective_entitlements
