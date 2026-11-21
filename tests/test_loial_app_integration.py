@@ -788,6 +788,28 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                     main.Customer.business_id==business_id,
                     main.Customer.wallet_uuid=="W-INTEGRATION-TEST-001").one()
                 assert card.stamps==4
+            # A reward is consumed once even when two staff terminals try to
+            # redeem the same unlocked loyalty card.
+            reward_payload={
+                "business_id": business_id,
+                "customer_uuid": "W-INTEGRATION-TEST-001",
+                "pin": new_pin
+            }
+            redeemed=client.post("/api/redeem-reward",json=reward_payload)
+            assert redeemed.status_code==200,redeemed.text
+            assert redeemed.json()["stamps"]==0
+            already_used=client.post("/api/redeem-reward",json=reward_payload)
+            assert already_used.status_code==409,already_used.text
+            with main.SessionLocal() as db:
+                from loial_scans import StampAward
+                card=db.query(main.Customer).filter(
+                    main.Customer.business_id==business_id,
+                    main.Customer.wallet_uuid=="W-INTEGRATION-TEST-001").one()
+                assert card.stamps==0
+                assert db.query(StampAward).filter(
+                    StampAward.business_id==business_id,
+                    StampAward.customer_id==card.id,
+                    StampAward.source=="redeem").count()==1
             # No external provider or recipient data is needed for this scenario.
     finally:
         main.engine.dispose()
