@@ -2543,8 +2543,17 @@ def redeem_customer_reward(request: Request, req: RedeemRequest, db: Session = D
     target = getattr(biz, "stamps_required", None) or 6
     if (customer.stamps or 0) < target:
         raise HTTPException(status_code=409, detail="Recompensa nu este inca disponibila")
-    customer.stamps = 0
-    customer.last_visit = datetime.now().isoformat()
+    # Redeem only the currently unlocked reward. The SQL predicate prevents
+    # two simultaneous terminals from both consuming the same reward.
+    from sqlalchemy import update as sql_update
+    redeemed = db.execute(sql_update(Customer).where(
+        Customer.id == customer.id,
+        func.coalesce(Customer.stamps, 0) >= target
+    ).values(stamps=0, last_visit=datetime.now().isoformat())).rowcount
+    if redeemed != 1:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Recompensa a fost deja acordata")
+    db.refresh(customer)
     from loial_inbox import queue_service_event
     from loial_scans import record_award
     redeem_key=uuid.uuid4().hex
