@@ -61,10 +61,11 @@ class WinbackCoreTests(unittest.TestCase):
         rows=[scan(2,"2026-10-01","manual"),
               scan(2,"2026-11-21","redeem"),
               scan(3,"2026-10-02","refund"),
-              scan(4,"2026-10-01","receipt")]
-        result=summarize_inactive(rows,[2,3,4],30,as_of=self.today)
-        self.assertEqual(result["confirmed_visit_customers"],2)
-        self.assertEqual(result["at_risk_customers"],2)
+              scan(4,"2026-10-01","receipt"),
+              scan(5,"2026-10-01","receipt_visit")]
+        result=summarize_inactive(rows,[2,3,4,5],30,as_of=self.today)
+        self.assertEqual(result["confirmed_visit_customers"],3)
+        self.assertEqual(result["at_risk_customers"],3)
 
     def test_only_bookkeeping_events_do_not_create_retention_candidates(self):
         rows=[scan(2,"2026-10-01","redeem"),
