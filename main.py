@@ -119,7 +119,7 @@ class User(Base):
     password = Column(String)
     name = Column(String)
     plan = Column(String, default="starter", index=True)
-    role = Column(String, default="owner", index=True)
+    role = Column(String, default="user", index=True)
 
 class Customer(Base):
     __tablename__ = "customers"
@@ -371,7 +371,7 @@ def seed_data(db: Session):
         if len(demo_secret) < 12:
             raise RuntimeError("Set LOIAL_DEV_DEMO_PASSWORD (minim 12 caractere) for explicit dev seed")
         db.add(User(email="demo@loial.app", password=pwd_context.hash(demo_secret),
-                    name="Cont demo", plan="starter", role="owner"))
+                    name="Cont demo", plan="starter", role="user"))
     admin_email = os.getenv("LOIAL_ADMIN_BOOTSTRAP_EMAIL", "").strip().lower()
     admin_secret = os.getenv("LOIAL_ADMIN_BOOTSTRAP_PASSWORD", "")
     if admin_email:
@@ -2412,9 +2412,9 @@ def require_business_owner_or_admin(business_id: int, credentials, db: Session):
                           BusinessAccount.email == email).first()
         if account:
             return account
-    elif claims.get("role") in ("admin", "owner"):
+    elif claims.get("role") == "admin":
         operator = db.query(User).filter(User.email == email).first()
-        if operator and operator.role in ("admin", "owner"):
+        if operator and operator.role == "admin":
             return operator
     raise HTTPException(status_code=403, detail="Nu ai acces la aceasta firma")
 
@@ -2426,7 +2426,7 @@ def require_platform_admin(credentials, db: Session):
     except JWTError:
         raise HTTPException(status_code=401, detail="Sesiune invalida")
     admin = db.query(User).filter(User.email == claims.get("sub")).first()
-    if not admin or admin.role not in ("admin", "owner") or claims.get("role") not in ("admin", "owner"):
+    if not admin or admin.role != "admin" or claims.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Doar administratorul platformei")
     return admin
 
