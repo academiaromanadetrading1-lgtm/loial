@@ -83,7 +83,7 @@ def install_crm(app,engine,factory,BusinessAccount,Customer,Consent,AISale,jwt_k
         except JWTError: raise HTTPException(401,"Sesiune invalida")
         if claims.get("role")!="business": raise HTTPException(403,"Acces rezervat firmei")
         biz=db.query(BusinessAccount).filter_by(email=claims.get("sub")).first()
-        if not biz or claims.get("business_id") not in (None,biz.id): raise HTTPException(403,"Acces refuzat")
+        if not biz or type(claims.get("business_id")) is not int or claims["business_id"]!=biz.id: raise HTTPException(403,"Acces refuzat")
         return biz
     def wallet(request:Request,db=Depends(session)):
         token=request.headers.get("X-Loial-Wallet-Token","")
