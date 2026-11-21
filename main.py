@@ -327,7 +327,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         if email is None:
             raise HTTPException(status_code=401, detail="Invalid token")
         user = db.query(User).filter(User.email == email).first()
-        if not user or payload.get("role") != user.role:
+        if not user or payload.get("principal_type") != "user" or payload.get("role") != user.role:
             raise HTTPException(status_code=401,detail="Sesiune de utilizator invalida")
         return user
     except JWTError:
@@ -586,7 +586,9 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
     if role=="business" and not isinstance(authenticated,BusinessAccount):
         raise HTTPException(status_code=403,detail="Cont Business invalid")
     biz_id_val = business.id if isinstance(authenticated,BusinessAccount) else None
-    claims={"sub":email,"role":role}
+    principal_type = ("business" if isinstance(authenticated, BusinessAccount) else
+                      "agent" if isinstance(authenticated, SalesAgent) else "user")
+    claims={"sub":email,"role":role,"principal_type":principal_type}
     if biz_id_val is not None:claims["business_id"]=biz_id_val
     if role=="ambassador" and agent:claims["agent_id"]=agent.id
     token=create_access_token(claims)
@@ -882,7 +884,7 @@ def agent_login(request: Request, email: str, password: str, db: Session = Depen
         raise HTTPException(status_code=401, detail="Email sau parolă incorectă")
     if agent.status != "active":
         raise HTTPException(status_code=403, detail=f"Cont în așteptare. Status: {agent.status}")
-    token = create_access_token({"sub": agent.email, "role": agent.role, "agent_id": agent.id})
+    token = create_access_token({"sub": agent.email, "role": agent.role, "agent_id": agent.id, "principal_type": "agent"})
     return {
         "access_token": token,
         "agent": {"id": agent.id, "name": agent.name, "email": agent.email, "role": agent.role, "is_manager": agent.is_manager, "team_id": agent.team_id}
@@ -902,6 +904,10 @@ def validate_agent(agent_id: int, role: str = "agent", commission_own: float = 2
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
+    if role not in ("agent", "ambassador", "manager"):
+        raise HTTPException(status_code=422, detail="Rol de afiliat invalid")
+    if not 0 <= commission_own <= 100:
+        raise HTTPException(status_code=422, detail="Comision invalid")
     agent.status = "trial"
     agent.active = True
     agent.role = role
@@ -2412,7 +2418,7 @@ def require_business_owner_or_admin(business_id: int, credentials, db: Session):
                           BusinessAccount.email == email).first()
         if account:
             return account
-    elif claims.get("role") == "admin":
+    elif claims.get("role") == "admin" and claims.get("principal_type") == "user":
         operator = db.query(User).filter(User.email == email).first()
         if operator and operator.role == "admin":
             return operator
@@ -2426,7 +2432,7 @@ def require_platform_admin(credentials, db: Session):
     except JWTError:
         raise HTTPException(status_code=401, detail="Sesiune invalida")
     admin = db.query(User).filter(User.email == claims.get("sub")).first()
-    if not admin or admin.role != "admin" or claims.get("role") != "admin":
+    if not admin or admin.role != "admin" or claims.get("role") != "admin" or claims.get("principal_type") != "user":
         raise HTTPException(status_code=403, detail="Doar administratorul platformei")
     return admin
 
