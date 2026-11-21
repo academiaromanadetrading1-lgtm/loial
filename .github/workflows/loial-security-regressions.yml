@@ -36,6 +36,8 @@ on:
       - 'test_stripe_billing_rules.py'
       - 'loial_scans.py'
       - 'test_scan_cooldown.py'
+      - 'test_wallet_private_access.py'
+      - 'loial_inbox.py'
       - 'loial_winback.py'
       - 'loial_winback_campaigns.py'
       - 'loial_receipts.py'
@@ -94,6 +96,7 @@ jobs:
             test_stripe_business_token_isolation \
             test_stamp_ledger_sqlite \
             test_scan_cooldown \
+            test_wallet_private_access \
             test_stripe_billing_rules \
             test_winback_core \
             test_winback_campaign_attribution \
