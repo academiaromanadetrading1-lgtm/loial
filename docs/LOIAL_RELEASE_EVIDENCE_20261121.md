@@ -27,3 +27,15 @@
 7. Review and approve PR, finalize domain/TLS/recovery and perform a controlled production deploy and postdeploy smoke tests.
 
 **Release decision: NO-GO.** Do not present the service as public-launch ready until the blocking evidence is recorded. Free-only pilot still requires checks 1–4, 6–7 and a separate decision to keep checkout disabled.
+
+
+## 2026-11-21 authentication hardening update
+- Verified commit: `40632bce5ec1675a38f4403e5eb422cd822ad980`.
+- GitHub Actions: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44894438759
+- Isolated tests: **272 passed**; assembled FastAPI integration: **1 passed**.
+- Both password-change endpoints enforce 10–72 UTF-8 bytes for new passwords, avoiding bcrypt's silent truncation beyond 72 bytes.
+- Login password-change form enforces minimum 10 and maximum 72 characters, with backend byte-length validation authoritative.
+- When multiple account models share an email and the supplied old password matches more than one account, the public change-password endpoint now refuses a multi-account password reset (409) instead of mutating all matching accounts.
+- CI branch concurrency cancels superseded workflows, limiting redundant runner consumption.
+
+This evidence covers CI only; it **does not** certify the currently deployed production commit or close real-device, billing, storage, legal or recovery testing gates.
