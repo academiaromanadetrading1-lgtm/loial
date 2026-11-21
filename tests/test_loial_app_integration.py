@@ -755,6 +755,39 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                 assert db.query(PaidMerchantInvoice).count()==before[0]
                 assert db.query(AmbassadorCommission).count()==before[1]
                 assert db.get(main.BusinessAccount,recruited_id).agent_id==ambassador_b["id"]
+            # Manual stamps use an atomic bounded update rather than a
+            # read-modify-write of a potentially stale customer object.
+            from loial_scans import StampAward
+            from datetime import datetime, timedelta, timezone
+            with main.SessionLocal() as db:
+                biz=db.get(main.BusinessAccount,business_id)
+                biz.stamps_required=4
+                card=db.query(main.Customer).filter(
+                    main.Customer.business_id==business_id,
+                    main.Customer.wallet_uuid=="W-INTEGRATION-TEST-001").one()
+                card.stamps=3
+                for award in db.query(StampAward).filter(
+                    StampAward.business_id==business_id,
+                    StampAward.customer_id==card.id).all():
+                    award.created_at=(datetime.now(timezone.utc)-timedelta(minutes=2)).isoformat()
+                db.commit()
+            final_stamp=client.post("/api/scan-universal",json={
+                "business_id":business_id,"customer_uuid":"W-INTEGRATION-TEST-001",
+                "pin":new_pin,"idempotency_key":"atomic-target-last-stamp"
+            })
+            assert final_stamp.status_code==200,final_stamp.text
+            assert final_stamp.json()["stamps"]==4
+            assert final_stamp.json()["reward_unlocked"] is True
+            excess=client.post("/api/scan-universal",json={
+                "business_id":business_id,"customer_uuid":"W-INTEGRATION-TEST-001",
+                "pin":new_pin,"idempotency_key":"atomic-target-over-cap"
+            })
+            assert excess.status_code==409,excess.text
+            with main.SessionLocal() as db:
+                card=db.query(main.Customer).filter(
+                    main.Customer.business_id==business_id,
+                    main.Customer.wallet_uuid=="W-INTEGRATION-TEST-001").one()
+                assert card.stamps==4
             # No external provider or recipient data is needed for this scenario.
     finally:
         main.engine.dispose()
