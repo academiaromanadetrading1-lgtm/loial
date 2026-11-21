@@ -15,7 +15,7 @@ WinbackBase = declarative_base()
 
 # Ledger also contains redeem/refund bookkeeping; only new staff scans and
 # redeemed receipt claims are evidence of a customer visit.
-CONFIRMED_VISIT_SOURCES = ("manual", "receipt")
+CONFIRMED_VISIT_SOURCES = ("manual", "receipt", "receipt_visit")
 
 def is_confirmed_visit(row):
     return getattr(row, "source", None) in CONFIRMED_VISIT_SOURCES
