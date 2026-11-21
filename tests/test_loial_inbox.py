@@ -98,8 +98,11 @@ def env():
         db.commit()
 
     def owner_headers(email, role="business"):
-        return {"Authorization": "Bearer " + jwt.encode({"sub": email, "role": role},
-                          "test-inbox-jwt-signing-key", algorithm="HS256")}
+        bid={"boss1@example.test":1,"boss2@example.test":2,
+             "boss3@example.test":3}.get(email,999)
+        return {"Authorization": "Bearer " + jwt.encode(
+            {"sub":email,"role":role,"business_id":bid},
+            "test-inbox-jwt-signing-key", algorithm="HS256")}
 
     def wallet_headers(token):
         return {"X-Loial-Wallet-Token": token}
