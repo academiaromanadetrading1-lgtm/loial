@@ -361,7 +361,7 @@
 
 <script>
   // A missing or malformed QR destination must never fall back to merchant 1.
-  const joinMatch = /^\\/join\\/([1-9]\\d*)\\/?$/.exec(location.pathname);
+  const joinMatch = /^\/join\/([1-9]\d*)\/?$/.exec(location.pathname);
   const bizId = joinMatch ? Number(joinMatch[1]) : null;
   if (!Number.isSafeInteger(bizId) || bizId <= 0) {
     location.replace('/');
