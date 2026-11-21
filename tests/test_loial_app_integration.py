@@ -21,6 +21,13 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
     main = importlib.import_module("main")
     try:
         with TestClient(main.app) as client:
+            # Railway health check is public, stable and contains no customer
+            # counts, credentials, schema information or operational internals.
+            health=client.get("/health")
+            assert health.status_code==200,health.text
+            assert health.json()=={"status":"healthy"}
+            assert "customers" not in health.text
+            assert "sqlite" not in health.text
             # Installable universal wallet, public icons, and cache-safe PWA shell.
             manifest=client.get("/manifest.json")
             assert manifest.status_code==200
