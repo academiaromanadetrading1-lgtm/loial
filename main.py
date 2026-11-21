@@ -1998,7 +1998,8 @@ class PublicFeedbackRequest(BaseModel):
     message: str
 
 @app.post("/api/private-feedback")
-def save_public_review_feedback(req: PublicFeedbackRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def save_public_review_feedback(request: Request, req: PublicFeedbackRequest, db: Session = Depends(get_db)):
     if not 1 <= req.rating <= 5 or len(req.message) > 2000:
         raise HTTPException(422, "Feedback invalid")
     if not db.get(BusinessAccount, req.business_id):
