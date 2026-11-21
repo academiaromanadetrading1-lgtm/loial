@@ -563,7 +563,9 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
     role = "pending"
     name = email
 
-    if user and user.role and pwd_context.verify(req.password, user.password):
+    # Business credentials must authenticate the BusinessAccount record.
+    # A legacy User or agent row sharing the email cannot mint merchant JWTs.
+    if user and user.role and user.role!="business" and pwd_context.verify(req.password, user.password):
         authenticated = user
         role = user.role
         name = user.name
@@ -581,7 +583,9 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
         raise HTTPException(status_code=401, detail="Email sau parolă incorectă")
 
     log_auth_event(email, True, ip)
-    biz_id_val = business.id if role=="business" and business else None
+    if role=="business" and not isinstance(authenticated,BusinessAccount):
+        raise HTTPException(status_code=403,detail="Cont Business invalid")
+    biz_id_val = business.id if isinstance(authenticated,BusinessAccount) else None
     claims={"sub":email,"role":role}
     if biz_id_val is not None:claims["business_id"]=biz_id_val
     if role=="ambassador" and agent:claims["agent_id"]=agent.id
