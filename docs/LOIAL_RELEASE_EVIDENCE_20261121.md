@@ -237,3 +237,13 @@ Public launch remains NO-GO while real restore, Stripe billing, device testing a
 - Tests deactivate the manual Business grant while retaining the old premium plan label; expense endpoints return 403. Additional tests reject missing, string-typed, cross-tenant and non-Business JWT scopes.
 - No deployment was performed. Staging remains idle-sleeping with persistent volume, production remains online on deployment 1bdeabfe-dc4b-473f-8b66-f3d19137feeb.
 - Public release NO-GO pending actual off-volume backup/restore, Stripe checkout/webhooks, mobile QR/PWA and legal/operator validation.
+
+## 2026-11-21 cross-role identity and premium ambassador authorization
+
+- CI-verified source revision b7dfa3dc524474ba341f61eb012d3115bac59443: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44932999936
+- **299 isolated tests PASS** and **1 full assembled FastAPI integration PASS**, including Python compile, inline JavaScript and PWA checks.
+- Identity overview now validates the exact integer business_id of a Business JWT and the exact integer agent_id of an Ambassador JWT, including that the account ID corresponds to the subject email. Business role linking uses the same business validator.
+- Premium ambassador card access now verifies account IDs for both direct Ambassador and linked Business credentials, instead of resolving profiles by email alone.
+- Regression tests cover legitimate Business and Ambassador access plus missing, text-typed and mismatched account identifiers. Legacy isolated test fixtures were updated to issue correctly scoped tokens.
+- Staging remains idle-sleeping with the persistent volume attached, on deployment 8479fe18-8589-461b-a004-17e0ad09002b. Production remains online and unchanged at 1bdeabfe-dc4b-473f-8b66-f3d19137feeb.
+- Public release NO-GO pending actual backup and independent restoration, Stripe checkout and webhook validation, real-device QR/PWA testing, and operator/legal sign-off.
