@@ -38,8 +38,11 @@ def now_utc():
     return datetime.now(timezone.utc)
 
 def from_unix(seconds):
-    if not isinstance(seconds,int) or seconds<1:return None
-    return datetime.fromtimestamp(seconds,tz=timezone.utc)
+    if type(seconds) is not int or seconds<1:return None
+    try:
+        return datetime.fromtimestamp(seconds,tz=timezone.utc)
+    except (OverflowError,OSError,ValueError):
+        return None
 
 def utc_iso(dt):
     return dt.astimezone(timezone.utc).isoformat() if dt else None
@@ -87,7 +90,9 @@ def invoice_period(invoice):
         period=line.get("period") or {}
         start=from_unix(period.get("start"))
         end=from_unix(period.get("end"))
-        if start and end and end>start:
+        # LOIAL sells monthly subscriptions, never annual/prepaid multi-month
+        # access. Reject malformed or implausibly long invoice periods.
+        if start and end and timedelta(days=27)<=end-start<=timedelta(days=35):
             return start.strftime("%Y-%m"),end
     return None,None
 
