@@ -81,16 +81,16 @@ def summarize_inactive(award_rows, customer_ids, threshold=30, ticket_minor=0,
         "methodology": "Verified stamps grouped into distinct calendar days; 3+ visit days use mean interval × 1.3, otherwise merchant threshold. No messages sent; estimates are scenarios.",
     }
 
-def install_winback(app, engine, factory, BusinessAccount, Customer, StampAward,
+def install_winback(app, engine, get_db, BusinessAccount, Customer, StampAward,
                     merchant_auth, security):
     WinbackBase.metadata.create_all(bind=engine)
     router = APIRouter(prefix="/api/loial-winback", tags=["winback"])
 
-    def authenticated_merchant(credentials=Depends(security), db=Depends(factory)):
+    def authenticated_merchant(credentials=Depends(security), db=Depends(get_db)):
         return merchant_auth(credentials, db)
 
     @router.get("/settings")
-    def settings(business=Depends(authenticated_merchant), db=Depends(factory)):
+    def settings(business=Depends(authenticated_merchant), db=Depends(get_db)):
         row = db.get(WinbackSettings, business.id)
         return {
             "default_return_days": row.default_return_days if row else 30,
@@ -102,7 +102,7 @@ def install_winback(app, engine, factory, BusinessAccount, Customer, StampAward,
 
     @router.put("/settings")
     def update_settings(payload: SettingsInput, business=Depends(authenticated_merchant),
-                        db=Depends(factory)):
+                        db=Depends(get_db)):
         row = db.get(WinbackSettings, business.id)
         if row is None:
             row = WinbackSettings(business_id=business.id)
@@ -113,7 +113,7 @@ def install_winback(app, engine, factory, BusinessAccount, Customer, StampAward,
         return {"status": "updated", "business_id": business.id}
 
     @router.get("/insights")
-    def insights(business=Depends(authenticated_merchant), db=Depends(factory)):
+    def insights(business=Depends(authenticated_merchant), db=Depends(get_db)):
         row = db.get(WinbackSettings, business.id)
         threshold = row.default_return_days if row else 30
         ticket_minor = row.average_ticket_minor if row else 0
