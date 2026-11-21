@@ -151,3 +151,15 @@ This evidence covers CI only; it **does not** certify the currently deployed pro
 - Railway production remains on the unchanged prior deployment. Staging has **no persistent volume** and should not be redeployed onto an ephemeral SQLite path.
 
 **Public release remains NO-GO** pending real staging storage/rollout, verified backup restoration, Stripe payment/webhook tests, mobile QR/PWA checks and operator/legal sign-off.
+
+
+## 2026-11-21 merchant JWT scope hardening
+
+- CI tested revision: `be701706176a64517650b011e26260bc4fc098cc`; GitHub Actions: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44900256205
+- **290** isolated tests passed and **1** assembled FastAPI integration passed, including JavaScript/PWA validation.
+- Direct merchant settings and employee routes now share a business-only JWT validator. It checks `role=business`, account existence and the optional `business_id` claim; an identical email on a customer or other account role is insufficient authorization.
+- The administrator's primary staff PIN rotation route was aligned with the same validator following an integration regression that exposed missing `business_id` scope enforcement.
+- Regression coverage confirms forged alternate role or mismatched merchant scope cannot read merchant details, list/add staff, modify settings or rotate the business PIN.
+- Production Railway remains online at the prior deployment, with no new code installed. Railway staging remains sleeping without persistent volume. No volume was created and no live database modified.
+
+**Release status: NO-GO.** Staging durable storage creation/attachment remains an explicit approval-required infrastructure change due to possible cost and redeployment; backup/restore, Stripe, device and legal/operator checks remain pending.
