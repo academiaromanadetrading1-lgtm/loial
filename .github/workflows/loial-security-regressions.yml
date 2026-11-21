@@ -35,6 +35,7 @@ on:
       - 'test_stamp_ledger_sqlite.py'
       - 'test_stripe_billing_rules.py'
       - 'loial_scans.py'
+      - 'test_scan_cooldown.py'
       - 'loial_winback.py'
       - 'loial_winback_campaigns.py'
       - 'loial_receipts.py'
@@ -92,6 +93,7 @@ jobs:
             test_public_feedback_throttle \
             test_stripe_business_token_isolation \
             test_stamp_ledger_sqlite \
+            test_scan_cooldown \
             test_stripe_billing_rules \
             test_winback_core \
             test_winback_campaign_attribution \
