@@ -414,7 +414,7 @@ def cleanup_old_data(db: Session):
 
 @app.post("/gdpr/cleanup")
 def trigger_cleanup(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     result = cleanup_old_data(db)
     return {"status": "completed", **result}
@@ -890,14 +890,14 @@ def agent_login(request: Request, email: str, password: str, db: Session = Depen
 
 @app.get("/sales/pending")
 def list_pending(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     pending = db.query(SalesAgent).filter(SalesAgent.status == "pending").all()
     return [{"id": a.id, "name": a.name, "email": a.email, "phone": a.phone, "created_at": a.created_at} for a in pending]
 
 @app.post("/sales/validate/{agent_id}")
 def validate_agent(agent_id: int, role: str = "agent", commission_own: float = 20.0, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent:
@@ -932,7 +932,7 @@ def request_team(name: str, current_user: User = Depends(get_current_user), db: 
 
 @app.get("/sales/teams/pending")
 def pending_teams(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     teams = db.query(SalesTeam).all()
     result = []
@@ -944,7 +944,7 @@ def pending_teams(current_user: User = Depends(get_current_user), db: Session = 
 
 @app.post("/sales/team/approve/{team_id}")
 def approve_team(team_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     team = db.query(SalesTeam).filter(SalesTeam.id == team_id).first()
     if not team:
@@ -974,14 +974,14 @@ def my_team(current_user: User = Depends(get_current_user), db: Session = Depend
 
 @app.get("/sales/all")
 def all_agents(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     agents = db.query(SalesAgent).all()
     return [{"id": a.id, "name": a.name, "email": a.email, "role": a.role, "status": a.status, "is_manager": a.is_manager, "commission_own": a.commission_own} for a in agents]
 
 @app.post("/sales/agent")
 def create_sales_agent(name: str, email: str, phone: str = "", commission_own: float = 20.0, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     agent = SalesAgent(name=name, email=email, phone=phone, commission_own=commission_own, commission_team=5.0, bonus_team=5.0, active=True, created_at=datetime.now().isoformat())
     db.add(agent)
@@ -1125,7 +1125,7 @@ def agent_stats(agent_id: int, month: str = None, current_user: User = Depends(g
 
 @app.post("/sales/team")
 def create_team(name: str, manager_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     team = SalesTeam(name=name, manager_id=manager_id, created_at=datetime.now().isoformat())
     db.add(team)
@@ -1150,14 +1150,14 @@ def add_to_team(team_id: int, agent_id: int, current_user: User = Depends(get_cu
 @app.post("/sales/commissions/calculate")
 def calc_commissions(month: str = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     return {"results": calculate_commissions(db, Sale, Commission, SalesAgent, month)}
 
 @app.post("/sales/commissions/pay/{agent_id}")
 def pay_commission(agent_id: int, month: str = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     if not month:
         month = datetime.now().strftime("%Y-%m")
@@ -1172,7 +1172,7 @@ def pay_commission(agent_id: int, month: str = None, current_user: User = Depend
 @app.put("/sales/agent/{agent_id}/commission")
 def set_commission(agent_id: int, own: float = 20.0, team: float = 5.0, bonus: float = 5.0, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Comisioanele sunt fixe conform planului publicat, calculate exclusiv din incasari verificate")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if agent:
@@ -1184,7 +1184,7 @@ def set_commission(agent_id: int, own: float = 20.0, team: float = 5.0, bonus: f
 
 @app.post("/admin/broadcast")
 def broadcast_message(title: str, message: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     businesses = db.query(BusinessAccount).all()
     count = 0
@@ -1207,7 +1207,7 @@ def submit_feedback(business_email: str, message: str, db: Session = Depends(get
 
 @app.get("/admin/feedback")
 def list_feedback(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     feedbacks = db.query(BusinessFeedback).order_by(BusinessFeedback.id.desc()).all()
     result = []
@@ -1218,7 +1218,7 @@ def list_feedback(current_user: User = Depends(get_current_user), db: Session = 
 
 @app.post("/admin/feedback/{feedback_id}/respond")
 def respond_feedback(feedback_id: int, response: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     feedback = db.query(BusinessFeedback).filter(BusinessFeedback.id == feedback_id).first()
     if not feedback:
@@ -1243,7 +1243,7 @@ def business_login(request: Request, email: str, password: str, db: Session = De
 
 @app.get("/analytics/admin")
 def admin_analytics(period: str = "month", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     now = datetime.now()
     periods = {"day": 1, "week": 7, "month": 30, "quarter": 90, "semester": 180, "year": 365}
@@ -1434,7 +1434,7 @@ def set_payout_method(agent_id: int, method: str, details: str, current_user: Us
 @app.get("/admin/payouts/pending")
 def pending_payouts(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     month = datetime.now().strftime("%Y-%m")
     agents = db.query(SalesAgent).filter(SalesAgent.status == "active").all()
@@ -1480,7 +1480,7 @@ def pending_payouts(current_user: User = Depends(get_current_user), db: Session 
 @app.post("/admin/payouts/pay/{agent_id}")
 def pay_agent(agent_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent:
@@ -1541,7 +1541,7 @@ def agent_payouts(agent_id: int, current_user: User = Depends(get_current_user),
 @app.post("/invoices/create")
 def create_invoice(business_id: int, amount: float, description: str = "Loial Pro Subscription", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Facturarea abonamentelor se face exclusiv prin fluxul Stripe.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     if not biz:
@@ -1561,7 +1561,7 @@ def create_invoice(business_id: int, amount: float, description: str = "Loial Pr
 
 @app.get("/invoices")
 def list_invoices(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     invoices = db.query(Invoice).order_by(Invoice.id.desc()).all()
     result = []
@@ -1573,7 +1573,7 @@ def list_invoices(current_user: User = Depends(get_current_user), db: Session = 
 @app.post("/invoices/{invoice_id}/paid")
 def mark_invoice_paid(invoice_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
@@ -1586,7 +1586,7 @@ def mark_invoice_paid(invoice_id: int, current_user: User = Depends(get_current_
 @app.post("/payouts/wise")
 def create_wise_payout(agent_id: int, amount: float, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent:
@@ -1651,7 +1651,7 @@ def get_pricing(country: str = "RO", db: Session = Depends(get_db)):
 @app.put("/pricing/{plan}")
 def update_pricing(plan: str, base_price: float, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Pretul LOIAL se schimba numai prin actualizarea verificata a configuratiei Stripe.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     pricing = db.query(Pricing).filter(Pricing.plan == plan).first()
     if not pricing:
@@ -1669,7 +1669,7 @@ def get_vat_rates(db: Session = Depends(get_db)):
 @app.put("/vat-rates/{country}")
 def update_vat_rate(country: str, rate: float, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Configurarea TVA a fluxului vechi este retrasa.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     vat = db.query(VATRate).filter(VATRate.country_code == country.upper()).first()
     if vat:
@@ -1683,7 +1683,7 @@ def update_vat_rate(country: str, rate: float, current_user: User = Depends(get_
 @app.post("/invoices/create")
 def create_invoice(business_id: int, plan: str = "pro", country: str = "RO", description: str = "", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Facturarea abonamentelor se face exclusiv prin fluxul Stripe.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     if not biz:
