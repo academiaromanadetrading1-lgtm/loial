@@ -161,6 +161,8 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
             for token in (other_role_token,wrong_scope_token,missing_scope_token,
                           string_scope_token):
                 headers={"Authorization":"Bearer "+token}
+                assert client.get("/api/loial-crm/customers",headers=headers).status_code==403
+                assert client.get("/api/loial-scans/history",headers=headers).status_code==403
                 assert client.get("/api/my-business",headers=headers).status_code==403
                 assert client.get("/api/my-business/staff",headers=headers).status_code==403
                 assert client.post("/api/my-business/staff",headers=headers,json={
