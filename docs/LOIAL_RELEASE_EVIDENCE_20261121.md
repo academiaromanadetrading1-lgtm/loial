@@ -288,3 +288,15 @@ Public launch remains NO-GO while real restore, Stripe billing, device testing a
 - Tests explicitly cover timestamp ordering, missing/invalid timestamps, same-subscription duplicates, unbound-account initial binding and differing subscriptions. No real Stripe API calls were made, and these unit tests do not replace signed webhook TEST verification.
 - Staging is online with volume attached, deployment 8479fe18-8589-461b-a004-17e0ad09002b. Production remains online and unchanged on 1bdeabfe-dc4b-473f-8b66-f3d19137feeb. No new deployment occurred.
 - Public launch remains NO-GO pending actual staging off-volume backup/restore, end-to-end Stripe TEST, real-device QR/PWA and legal/operator sign-off.
+
+## 2026-11-21 stale payment-failure and subscription-revocation webhooks
+
+- Verified source commit e1034073e9ffb080fb759f80d12b3ffd6d674eb3, CI: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44949033459
+- **307 isolated Python tests PASS** and **1 assembled FastAPI integration PASS**, plus compilation, JavaScript and PWA checks.
+- Stripe invoice.payment_failed and customer.subscription.updated/deleted now compare the signed event timestamp to the subscription's latest accepted lifecycle/paid-invoice watermark. Older and missing/invalid event timestamps cannot suspend or terminate a newer verified state.
+- Matched, current lifecycle events continue to suspend/terminate subscriptions and advance the watermark. Equal-second events are deliberately treated as stale to prefer preservation of newer billing evidence.
+- In the checkout handler, the stale/invalid timestamp check now happens before creating a new subscription database record, preventing an orphan pending subscription from a rejected event.
+- Added tests for old/equal timestamps, missing/non-integer timestamp values, the legitimate newer failure transition and unbound-account state.
+- **Limitation**: tests exercise the code with isolated fixtures; no real Stripe TEST webhook, end-to-end checkout or independent database restore was executed.
+- Railway staging volume is attached and service is idle-sleeping at deployment 8479fe18-8589-461b-a004-17e0ad09002b; production is online, unchanged at deployment 1bdeabfe-dc4b-473f-8b66-f3d19137feeb. No deployment took place.
+- Public release remains NO-GO until updated staging code, off-volume backup and independent restore, real Stripe TEST billing, phone QR/PWA and legal/operator sign-off are verified.
