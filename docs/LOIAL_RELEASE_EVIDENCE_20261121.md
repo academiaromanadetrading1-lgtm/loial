@@ -218,3 +218,12 @@ Public launch remains NO-GO while real restore, Stripe billing, device testing a
 - A temporary failure of integration CI came from deliberately exceeding the existing five-signups-per-minute limiter; the isolated test resets its own rate-limit storage after the negative-input checks. Latest CI is green.
 - Railway staging still has its own mounted persistent volume and is idle-sleeping; production remains on the previous deployment. These GitHub changes were **not** deployed.
 - Release remains NO-GO pending real backup/restore, Stripe billing, real-device QR/PWA tests, and legal/operator sign-off.
+
+## 2026-11-21 merchant authorization isolation: CRM, inbox and AI
+
+- CI-verified commit fed4ea60d9e3aa9c9f81a377ff083a7faeaa91d9: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44927691513
+- **297 isolated tests passed** and **1 assembled FastAPI integration passed**; Python compilation, JavaScript and PWA checks also passed.
+- CRM, inbox and LOIAL AI owner dependencies now demand Business role and an exact integer business ID. Previously absent merchant scope could be accepted based solely on matching email.
+- Regression tests cover missing, text-typed and cross-merchant identifiers. Isolated module fixtures and expenses integration were updated to issue valid business-scoped tokens. Full FastAPI smoke test checks CRM and loyalty audit authorization.
+- Railway production is online and unchanged at deployment 1bdeabfe-dc4b-473f-8b66-f3d19137feeb. Staging is idle-sleeping with persistent volume at deployment 8479fe18-8589-461b-a004-17e0ad09002b. No new deployment occurred.
+- Public release remains NO-GO pending off-volume backup and independent restore, billing/webhook validation, mobile QR/PWA and legal/operator sign-off.
