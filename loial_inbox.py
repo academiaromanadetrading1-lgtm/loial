@@ -189,7 +189,7 @@ def audience_matches(customer, audience, reference=None):
             "inactive_91_365": 91 <= d <= 365}.get(audience, False)
 
 def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent,
-                        Sale, jwt_key, jwt_algorithm):
+                        Sale, jwt_key, jwt_algorithm, require_billing=False):
     InboxBase.metadata.create_all(bind=engine)
     from loial_crm import CRMBase
     CRMBase.metadata.create_all(bind=engine)
@@ -216,7 +216,15 @@ def install_loial_inbox(app, engine, factory, BusinessAccount, Customer, Consent
             BusinessAccount.email == claims.get("sub")).first()
         if not account or (claims.get("business_id") and claims["business_id"] != account.id):
             raise HTTPException(status_code=403, detail="Acces refuzat")
-        if (account.plan or "").lower() not in BUSINESS_PLANS:
+        if require_billing:
+            # In deployed LOIAL, mutable plan labels are not proof of payment.
+            # Expired, unpaid or canceled businesses must lose campaign access.
+            from loial_stripe_billing import effective_entitlements
+            access=effective_entitlements(db,account.id)
+            if not access["active"]:
+                raise HTTPException(status_code=403, detail="Abonament Loial Business inactiv")
+        elif (account.plan or "").lower() not in BUSINESS_PLANS:
+            # Compatibility for isolated legacy module fixtures only.
             raise HTTPException(status_code=403, detail="Disponibil in Loial Business")
         return account
 
