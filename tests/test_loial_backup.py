@@ -88,3 +88,27 @@ def test_backup_includes_committed_wal_data(tmp_path):
         assert outcome["restore_verified"] is True
         with sqlite3.connect(destination) as copy:
             assert copy.execute("SELECT amount FROM receipts").fetchone()[0]==12345
+
+
+def test_restore_checker_rejects_valid_but_empty_sqlite(tmp_path):
+    empty=tmp_path/"empty.sqlite"
+    sqlite3.connect(empty).close()
+    with pytest.raises(RuntimeError,match="no application tables"):
+        verify_restorable(empty)
+    with pytest.raises(ValueError,match="empty"):
+        backup_database(empty,tmp_path/"not-valid-backup.sqlite")
+    assert not (tmp_path/"not-valid-backup.sqlite").exists()
+
+
+def test_restore_checker_rejects_foreign_key_violations(tmp_path):
+    snapshot=tmp_path/"broken-relations.sqlite"
+    with sqlite3.connect(snapshot) as db:
+        db.execute("CREATE TABLE parent (id INTEGER PRIMARY KEY)")
+        db.execute("CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES parent(id))")
+        db.execute("INSERT INTO child (id,parent_id) VALUES (1,999)")
+        db.commit()
+    with pytest.raises(RuntimeError,match="foreign key violations"):
+        verify_restorable(snapshot)
+    with pytest.raises(RuntimeError,match="foreign key violations"):
+        backup_database(snapshot,tmp_path/"unusable-backup.sqlite")
+    assert not (tmp_path/"unusable-backup.sqlite").exists()
