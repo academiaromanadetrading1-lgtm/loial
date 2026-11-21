@@ -101,6 +101,53 @@ class ApplicationBootSmokeTests(unittest.TestCase):
         response=self.client.get("/join/987654321")
         self.assertEqual(response.status_code,404,response.text)
 
+    def test_stripe_webhook_unconfigured_fails_closed(self):
+        with patch.dict(os.environ,{"LOIAL_PUBLIC_FREE_PILOT":"0",
+                                    "LOIAL_STRIPE_WEBHOOK_SECRET":""}):
+            response=self.client.post("/api/loial-stripe/webhook",
+                                      content=b"{}",headers={"Stripe-Signature":"invalid"})
+        self.assertEqual(response.status_code,503,response.text)
+        self.assertEqual(response.headers.get("Cache-Control"),"no-store")
+
+    def test_stripe_webhook_rejects_invalid_signature(self):
+        with patch.dict(os.environ,{"LOIAL_PUBLIC_FREE_PILOT":"0",
+                                    "LOIAL_STRIPE_WEBHOOK_SECRET":"whsec_ci_only",
+                                    "LOIAL_STRIPE_SECRET_KEY":"sk_test_ci_only"}):
+            response=self.client.post("/api/loial-stripe/webhook",
+                                      content=b"{}",headers={"Stripe-Signature":"invalid"})
+        self.assertEqual(response.status_code,400,response.text)
+
+    def test_stripe_webhook_records_unknown_event_once_without_real_stripe(self):
+        # The mocked signature verifier simulates a VERIFIED Stripe event.
+        # This test sends no network calls and cannot create real payments.
+        import stripe
+        event={"id":"evt_loial_ci_smoke_unique","livemode":False,
+               "type":"test.loial_smoke","data":{"object":{}}}
+        env={"LOIAL_PUBLIC_FREE_PILOT":"0",
+             "LOIAL_STRIPE_WEBHOOK_SECRET":"whsec_ci_only",
+             "LOIAL_STRIPE_SECRET_KEY":"sk_test_ci_only"}
+        with patch.dict(os.environ,env):
+            with patch.object(stripe.Webhook,"construct_event",return_value=event):
+                first=self.client.post("/api/loial-stripe/webhook",content=b"{}")
+                again=self.client.post("/api/loial-stripe/webhook",content=b"{}")
+        self.assertEqual(first.status_code,200,first.text)
+        self.assertEqual(first.json()["status"],"recorded")
+        self.assertEqual(again.status_code,200,again.text)
+        self.assertEqual(again.json()["status"],"duplicate")
+
+    def test_stripe_webhook_ignores_live_event_with_test_key(self):
+        import stripe
+        event={"id":"evt_loial_ci_live_mismatch","livemode":True,
+               "type":"test.loial_smoke","data":{"object":{}}}
+        env={"LOIAL_PUBLIC_FREE_PILOT":"0",
+             "LOIAL_STRIPE_WEBHOOK_SECRET":"whsec_ci_only",
+             "LOIAL_STRIPE_SECRET_KEY":"sk_test_ci_only"}
+        with patch.dict(os.environ,env):
+            with patch.object(stripe.Webhook,"construct_event",return_value=event):
+                response=self.client.post("/api/loial-stripe/webhook",content=b"{}")
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json()["status"],"ignored_mode_mismatch")
+
     def test_join_for_nonexistent_firm_fails_closed(self):
         response = self.client.get("/join/987654321")
         self.assertEqual(response.status_code,404,response.text)
