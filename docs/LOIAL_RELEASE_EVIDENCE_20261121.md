@@ -247,3 +247,13 @@ Public launch remains NO-GO while real restore, Stripe billing, device testing a
 - Regression tests cover legitimate Business and Ambassador access plus missing, text-typed and mismatched account identifiers. Legacy isolated test fixtures were updated to issue correctly scoped tokens.
 - Staging remains idle-sleeping with the persistent volume attached, on deployment 8479fe18-8589-461b-a004-17e0ad09002b. Production remains online and unchanged at 1bdeabfe-dc4b-473f-8b66-f3d19137feeb.
 - Public release NO-GO pending actual backup and independent restoration, Stripe checkout and webhook validation, real-device QR/PWA testing, and operator/legal sign-off.
+
+## 2026-11-21 paid-plan tier fidelity in Stripe synchronization
+
+- CI-verified source revision e3b66043e5149e1593c46decb1154cb7a6beb57e: https://github.com/academiaromanadetrading1-lgtm/loial/actions/runs/44935936446
+- **299 isolated tests PASS** and **1 assembled FastAPI integration PASS**, plus module compilation, JavaScript and PWA checks.
+- Found two billing paths that always set business.plan to probusiness when any verified paid entitlement existed: paid-invoice processing and premium middleware. This incorrectly labels a EUR 67 Business subscription as the EUR 270 ProBusiness tier.
+- Invoice processing now sets the business's legacy plan display flag from the verified invoice tier. Middleware now mirrors the effective entitlement tier (including manual Business grants) and defaults to free when access is inactive.
+- Tests establish EUR 67 payment yields Business, EUR 270 verified payment yields ProBusiness, and an active manually granted Business account does not silently become ProBusiness after a premium endpoint request. Paid access is still derived from verified entitlements, not the mutable display flag.
+- No Railway deployment or database changes were performed. Staging remains idle-sleeping with mounted volume at 8479fe18-8589-461b-a004-17e0ad09002b; production is online on 1bdeabfe-dc4b-473f-8b66-f3d19137feeb.
+- Public release NO-GO pending live-equivalent Stripe test checkout/webhook, off-volume backup/independent restore, real-device QR/PWA, operator/legal sign-off.
