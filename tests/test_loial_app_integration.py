@@ -226,7 +226,9 @@ def test_full_application_starts_and_registers_wallet(tmp_path, monkeypatch):
                 business.plan="probusiness"
                 db.commit()
             stale_inbox=client.get("/api/loial-inbox/sent",headers=bearer)
-            assert stale_inbox.status_code==403,stale_inbox.text
+            # The global subscription guard returns 402 before the inbox's
+            # additional active-entitlement check returns 403.
+            assert stale_inbox.status_code in (402,403),stale_inbox.text
             with main.SessionLocal() as db:
                 business=db.get(main.BusinessAccount,business_id)
                 business.plan="free"
