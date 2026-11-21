@@ -2683,6 +2683,11 @@ def change_any_password(request: Request, req: ChangePasswordRequest, db: Sessio
             matching_accounts.append(acc)
     if not matching_accounts:
         raise HTTPException(status_code=401, detail="Email sau parolă actuală incorectă")
+    if len(matching_accounts)>1:
+        # Email addresses are not globally unique between account models.
+        # A single public request must never rotate multiple account roles.
+        raise HTTPException(status_code=409,
+                            detail="Mai multe tipuri de cont corespund. Contacteaza suportul pentru schimbarea separata.")
     new_hash = pwd_context.hash(req.new_password)
     for acc in matching_accounts:
         acc.password = new_hash
