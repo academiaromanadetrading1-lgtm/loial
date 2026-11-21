@@ -553,31 +553,47 @@
     updateCardQr(uuid);
     renderDots(stamps, targetStamps);
 
-    fetch(`/api/presence/${bizId}/${uuid}`, { method: 'POST' }).catch(() => {});
-
-    setInterval(async () => {
+    // Private wallet polling replaces the retired public UUID-status endpoints.
+    // Reopening the card must not create duplicate intervals.
+    if (window.loialPrivateCardInterval) clearInterval(window.loialPrivateCardInterval);
+    window.loialPrivateCardInterval = setInterval(async () => {
+      if (document.hidden) return;
+      const privateToken = localStorage.getItem('loial_wallet_inbox_token') || '';
+      if (!privateToken) return;
       try {
-        const r = await fetch('/api/customer-status/' + encodeURIComponent(uuid) + '?business_id=' + bizId);
-        if (r.ok) {
-          const st = await r.json();
-          if (st.stamps !== knownStamps) {
-            const increased = st.stamps > knownStamps;
-            knownStamps = st.stamps;
-            renderDots(st.stamps, targetStamps);
-            document.getElementById('premiumCustomerStatus').textContent = st.stamps >= targetStamps ? 'RECOMPENSĂ DISPONIBILĂ' : 'MEMBRU LOIAL';
-            if (increased && navigator.vibrate) navigator.vibrate();
-            const banner = document.getElementById('reminderBanner');
-            if (st.stamps >= targetStamps) {
-              banner.className = 'reminder-pill reward-ready';
-              banner.textContent = '🏆 PREMIU DEBLOCAT! Arată cardul la casă pentru a-l revendica!';
-            } else if (increased) {
-              banner.className = 'reminder-pill confirmed';
-              banner.textContent = `🎉 Ai primit +1 ștampilă! Ai acum ${st.stamps}/${targetStamps} ștampile!`;
-            }
+        const response = await fetch('/api/wallet-profile/' + encodeURIComponent(uuid), {
+          headers: { 'X-Loial-Wallet-Token': privateToken },
+          cache: 'no-store'
+        });
+        if (!response.ok) return;
+        const profile = await response.json();
+        const currentCard = (profile.cards || []).find(c => c.business_id === bizId);
+        if (!currentCard) return;
+        const newStamps = Number(currentCard.stamps || 0);
+        const newTarget = Number(currentCard.target || 6);
+        if (!Number.isFinite(newStamps) || !Number.isFinite(newTarget)) return;
+        if (newTarget !== targetStamps || newStamps !== knownStamps) {
+          const increased = newStamps > knownStamps;
+          knownStamps = newStamps;
+          targetStamps = newTarget;
+          renderDots(newStamps, newTarget);
+          document.getElementById('premiumCustomerStatus').textContent =
+            newStamps >= newTarget ? 'RECOMPENSĂ DISPONIBILĂ' : 'MEMBRU LOIAL';
+          if (increased && navigator.vibrate) navigator.vibrate();
+          const banner = document.getElementById('reminderBanner');
+          if (newStamps >= newTarget) {
+            banner.className = 'reminder-pill reward-ready';
+            banner.textContent = '🏆 PREMIU DEBLOCAT! Arată cardul la casă pentru a-l revendica!';
+          } else if (increased) {
+            banner.className = 'reminder-pill confirmed';
+            banner.textContent =
+              `🎉 Ai primit +1 ștampilă! Ai acum ${newStamps}/${newTarget} ștampile!`;
           }
         }
-      } catch (err) {}
-    }, 2500);
+      } catch (err) {
+        // A disconnected device keeps the last verified state; it never invents stamps.
+      }
+    }, 8000);
   }
 
   async function loadUniversalWallet() {
