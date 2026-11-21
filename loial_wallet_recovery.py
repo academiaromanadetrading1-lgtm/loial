@@ -7,10 +7,12 @@ be used to take over an already privately authenticated wallet. Only this
 merchant's card is transferred; other businesses remain untouched.
 """
 import hashlib
+import os
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from jose import JWTError, jwt
@@ -50,6 +52,24 @@ def sha(text):
 
 def now_utc():
     return datetime.now(timezone.utc)
+
+def recovery_public_origin():
+    """Use the configured deployment origin, never a request Host header."""
+    origin=os.getenv("LOIAL_PUBLIC_ORIGIN","https://loial.space").rstrip("/")
+    try:
+        parts=urlsplit(origin)
+        valid=(parts.scheme=="https" and bool(parts.hostname)
+               and parts.username is None and parts.password is None
+               and not parts.path and not parts.query and not parts.fragment
+               and not any(c.isspace() or c in "*\\\\?#" for c in origin)
+               and (parts.port is None or 1<=parts.port<=65535))
+    except ValueError:
+        valid=False
+    if not valid:
+        raise HTTPException(status_code=503,
+                            detail="Recovery public origin is not configured safely")
+    return origin
+
 
 def verified_wallet(db, wallet_uuid):
     return db.query(WalletInboxAccess).filter(
@@ -141,7 +161,7 @@ def install_wallet_recovery(app,engine,factory,BusinessAccount,Customer,
             verification_note=req.verification_note.strip())
         db.add(ticket)
         db.commit()
-        return {"recovery_url":"https://loial.space/wallet-recovery.html?code="+raw,
+        return {"recovery_url":recovery_public_origin()+"/wallet-recovery.html?code="+raw,
                 "expires_in_minutes":TTL_MINUTES,
                 "business":biz.name,
                 "customer":customer.name,
