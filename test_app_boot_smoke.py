@@ -360,7 +360,7 @@ class ApplicationBootSmokeTests(unittest.TestCase):
             json={"receipt_ref":"CI-REFUND-98721-A","reason":"Actual test refund"},
             headers=headers)
         self.assertEqual(canceled.status_code,200,canceled.text)
-        self.assertTrue(canceled.json()["reversed_stamp"])
+        self.assertTrue(canceled.json()["stamp_reversed"])
         with app.SessionLocal() as db:
             card=db.query(app.Customer).filter_by(business_id=98721,
                 wallet_uuid=wallet_uuid).one()
