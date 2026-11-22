@@ -18,6 +18,8 @@ on:
       - 'test_language_switching.cjs'
       - 'test_pwa_install_contract.cjs'
       - 'test_pwa_offline_lifecycle.cjs'
+      - 'test_pwa_offline_language.cjs'
+      - 'loial-offline.html'
       - 'loial-pwa-install.js'
       - 'sw.js'
       - 'manifest.json'
@@ -84,6 +86,8 @@ jobs:
         run: node test_pwa_install_contract.cjs
       - name: Simulate PWA offline lifecycle and private cache isolation
         run: node test_pwa_offline_lifecycle.cjs
+      - name: Check all nine offline PWA translations
+        run: node test_pwa_offline_language.cjs
       - name: Run isolated security regression tests
         run: |
           python -m unittest -v \
