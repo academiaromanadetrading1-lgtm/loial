@@ -237,6 +237,63 @@ class ApplicationBootSmokeTests(unittest.TestCase):
             self.assertEqual({c.business_id:c.stamps for c in cards},
                              {98701:1,98702:0})
 
+    def test_paid_receipt_at_stamp_cap_is_claimed_once_without_extra_stamp(self):
+        """A receipt documents a visit even after a loyalty reward is unlocked."""
+        from urllib.parse import urlsplit, parse_qs
+        from loial_receipts import Receipt
+        from loial_scans import StampAward
+        app=self.application
+        merchant_id=98711
+        wallet_uuid="ci-wallet-98711"
+        secret="ci-only-receipt-private-device-98711-abcdefghijklmnopqrst"
+        with app.SessionLocal() as db:
+            db.add(app.BusinessAccount(id=merchant_id,name="Receipt Bakery",
+                email="receipt-pilot@example.invalid",plan="free",staff_pin="864209"))
+            db.commit()
+        enrolled=self.client.post("/api/enroll-sync",json={
+            "business_id":merchant_id,"name":"Receipt Tester",
+            "uuid":wallet_uuid,"wallet_claim_token":secret})
+        self.assertEqual(enrolled.status_code,200,enrolled.text)
+        with app.SessionLocal() as db:
+            customer=db.query(app.Customer).filter_by(
+                business_id=merchant_id,wallet_uuid=wallet_uuid).one()
+            customer.stamps=6
+            db.commit()
+
+        auth=app.create_access_token({
+            "sub":"receipt-pilot@example.invalid","role":"business",
+            "business_id":merchant_id})
+        payload={"receipt_ref":"CI-RECEIPT-CAP-001","currency":"RON",
+                 "lines":[{"product":"Synthetic bread","quantity":1,"unit_price":18.0}]}
+        issued=self.client.post("/api/loial-receipts/issue",
+            json=payload,headers={"Authorization":"Bearer "+auth})
+        self.assertEqual(issued.status_code,200,issued.text)
+        self.assertEqual(issued.json()["status"],"issued")
+        receipt_token=parse_qs(urlsplit(issued.json()["claim_url"]).query)["token"][0]
+        claim=self.client.post("/api/loial-receipts/claim",
+            json={"receipt_token":receipt_token},
+            headers={"X-Loial-Wallet-Token":secret})
+        self.assertEqual(claim.status_code,200,claim.text)
+        self.assertEqual(claim.json()["status"],"claimed")
+        self.assertFalse(claim.json()["stamp_granted"])
+        self.assertEqual(claim.json()["stamps"],6)
+
+        duplicate=self.client.post("/api/loial-receipts/claim",
+            json={"receipt_token":receipt_token},
+            headers={"X-Loial-Wallet-Token":secret})
+        self.assertEqual(duplicate.status_code,409,duplicate.text)
+        with app.SessionLocal() as db:
+            receipt=db.query(Receipt).filter_by(
+                business_id=merchant_id,receipt_ref="CI-RECEIPT-CAP-001").one()
+            customer=db.query(app.Customer).filter_by(
+                business_id=merchant_id,wallet_uuid=wallet_uuid).one()
+            self.assertEqual(receipt.status,"claimed")
+            self.assertEqual(customer.stamps,6)
+            stamps=db.query(StampAward).filter_by(
+                business_id=merchant_id,operation_key="receipt:"+str(receipt.id)).all()
+            self.assertEqual(len(stamps),1)
+            self.assertEqual(stamps[0].source,"receipt_visit")
+
     def test_join_for_nonexistent_firm_fails_closed(self):
         response = self.client.get("/join/987654321")
         self.assertEqual(response.status_code,404,response.text)
