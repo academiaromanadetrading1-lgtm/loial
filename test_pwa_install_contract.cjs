@@ -55,6 +55,20 @@ chrome.listeners['win:beforeinstallprompt']({
 assert.match(chrome.help.textContent,/instala/i);
 chrome.button.handler();
 assert.equal(prompted,1,'Android must use native install prompt');
+// Installation guidance must never revert to an untranslated Romanian string.
+assert.doesNotMatch(fs.readFileSync('loial-pwa-install.js','utf8'),
+  /t\\.textContent='În (?:Safari|Chrome)/);
+const appleHelp=apple.help.textContent;
+apple.button.handler();
+assert.equal(apple.help.textContent,appleHelp,
+  'iOS click should keep language-aware Safari instructions');
+const androidHelp=chrome.help.textContent;
+chrome.button.handler();
+assert.equal(chrome.help.textContent,androidHelp,
+  'Android click should keep translated native-prompt instructions');
+const fallback=installHarness('Mozilla/5.0 (Linux; Android) AppleWebKit');
+assert.match(fallback.help.textContent,/Android/);
+
 const installed=installHarness('Mozilla/5.0 (iPhone)',true);
 assert.equal(installed.button.hidden,true,'Do not offer install when already in standalone mode');
 
