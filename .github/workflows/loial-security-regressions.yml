@@ -16,6 +16,8 @@ on:
       - 'test_wallet_storage_recovery.cjs'
       - 'test_i18n_dictionary.cjs'
       - 'test_language_switching.cjs'
+      - 'test_wallet_dynamic_language.cjs'
+      - 'loial-wallet-ui-i18n.js'
       - 'test_pwa_install_contract.cjs'
       - 'test_pwa_offline_lifecycle.cjs'
       - 'test_pwa_offline_language.cjs'
@@ -82,6 +84,8 @@ jobs:
         run: node test_i18n_dictionary.cjs
       - name: Test language preferences and switching
         run: node test_language_switching.cjs
+      - name: Test dynamic wallet language including stamps and inbox
+        run: node test_wallet_dynamic_language.cjs
       - name: Validate PWA installation contract and privacy
         run: node test_pwa_install_contract.cjs
       - name: Simulate PWA offline lifecycle and private cache isolation
