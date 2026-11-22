@@ -612,6 +612,25 @@ class ApplicationBootSmokeTests(unittest.TestCase):
             self.assertEqual(len(inbox),3)  # welcome, final stamp, redemption
             self.assertEqual(db.query(InboxEntry).filter_by(
                 business_id=merchant_id).count(),3)
+            # Simulate a genuinely new purchase after the anti-double-scan
+            # interval without sleeping; existing reward remains consumed.
+            from datetime import datetime, timedelta, timezone
+            first_award=next(e for e in events if e.source=="manual")
+            first_award.created_at=(datetime.now(timezone.utc)-
+                                    timedelta(seconds=15)).isoformat()
+            db.commit()
+        next_purchase=self.client.post("/api/scan-universal",json={
+            **scan,"idempotency_key":"ci-reward-post-redeem-98761"})
+        self.assertEqual(next_purchase.status_code,200,next_purchase.text)
+        self.assertEqual(next_purchase.json()["stamps"],1)
+        self.assertFalse(next_purchase.json()["reward_unlocked"])
+        with app.SessionLocal() as db:
+            card=db.query(app.Customer).filter_by(
+                business_id=merchant_id,wallet_uuid=wallet_uuid).one()
+            self.assertEqual(card.stamps,1)
+            self.assertEqual([e.source for e in db.query(StampAward).filter_by(
+                business_id=merchant_id,customer_id=card.id).order_by(
+                StampAward.id).all()],["manual","redeem","manual"])
 
     def test_join_for_nonexistent_firm_fails_closed(self):
         response = self.client.get("/join/987654321")
