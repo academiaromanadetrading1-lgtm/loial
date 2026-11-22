@@ -217,6 +217,26 @@ class ApplicationBootSmokeTests(unittest.TestCase):
             self.assertEqual(db.query(InboxDelivery).filter(
                 InboxDelivery.business_id==98702).count(),0)
 
+        # Same universal wallet can join a second merchant only after proving
+        # possession of its private device credential.
+        second={**payload,"business_id":98702}
+        denied=self.client.post("/api/enroll-sync",
+            json={**second,"wallet_claim_token":None})
+        self.assertEqual(denied.status_code,401,denied.text)
+        allowed=self.client.post("/api/enroll-sync",json=second)
+        self.assertEqual(allowed.status_code,200,allowed.text)
+        self.assertEqual(allowed.json()["inbox_access"],secret)
+        after=self.client.get("/api/loial-inbox/me",
+            headers={"X-Loial-Wallet-Token":secret})
+        self.assertEqual(after.status_code,200,after.text)
+        self.assertEqual(after.json()["cards"],2)
+        with app.SessionLocal() as db:
+            cards=db.query(app.Customer).filter(
+                app.Customer.wallet_uuid=="ci-wallet-98701").all()
+            self.assertEqual({c.business_id for c in cards},{98701,98702})
+            self.assertEqual({c.business_id:c.stamps for c in cards},
+                             {98701:1,98702:0})
+
     def test_join_for_nonexistent_firm_fails_closed(self):
         response = self.client.get("/join/987654321")
         self.assertEqual(response.status_code,404,response.text)
