@@ -432,6 +432,58 @@ class ApplicationBootSmokeTests(unittest.TestCase):
             self.assertEqual(db.query(app.Consent).filter(
                 app.Consent.purpose==PURPOSE).count(),3)
 
+    def test_private_inbox_read_state_cannot_be_modified_by_other_wallet(self):
+        """End-to-end wallet isolation: reading a stranger's delivery is forbidden."""
+        from loial_inbox import InboxDelivery, InboxEntry
+        app=self.application
+        merchant_id=98741
+        wallets=(
+            ("ci-wallet-inbox-98741-a","ci-private-token-98741-a-abcdefghijklmnopqrstuv"),
+            ("ci-wallet-inbox-98741-b","ci-private-token-98741-b-abcdefghijklmnopqrstuv"))
+        with app.SessionLocal() as db:
+            db.add(app.BusinessAccount(id=merchant_id,name="Inbox Shop",
+                email="inbox-shop@example.invalid",plan="free",staff_pin="641203"))
+            db.commit()
+        for idx,(wallet,token) in enumerate(wallets):
+            response=self.client.post("/api/enroll-sync",json={
+                "business_id":merchant_id,"name":f"Inbox Client {idx+1}",
+                "uuid":wallet,"wallet_claim_token":token})
+            self.assertEqual(response.status_code,200,response.text)
+        # Both customers have their own service welcome message.
+        with app.SessionLocal() as db:
+            members={card.wallet_uuid:card for card in db.query(app.Customer).filter(
+                app.Customer.business_id==merchant_id).all()}
+            self.assertEqual(set(members),{x[0] for x in wallets})
+            deliveries={w:db.query(InboxDelivery).filter_by(
+                customer_id=members[w].id,business_id=merchant_id).first()
+                for w,_ in wallets}
+            self.assertTrue(all(deliveries.values()))
+            a_id=deliveries[wallets[0][0]].id
+            b_id=deliveries[wallets[1][0]].id
+            self.assertNotEqual(a_id,b_id)
+        first={"X-Loial-Wallet-Token":wallets[0][1]}
+        second={"X-Loial-Wallet-Token":wallets[1][1]}
+        own=self.client.get("/api/loial-inbox/me",headers=first)
+        self.assertEqual(own.status_code,200,own.text)
+        self.assertIn(a_id,[x["delivery_id"] for x in own.json()["messages"]])
+        self.assertNotIn(b_id,[x["delivery_id"] for x in own.json()["messages"]])
+        other=self.client.get("/api/loial-inbox/me",headers=second)
+        self.assertEqual(other.status_code,200,other.text)
+        self.assertNotIn(a_id,[x["delivery_id"] for x in other.json()["messages"]])
+        denied=self.client.post(f"/api/loial-inbox/read/{b_id}",headers=first)
+        self.assertEqual(denied.status_code,404,denied.text)
+        self.assertEqual(self.client.get(
+            "/api/loial-inbox/threads/98742",headers=first).status_code,404)
+        accepted=self.client.post(f"/api/loial-inbox/read/{a_id}",headers=first)
+        self.assertEqual(accepted.status_code,200,accepted.text)
+        repeated=self.client.post(f"/api/loial-inbox/read/{a_id}",headers=first)
+        self.assertEqual(repeated.status_code,200,repeated.text)
+        with app.SessionLocal() as db:
+            self.assertIsNotNone(db.get(InboxDelivery,a_id).read_at)
+            self.assertIsNone(db.get(InboxDelivery,b_id).read_at)
+            self.assertEqual(db.query(InboxEntry).filter_by(
+                business_id=merchant_id).count(),2)
+
     def test_join_for_nonexistent_firm_fails_closed(self):
         response = self.client.get("/join/987654321")
         self.assertEqual(response.status_code,404,response.text)
