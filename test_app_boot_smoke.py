@@ -484,6 +484,73 @@ class ApplicationBootSmokeTests(unittest.TestCase):
             self.assertEqual(db.query(InboxEntry).filter_by(
                 business_id=merchant_id).count(),2)
 
+    def test_direct_marketing_revalidates_consent_and_idempotency(self):
+        """Real ASGI audience/send flow uses latest consent and no duplicate delivery."""
+        from loial_inbox import InboxEntry, InboxDelivery
+        app=self.application
+        merchant_id=98751
+        secret_a="ci-consent-send-secret-98751-A-abcdefghijklmnopqrstuvwxyz"
+        secret_b="ci-consent-send-secret-98751-B-abcdefghijklmnopqrstuvwxyz"
+        with app.SessionLocal() as db:
+            db.add(app.BusinessAccount(id=merchant_id,name="Marketing Test Shop",
+                email="send-pilot@example.invalid",plan="business",staff_pin="641208"))
+            db.commit()
+        for idx,(wallet,secret,opt) in enumerate((
+            ("ci-wallet-send-98751-A",secret_a,True),
+            ("ci-wallet-send-98751-B",secret_b,False)
+        )):
+            result=self.client.post("/api/enroll-sync",json={
+                "business_id":merchant_id,"name":f"Marketing Tester {idx}",
+                "uuid":wallet,"wallet_claim_token":secret,
+                "consent_loial_offers":opt})
+            self.assertEqual(result.status_code,200,result.text)
+        merchant_headers={"Authorization":"Bearer "+app.create_access_token({
+            "sub":"send-pilot@example.invalid","role":"business",
+            "business_id":merchant_id})}
+        message={"subject":"Test oferta Loial","text":"Oferta de test",
+                 "audience":"all","idempotency_key":"marketing-test-98751-one"}
+        with patch("loial_stripe_billing.effective_entitlements",
+                   return_value={"active":True}):
+            audience=self.client.get("/api/loial-inbox/audience",headers=merchant_headers)
+            self.assertEqual(audience.status_code,200,audience.text)
+            self.assertEqual(audience.json()["eligible"],1)
+            first=self.client.post("/api/loial-inbox/send",
+                json=message,headers=merchant_headers)
+            self.assertEqual(first.status_code,200,first.text)
+            self.assertEqual(first.json()["sent"],1)
+            replay=self.client.post("/api/loial-inbox/send",
+                json=message,headers=merchant_headers)
+            self.assertEqual(replay.status_code,200,replay.text)
+            self.assertEqual(replay.json()["status"],"already_delivered")
+            changed=self.client.post("/api/loial-inbox/send",json={
+                **message,"text":"Mesaj diferit"},headers=merchant_headers)
+            self.assertEqual(changed.status_code,409,changed.text)
+            preference=self.client.post("/api/loial-inbox/preferences",
+                json={"business_id":merchant_id,"enabled":False},
+                headers={"X-Loial-Wallet-Token":secret_a})
+            self.assertEqual(preference.status_code,200,preference.text)
+            audience_after=self.client.get(
+                "/api/loial-inbox/audience",headers=merchant_headers)
+            self.assertEqual(audience_after.json()["eligible"],0)
+            blocked=self.client.post("/api/loial-inbox/send",
+                json={**message,"idempotency_key":"marketing-test-98751-two"},
+                headers=merchant_headers)
+            self.assertEqual(blocked.status_code,200,blocked.text)
+            self.assertEqual(blocked.json()["status"],"no_eligible_clients")
+        owner_inbox=self.client.get("/api/loial-inbox/me",
+            headers={"X-Loial-Wallet-Token":secret_a})
+        other_inbox=self.client.get("/api/loial-inbox/me",
+            headers={"X-Loial-Wallet-Token":secret_b})
+        self.assertEqual(owner_inbox.status_code,200,owner_inbox.text)
+        self.assertEqual(other_inbox.status_code,200,other_inbox.text)
+        self.assertEqual(sum(x["kind"]=="marketing" for x in owner_inbox.json()["messages"]),1)
+        self.assertEqual(sum(x["kind"]=="marketing" for x in other_inbox.json()["messages"]),0)
+        with app.SessionLocal() as db:
+            entries=db.query(InboxEntry).filter_by(business_id=merchant_id,
+                category="marketing").all()
+            self.assertEqual(len(entries),1)
+            self.assertEqual(db.query(InboxDelivery).filter_by(entry_id=entries[0].id).count(),1)
+
     def test_join_for_nonexistent_firm_fails_closed(self):
         response = self.client.get("/join/987654321")
         self.assertEqual(response.status_code,404,response.text)
