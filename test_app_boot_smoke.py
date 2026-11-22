@@ -315,6 +315,68 @@ class ApplicationBootSmokeTests(unittest.TestCase):
         self.assertEqual(refund_again.status_code,200,refund_again.text)
         self.assertEqual(refund_again.json()["status"],"already_refunded")
 
+    def test_receipt_refund_reverses_only_its_own_unredeemed_stamp(self):
+        """Real ASGI receipt claim/refund with independent merchants and wallet."""
+        from urllib.parse import urlsplit, parse_qs
+        from loial_receipts import Receipt
+        from loial_scans import StampAward
+        app=self.application
+        businesses=((98721,"refund-a@example.invalid","601278"),
+                    (98722,"refund-b@example.invalid","601279"))
+        with app.SessionLocal() as db:
+            for bid,email,pin in businesses:
+                db.add(app.BusinessAccount(id=bid,name=f"Synthetic {bid}",
+                    email=email,plan="free",staff_pin=pin))
+            db.commit()
+        wallet_uuid="ci-wallet-refund-98721"
+        secret="ci-device-refund-98721-abcdefghijklmnop-1234567890"
+        enroll=self.client.post("/api/enroll-sync",json={
+            "business_id":98721,"name":"Refund Test",
+            "uuid":wallet_uuid,"wallet_claim_token":secret})
+        self.assertEqual(enroll.status_code,200,enroll.text)
+        authorization="Bearer "+app.create_access_token({
+            "sub":"refund-a@example.invalid","role":"business","business_id":98721})
+        headers={"Authorization":authorization}
+        receipt_payload={"receipt_ref":"CI-REFUND-98721-A",
+             "lines":[{"product":"Test pastry","quantity":1,"unit_price":12.5}]}
+        issued=self.client.post("/api/loial-receipts/issue",
+            json=receipt_payload,headers=headers)
+        self.assertEqual(issued.status_code,200,issued.text)
+        token=parse_qs(urlsplit(issued.json()["claim_url"]).query)["token"][0]
+        claimed=self.client.post("/api/loial-receipts/claim",
+            json={"receipt_token":token},
+            headers={"X-Loial-Wallet-Token":secret})
+        self.assertEqual(claimed.status_code,200,claimed.text)
+        self.assertTrue(claimed.json()["stamp_granted"])
+        self.assertEqual(claimed.json()["stamps"],1)
+        # A different merchant cannot cancel this firm's receipt by reference.
+        other_header={"Authorization":"Bearer "+app.create_access_token({
+            "sub":"refund-b@example.invalid","role":"business","business_id":98722})}
+        denied=self.client.post("/api/loial-receipts/refund",
+            json={"receipt_ref":"CI-REFUND-98721-A","reason":"Wrong merchant"},
+            headers=other_header)
+        self.assertEqual(denied.status_code,404,denied.text)
+        canceled=self.client.post("/api/loial-receipts/refund",
+            json={"receipt_ref":"CI-REFUND-98721-A","reason":"Actual test refund"},
+            headers=headers)
+        self.assertEqual(canceled.status_code,200,canceled.text)
+        self.assertTrue(canceled.json()["reversed_stamp"])
+        with app.SessionLocal() as db:
+            card=db.query(app.Customer).filter_by(business_id=98721,
+                wallet_uuid=wallet_uuid).one()
+            receipt=db.query(Receipt).filter_by(business_id=98721,
+                receipt_ref="CI-REFUND-98721-A").one()
+            awards=db.query(StampAward).filter_by(business_id=98721,
+                customer_id=card.id).all()
+            self.assertEqual(card.stamps,0)
+            self.assertEqual(receipt.status,"refunded")
+            self.assertEqual({x.source for x in awards},{"receipt","refund"})
+        replay=self.client.post("/api/loial-receipts/refund",
+            json={"receipt_ref":"CI-REFUND-98721-A","reason":"Retry test"},
+            headers=headers)
+        self.assertEqual(replay.status_code,200,replay.text)
+        self.assertEqual(replay.json()["status"],"already_refunded")
+
     def test_join_for_nonexistent_firm_fails_closed(self):
         response = self.client.get("/join/987654321")
         self.assertEqual(response.status_code,404,response.text)
