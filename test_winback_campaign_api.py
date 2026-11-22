@@ -122,6 +122,30 @@ class WinbackCampaignApiTests(unittest.TestCase):
             self.assertEqual(db.query(InboxDelivery).count(),0)
             self.assertEqual(db.query(InboxEntry).count(),0)
 
+    def test_new_opt_in_after_withdrawal_allows_only_new_approved_campaign(self):
+        original=self.draft()
+        with self.Session() as db:
+            db.add(Consent(customer_id=11,purpose=PURPOSE,granted=0,
+                           date=datetime.now(timezone.utc).isoformat(),ip="wallet"))
+            db.commit()
+        blocked=self.client.post(
+            f"/api/loial-winback/campaigns/{original['campaign_id']}/approve")
+        self.assertEqual(blocked.status_code,200,blocked.text)
+        self.assertEqual(blocked.json()["delivered_to_wallet_inbox"],0)
+        with self.Session() as db:
+            db.add(Consent(customer_id=11,purpose=PURPOSE,granted=1,
+                           date=datetime.now(timezone.utc).isoformat(),ip="wallet"))
+            db.commit()
+        fresh=self.draft()
+        self.assertEqual(fresh["eligible_with_marketing_consent"],1)
+        approved=self.client.post(
+            f"/api/loial-winback/campaigns/{fresh['campaign_id']}/approve")
+        self.assertEqual(approved.status_code,200,approved.text)
+        self.assertEqual(approved.json()["delivered_to_wallet_inbox"],1)
+        with self.Session() as db:
+            self.assertEqual(db.query(InboxDelivery).count(),1)
+            self.assertEqual(db.query(InboxEntry).count(),1)
+
     def test_customer_returning_after_draft_is_not_targeted(self):
         draft=self.draft()
         with self.Session() as db:
