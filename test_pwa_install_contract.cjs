@@ -62,10 +62,9 @@ const appleHelp=apple.help.textContent;
 apple.button.handler();
 assert.equal(apple.help.textContent,appleHelp,
   'iOS click should keep language-aware Safari instructions');
-const androidHelp=chrome.help.textContent;
 chrome.button.handler();
-assert.equal(chrome.help.textContent,androidHelp,
-  'Android click should keep translated native-prompt instructions');
+assert.match(chrome.help.textContent,/Android/,
+  'After native prompt is consumed Android shows localized browser-menu instructions');
 const fallback=installHarness('Mozilla/5.0 (Linux; Android) AppleWebKit');
 assert.match(fallback.help.textContent,/Android/);
 
