@@ -148,6 +148,72 @@ class ApplicationBootSmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code,200,response.text)
         self.assertEqual(response.json()["status"],"ignored_mode_mismatch")
 
+    def test_synthetic_wallet_enrollment_scan_and_private_inbox_flow(self):
+        """Full ASGI test: join QR, guarded enrollment, actual scan ledger, private inbox."""
+        from loial_inbox import InboxDelivery
+        from loial_scans import StampAward
+        app=self.application
+        with app.SessionLocal() as db:
+            db.add_all([
+                app.BusinessAccount(id=98701,name="Pilot Bakery A",
+                    email="pilot-a@example.invalid",plan="free",staff_pin="864209"),
+                app.BusinessAccount(id=98702,name="Pilot Bakery B",
+                    email="pilot-b@example.invalid",plan="free",staff_pin="125498")
+            ])
+            db.commit()
+        good_join=self.client.get("/join/98701")
+        self.assertEqual(good_join.status_code,200,good_join.text[:150])
+        missing=self.client.get("/join/98703")
+        self.assertEqual(missing.status_code,404,missing.text[:150])
+        secret="ci-only-device-private-token-98701-0123456789abcdefghijkl"
+        payload={"business_id":98701,"name":"Test Wallet Holder",
+                 "uuid":"ci-wallet-98701","consent_loial_offers":False,
+                 "wallet_claim_token":secret}
+        registered=self.client.post("/api/enroll-sync",json=payload)
+        self.assertEqual(registered.status_code,200,registered.text)
+        self.assertEqual(registered.json()["status"],"saved")
+        self.assertEqual(registered.json()["inbox_access"],secret)
+
+        unauthorized=self.client.post("/api/enroll-sync",
+            json={**payload,"wallet_claim_token":None})
+        self.assertEqual(unauthorized.status_code,401,unauthorized.text)
+        repeat=self.client.post("/api/enroll-sync",json=payload)
+        self.assertEqual(repeat.status_code,200,repeat.text)
+        self.assertEqual(repeat.json()["status"],"exists")
+
+        inbox=self.client.get("/api/loial-inbox/me",
+            headers={"X-Loial-Wallet-Token":secret})
+        self.assertEqual(inbox.status_code,200,inbox.text)
+        self.assertEqual(inbox.json()["cards"],1)
+        public=self.client.get("/api/loial-inbox/me")
+        self.assertEqual(public.status_code,401,public.text)
+        other=self.client.get("/api/loial-inbox/me",
+            headers={"X-Loial-Wallet-Token":"ci-only-another-device-token-"+"z"*48})
+        self.assertEqual(other.status_code,401,other.text)
+
+        scan={"business_id":98701,"pin":"864209","customer_uuid":"ci-wallet-98701",
+              "idempotency_key":"ci-purchase-98701-0001"}
+        wrong=self.client.post("/api/scan-universal",json={**scan,"pin":"111111"})
+        self.assertEqual(wrong.status_code,401,wrong.text)
+        first=self.client.post("/api/scan-universal",json=scan)
+        self.assertEqual(first.status_code,200,first.text)
+        self.assertEqual(first.json()["stamps"],1)
+        replay=self.client.post("/api/scan-universal",json=scan)
+        self.assertEqual(replay.status_code,200,replay.text)
+        self.assertTrue(replay.json()["duplicate_ignored"])
+        another=self.client.post("/api/scan-universal",
+            json={**scan,"idempotency_key":"ci-purchase-98701-0002"})
+        self.assertEqual(another.status_code,409,another.text)
+        with app.SessionLocal() as db:
+            card=db.query(app.Customer).filter(
+                app.Customer.business_id==98701,
+                app.Customer.wallet_uuid=="ci-wallet-98701").one()
+            self.assertEqual(card.stamps,1)
+            self.assertEqual(db.query(StampAward).filter(
+                StampAward.business_id==98701).count(),1)
+            self.assertEqual(db.query(InboxDelivery).filter(
+                InboxDelivery.business_id==98702).count(),0)
+
     def test_join_for_nonexistent_firm_fails_closed(self):
         response = self.client.get("/join/987654321")
         self.assertEqual(response.status_code,404,response.text)
