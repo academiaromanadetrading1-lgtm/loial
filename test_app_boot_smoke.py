@@ -35,10 +35,13 @@ class ApplicationBootSmokeTests(unittest.TestCase):
         import main
         cls.application = main
         cls.client = TestClient(main.app)
+        # Enter the ASGI lifespan so startup migrations/optional queue tables
+        # exist exactly as they do in Railway (TestClient() alone skips startup).
+        cls.client.__enter__()
 
     @classmethod
     def tearDownClass(cls):
-        cls.client.close()
+        cls.client.__exit__(None, None, None)
         cls.patch.stop()
         cls.tempdir.cleanup()
 
