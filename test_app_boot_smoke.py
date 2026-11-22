@@ -430,7 +430,9 @@ class ApplicationBootSmokeTests(unittest.TestCase):
             self.assertEqual(consent_by_firm,{first:False,second:True})
             self.assertTrue(all(card.stamps==0 for card in cards))
             self.assertEqual(db.query(app.Consent).filter(
-                app.Consent.purpose==PURPOSE).count(),3)
+                app.Consent.purpose==PURPOSE,
+                app.Consent.customer_id.in_([card.id for card in cards])
+            ).count(),3)
 
     def test_private_inbox_read_state_cannot_be_modified_by_other_wallet(self):
         """End-to-end wallet isolation: reading a stranger's delivery is forbidden."""
