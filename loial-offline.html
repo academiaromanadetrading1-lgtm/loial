@@ -1,10 +1,37 @@
 <!doctype html>
-<html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#111318"><title>Loial • fără conexiune</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111318"><title>LOIAL • Offline</title>
 <style>body{margin:0;background:#0d0e12;color:#ebdab6;font:16px system-ui,Arial;min-height:100vh;display:grid;place-items:center;padding:24px}
 main{width:100%;max-width:420px;padding:30px;border-radius:24px;border:1px solid #aa925b;background:linear-gradient(130deg,#111318,#292a30,#101115);text-align:center}
 h1{letter-spacing:.22em;margin:0 0 6px;font-size:30px}small{color:#c3a873;letter-spacing:.15em}p{color:#e4e2df;line-height:1.6}button{background:#dbc591;color:#111318;border:0;border-radius:12px;padding:13px 24px;font:inherit;font-weight:750;cursor:pointer}
 .note{color:#aaa;font-size:13px}</style></head><body><main><h1>LOIAL</h1><small>BLACK METAL</small>
-<p>Nu există conexiune la internet. Cardul de fidelitate și ștampilele se verifică online pentru a arăta valorile actuale.</p>
-<button onclick="location.href='/wallet'">Încearcă din nou</button>
-<p class="note">Datele private nu sunt păstrate în memoria offline a aplicației.</p></main></body></html>
+<p id="offlineMessage">You are offline. Your loyalty cards and stamps require an internet connection to show their current values.</p>
+<button id="offlineRetry" onclick="location.href='/wallet'">Try again</button>
+<p class="note" id="offlinePrivacy">Private customer data is never stored in the offline application cache.</p></main>
+<script>
+(function(){
+  'use strict';
+  const translations={
+    en:['LOIAL • Offline','You are offline. Your loyalty cards and stamps require an internet connection to show their current values.','Try again','Private customer data is never stored in the offline application cache.'],
+    ro:['LOIAL • Fără conexiune','Nu există conexiune la internet. Cardurile și ștampilele se verifică online pentru a afișa valorile actuale.','Încearcă din nou','Datele private ale clienților nu sunt păstrate în cache-ul offline.'],
+    es:['LOIAL • Sin conexión','No hay conexión a internet. Tus tarjetas y sellos requieren conexión para mostrar los valores actuales.','Reintentar','Los datos privados de clientes nunca se guardan en la caché sin conexión.'],
+    de:['LOIAL • Offline','Du bist offline. Deine Treuekarten und Stempel benötigen Internet, um aktuelle Werte anzuzeigen.','Erneut versuchen','Private Kundendaten werden niemals im Offline-Cache gespeichert.'],
+    fr:['LOIAL • Hors ligne','Vous êtes hors ligne. Une connexion est nécessaire pour afficher vos cartes et tampons à jour.','Réessayer','Les données privées des clients ne sont jamais stockées dans le cache hors ligne.'],
+    it:['LOIAL • Offline','Sei offline. Serve una connessione per mostrare carte fedeltà e timbri aggiornati.','Riprova','I dati privati dei clienti non vengono mai salvati nella cache offline.'],
+    nl:['LOIAL • Offline','Je bent offline. Voor actuele klantenkaarten en stempels is internet nodig.','Opnieuw proberen','Privégegevens van klanten worden nooit in de offlinecache opgeslagen.'],
+    pl:['LOIAL • Offline','Brak połączenia z internetem. Aktualne karty i pieczątki wymagają połączenia.','Spróbuj ponownie','Prywatne dane klientów nigdy nie są przechowywane w pamięci podręcznej offline.'],
+    hu:['LOIAL • Offline','Nincs internetkapcsolat. A hűségkártyák és pecsétek friss adatainak megjelenítéséhez internet szükséges.','Újrapróbálás','A személyes ügyféladatokat soha nem tároljuk az offline gyorsítótárban.']
+  };
+  let lang='en';
+  try {
+    const saved=localStorage.getItem('loial_language');
+    if(Object.prototype.hasOwnProperty.call(translations,saved))lang=saved;
+  } catch(error) {}
+  const t=translations[lang];
+  document.documentElement.lang=lang;
+  document.title=t[0];
+  document.getElementById('offlineMessage').textContent=t[1];
+  document.getElementById('offlineRetry').textContent=t[2];
+  document.getElementById('offlinePrivacy').textContent=t[3];
+})();
+</script></body></html>
