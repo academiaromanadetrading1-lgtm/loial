@@ -294,6 +294,27 @@ class ApplicationBootSmokeTests(unittest.TestCase):
             self.assertEqual(len(stamps),1)
             self.assertEqual(stamps[0].source,"receipt_visit")
 
+        # Refunding a receipt that awarded zero stamps must not decrement the
+        # already-unlocked reward from an unrelated earlier purchase.
+        refund=self.client.post("/api/loial-receipts/refund",
+            json={"receipt_ref":"CI-RECEIPT-CAP-001",
+                  "reason":"Synthetic refund acceptance test"},
+            headers={"Authorization":"Bearer "+auth})
+        self.assertEqual(refund.status_code,200,refund.text)
+        with app.SessionLocal() as db:
+            receipt=db.query(Receipt).filter_by(
+                business_id=merchant_id,receipt_ref="CI-RECEIPT-CAP-001").one()
+            customer=db.query(app.Customer).filter_by(
+                business_id=merchant_id,wallet_uuid=wallet_uuid).one()
+            self.assertEqual(receipt.status,"refunded")
+            self.assertEqual(customer.stamps,6)
+        refund_again=self.client.post("/api/loial-receipts/refund",
+            json={"receipt_ref":"CI-RECEIPT-CAP-001",
+                  "reason":"Synthetic retry"},
+            headers={"Authorization":"Bearer "+auth})
+        self.assertEqual(refund_again.status_code,200,refund_again.text)
+        self.assertEqual(refund_again.json()["status"],"already_refunded")
+
     def test_join_for_nonexistent_firm_fails_closed(self):
         response = self.client.get("/join/987654321")
         self.assertEqual(response.status_code,404,response.text)
