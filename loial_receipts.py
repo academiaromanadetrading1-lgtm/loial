@@ -323,8 +323,9 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
                               last_visit=utc_now().isoformat())
             db.add(customer);db.flush()
         target=getattr(biz,"stamps_required",None) or 6
-        if expected_status!="reserved" and (customer.stamps or 0)>=target:
-            raise HTTPException(status_code=409,detail="Revendica mai intai recompensa existenta")
+        # A paid, unique receipt remains a valid visit even when the reward
+        # is unlocked. Below, the atomic update grants no extra stamp at cap,
+        # but still records a "receipt_visit" ledger event after claiming.
         claimed=utc_now()
         # Expiry is checked as part of the same atomic claim transition, not
         # solely before it (the ticket may expire during receipt processing).
