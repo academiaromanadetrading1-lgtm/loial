@@ -377,6 +377,61 @@ class ApplicationBootSmokeTests(unittest.TestCase):
         self.assertEqual(replay.status_code,200,replay.text)
         self.assertEqual(replay.json()["status"],"already_refunded")
 
+    def test_wallet_marketing_preference_is_explicit_and_merchant_scoped(self):
+        """Private wallet can opt in/out of one firm without changing another."""
+        from loial_inbox import PURPOSE, latest_offer_choice
+        app=self.application
+        first, second=98731,98732
+        wallet_uuid="ci-wallet-consent-98731"
+        secret="ci-private-consent-token-98731-abcdefghijklmnopqrstuv"
+        with app.SessionLocal() as db:
+            db.add_all([
+                app.BusinessAccount(id=first,name="Consent Shop A",
+                    email="consent-a@example.invalid",plan="free",staff_pin="641209"),
+                app.BusinessAccount(id=second,name="Consent Shop B",
+                    email="consent-b@example.invalid",plan="free",staff_pin="641210")])
+            db.commit()
+        payload={"business_id":first,"name":"Consent Tester","uuid":wallet_uuid,
+                 "wallet_claim_token":secret,"consent_loial_offers":False}
+        enrolled=self.client.post("/api/enroll-sync",json=payload)
+        self.assertEqual(enrolled.status_code,200,enrolled.text)
+        enrolled2=self.client.post("/api/enroll-sync",
+            json={**payload,"business_id":second,"consent_loial_offers":True})
+        self.assertEqual(enrolled2.status_code,200,enrolled2.text)
+        headers={"X-Loial-Wallet-Token":secret}
+        prefs=self.client.get("/api/loial-inbox/preferences",headers=headers)
+        self.assertEqual(prefs.status_code,200,prefs.text)
+        self.assertEqual({row["business_id"]:row["offers_enabled"]
+                          for row in prefs.json()},
+                         {first:False,second:True})
+        denied=self.client.post("/api/loial-inbox/preferences",
+            json={"business_id":first,"enabled":True})
+        self.assertEqual(denied.status_code,401,denied.text)
+        foreign=self.client.post("/api/loial-inbox/preferences",
+            json={"business_id":98733,"enabled":True},headers=headers)
+        self.assertEqual(foreign.status_code,404,foreign.text)
+        opt_in=self.client.post("/api/loial-inbox/preferences",
+            json={"business_id":first,"enabled":True},headers=headers)
+        self.assertEqual(opt_in.status_code,200,opt_in.text)
+        opt_out=self.client.post("/api/loial-inbox/preferences",
+            json={"business_id":first,"enabled":False},headers=headers)
+        self.assertEqual(opt_out.status_code,200,opt_out.text)
+        current=self.client.get("/api/loial-inbox/preferences",headers=headers)
+        self.assertEqual(current.status_code,200,current.text)
+        self.assertEqual({row["business_id"]:row["offers_enabled"]
+                          for row in current.json()},
+                         {first:False,second:True})
+        with app.SessionLocal() as db:
+            cards=db.query(app.Customer).filter(
+                app.Customer.wallet_uuid==wallet_uuid).all()
+            self.assertEqual(len(cards),2)
+            consent_by_firm={card.business_id:latest_offer_choice(
+                db,app.Consent,card.id) for card in cards}
+            self.assertEqual(consent_by_firm,{first:False,second:True})
+            self.assertTrue(all(card.stamps==0 for card in cards))
+            self.assertEqual(db.query(app.Consent).filter(
+                app.Consent.purpose==PURPOSE).count(),3)
+
     def test_join_for_nonexistent_firm_fails_closed(self):
         response = self.client.get("/join/987654321")
         self.assertEqual(response.status_code,404,response.text)
