@@ -42,4 +42,23 @@ storage.set('loial_card_29',JSON.stringify({uuid:'bad uuid with spaces'}));
 a=run();
 assert.equal(a.wallet, 'W-e7f01d1a-3f19-4bea-bfee-987e178dc383');
 assert.match(bootstrap, /readSavedObject\('loial_universal_profile'\)/);
-console.log('PASS: corrupt storage, valid legacy wallet and invalid legacy ID');
+
+// Existing malformed nonempty universal ID must not survive indefinitely.
+storage.set('loial_universal_uuid', 'bad uuid with spaces');
+storage.delete('loial_card_29');
+storage.delete('loial_invalid_universal_uuid_backup');
+a=run();
+assert.equal(a.wallet, 'W-e7f01d1a-3f19-4bea-bfee-987e178dc383');
+assert.equal(storage.get('loial_invalid_universal_uuid_backup'),'bad uuid with spaces');
+assert.equal(storage.get('loial_universal_uuid'),a.wallet);
+
+// Once migrated, the same wallet identity survives every reload.
+const reloaded=run();
+assert.equal(reloaded.wallet,a.wallet);
+assert.equal(storage.get('loial_invalid_universal_uuid_backup'),'bad uuid with spaces');
+
+// Valid persisted identifiers are never overwritten during a reload.
+storage.set('loial_universal_uuid','W-already-registered-wallet-123');
+const registered=run();
+assert.equal(registered.wallet,'W-already-registered-wallet-123');
+console.log('PASS: corrupt storage, legacy wallet migration, invalid persisted ID, reload recovery');
