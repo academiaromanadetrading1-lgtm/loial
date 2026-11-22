@@ -553,6 +553,66 @@ class ApplicationBootSmokeTests(unittest.TestCase):
             self.assertEqual(len(entries),1)
             self.assertEqual(db.query(InboxDelivery).filter_by(entry_id=entries[0].id).count(),1)
 
+    def test_reward_unlock_and_redeem_exactly_once(self):
+        """Real ASGI: final purchase unlocks reward, redeemed once, then resets."""
+        from loial_scans import StampAward
+        from loial_inbox import InboxEntry, InboxDelivery
+        app=self.application
+        merchant_id=98761
+        wallet_uuid="ci-wallet-reward-98761"
+        private="ci-reward-token-98761-abcdefghijklmnopqrstuvwxyz123456"
+        with app.SessionLocal() as db:
+            db.add(app.BusinessAccount(id=merchant_id,name="Reward Shop Test",
+                email="reward-shop@example.invalid",plan="free",staff_pin="514702"))
+            db.commit()
+        joined=self.client.post("/api/enroll-sync",json={
+            "business_id":merchant_id,"name":"Reward Test Client",
+            "uuid":wallet_uuid,"wallet_claim_token":private})
+        self.assertEqual(joined.status_code,200,joined.text)
+        with app.SessionLocal() as db:
+            card=db.query(app.Customer).filter_by(
+                business_id=merchant_id,wallet_uuid=wallet_uuid).one()
+            card.stamps=5
+            db.commit()
+        scan={"business_id":merchant_id,"pin":"514702",
+              "customer_uuid":wallet_uuid,
+              "idempotency_key":"ci-reward-final-purchase-98761"}
+        wrong=self.client.post("/api/scan-universal",
+            json={**scan,"pin":"999999"})
+        self.assertEqual(wrong.status_code,401,wrong.text)
+        granted=self.client.post("/api/scan-universal",json=scan)
+        self.assertEqual(granted.status_code,200,granted.text)
+        self.assertEqual(granted.json()["stamps"],6)
+        self.assertTrue(granted.json()["reward_unlocked"])
+        replay=self.client.post("/api/scan-universal",json=scan)
+        self.assertEqual(replay.status_code,200,replay.text)
+        self.assertTrue(replay.json()["duplicate_ignored"])
+        forbidden=self.client.post("/api/scan-universal",json={
+            **scan,"idempotency_key":"ci-reward-next-purchase-98761"})
+        self.assertEqual(forbidden.status_code,409,forbidden.text)
+        redeem={"business_id":merchant_id,"pin":"514702",
+                "customer_uuid":wallet_uuid}
+        unauthorized=self.client.post("/api/redeem-reward",
+            json={**redeem,"pin":"999999"})
+        self.assertEqual(unauthorized.status_code,401,unauthorized.text)
+        success=self.client.post("/api/redeem-reward",json=redeem)
+        self.assertEqual(success.status_code,200,success.text)
+        self.assertEqual(success.json()["status"],"redeemed")
+        self.assertEqual(success.json()["stamps"],0)
+        double=self.client.post("/api/redeem-reward",json=redeem)
+        self.assertEqual(double.status_code,409,double.text)
+        with app.SessionLocal() as db:
+            card=db.query(app.Customer).filter_by(
+                business_id=merchant_id,wallet_uuid=wallet_uuid).one()
+            events=db.query(StampAward).filter_by(
+                business_id=merchant_id,customer_id=card.id).all()
+            self.assertEqual(card.stamps,0)
+            self.assertEqual([e.source for e in events],["manual","redeem"])
+            inbox=db.query(InboxDelivery).filter_by(customer_id=card.id).all()
+            self.assertEqual(len(inbox),3)  # welcome, final stamp, redemption
+            self.assertEqual(db.query(InboxEntry).filter_by(
+                business_id=merchant_id).count(),3)
+
     def test_join_for_nonexistent_firm_fails_closed(self):
         response = self.client.get("/join/987654321")
         self.assertEqual(response.status_code,404,response.text)
