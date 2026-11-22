@@ -378,6 +378,15 @@
     }
   }
   let globalWalletUuid = localStorage.getItem('loial_universal_uuid');
+  // Corrupted persisted identifiers must not permanently break enrollment.
+  // Leave the old value recoverable before issuing a fresh public identifier.
+  if (globalWalletUuid && !/^[A-Za-z0-9_-]{8,120}$/.test(globalWalletUuid)) {
+    const backupKey = 'loial_invalid_universal_uuid_backup';
+    if (!localStorage.getItem(backupKey)) {
+      localStorage.setItem(backupKey, globalWalletUuid);
+    }
+    globalWalletUuid = null;
+  }
   if (!globalWalletUuid) {
     const legacy = readSavedObject('loial_card_' + bizId);
     // The universal UUID is a public card identifier, never a login secret.
