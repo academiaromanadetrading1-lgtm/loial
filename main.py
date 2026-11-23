@@ -3541,6 +3541,23 @@ install_stripe_billing(app,engine,SessionLocal,BusinessAccount,SalesAgent,
 
 
 
+# Asociere securizata intre browser si PWA, exclusiv cu autorizarea cardului existent.
+# Derive a separate encryption key from the deployment secret; do not store
+# the private bearer credential in plaintext in the pairing table.
+import base64 as _pair_b64
+import hashlib as _pair_hashlib
+from cryptography.fernet import Fernet as _PairFernet
+from loial_wallet_pairing import install_wallet_pairing
+_pair_key = _pair_b64.urlsafe_b64encode(_pair_hashlib.sha256(
+    (SECRET_KEY + ":loial-pwa-device-pair-v1").encode("utf-8")).digest())
+_pair_cipher = _PairFernet(_pair_key)
+install_wallet_pairing(
+    app, engine, SessionLocal,
+    encrypt=lambda token: _pair_cipher.encrypt(token.encode("utf-8")).decode("ascii"),
+    decrypt=lambda blob: _pair_cipher.decrypt(blob.encode("ascii")).decode("utf-8"),
+    limiter=limiter
+)
+
 # Recuperare izolata a cardurilor legacy, cu verificare in persoana si cod de unica folosinta.
 from loial_wallet_recovery import install_wallet_recovery
 install_wallet_recovery(app, engine, SessionLocal, BusinessAccount, Customer,
