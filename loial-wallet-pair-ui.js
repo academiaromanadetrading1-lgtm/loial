@@ -77,6 +77,19 @@ function ready(){
       // An earlier card belonging to the other browser must never be presented
       // as the newly paired customer's identity on this device.
       localStorage.removeItem('loial_universal_profile');
+      // Reconstruct the original verified profile so scanning the merchant QR
+      // on the installed PWA immediately reopens the existing card.
+      const profileResponse=await fetch('/api/wallet-profile/'+encodeURIComponent(data.wallet_uuid),{
+        headers:{'X-Loial-Wallet-Token':data.private_token},cache:'no-store'
+      });
+      if(profileResponse.ok){
+        const profile=await profileResponse.json();
+        if(typeof profile.name==='string'&&profile.name.trim()){
+          localStorage.setItem('loial_universal_profile',JSON.stringify({
+            uuid:data.wallet_uuid,name:profile.name,email:''
+          }));
+        }
+      }
       input.value='';
       info(translate('Card asociat. Se reîncarcă portofelul…','Wallet paired. Reloading…'));
       location.replace('/wallet?source=paired');
