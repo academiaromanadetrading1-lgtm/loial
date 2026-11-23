@@ -24,7 +24,7 @@ class Check:
 def validated_public_origin(value, environment_name=""):
     """Return an exact HTTPS origin, with staging never pointing to production."""
     from urllib.parse import urlsplit
-    raw=(value or "").strip()
+    raw=value or ""
     if not raw or raw!=raw.rstrip("/") or any(c.isspace() or c in "*\\\\?#" for c in raw):
         raise ValueError("LOIAL_PUBLIC_ORIGIN must be an exact HTTPS origin")
     try:
@@ -126,7 +126,7 @@ def preflight(env=None,stage="production"):
     add("staging_no_live_stripe",stage!="staging" or not stripe_key.startswith("sk_live_"),
         "Never configure live Stripe secret keys in staging")
     price_id=env.get("LOIAL_STRIPE_PRICE_ID","")
-    origin=env.get("LOIAL_PUBLIC_ORIGIN","https://loial.space").rstrip("/")
+    origin=env.get("LOIAL_PUBLIC_ORIGIN","https://loial.space")
     public_free_pilot=env.get("LOIAL_PUBLIC_FREE_PILOT","0")=="1"
     # Free-only public launch can proceed before Stripe credentials exist.
     # Fail closed when credentials are partly set, or live charges requested.

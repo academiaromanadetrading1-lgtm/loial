@@ -323,8 +323,9 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
                               last_visit=utc_now().isoformat())
             db.add(customer);db.flush()
         target=getattr(biz,"stamps_required",None) or 6
-        if expected_status!="reserved" and (customer.stamps or 0)>=target:
-            raise HTTPException(status_code=409,detail="Revendica mai intai recompensa existenta")
+        # A paid, unique receipt remains a valid visit even when the reward
+        # is unlocked. Below, the atomic update grants no extra stamp at cap,
+        # but still records a "receipt_visit" ledger event after claiming.
         claimed=utc_now()
         # Expiry is checked as part of the same atomic claim transition, not
         # solely before it (the ticket may expire during receipt processing).
@@ -368,6 +369,18 @@ def install_receipts(app,engine,factory,BusinessAccount,Customer,AIDocument,AISa
             from loial_friend_referrals import credit_after_valid_stamp
             credit_after_valid_stamp(db,wallet_uuid,biz.id,
                                      "receipt:"+str(receipt.id))
+        if not stamp_granted:
+            # A valid purchased receipt is still a visit when the customer's
+            # reward is already unlocked. Keep the audited visit ledger accurate
+            # without awarding an extra stamp or issuing a referral reward.
+            from loial_scans import record_award
+            record_award(db,biz.id,customer.id,"receipt:"+str(receipt.id),
+                         "receipt_visit",customer.stamps)
+        # A redeemed, single-use receipt is a confirmed visit even when the
+        # stamp target is already reached. Count it once, never infer revenue.
+        from loial_winback_campaigns import attribute_confirmed_visit
+        attribute_confirmed_visit(db,biz.id,customer.id,
+                                  "receipt:"+str(receipt.id),at=claimed)
         from loial_wallet_sync import queue_google_refresh
         queue_google_refresh(db,biz.id,wallet_uuid)
         from loial_apple_updates import mark_customer_pass_changed

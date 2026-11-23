@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -360,16 +360,43 @@
   </div>
 
 <script>
-  const bizId = parseInt(location.pathname.split('/').pop()) || 1;
+  // A missing or malformed QR destination must never fall back to merchant 1.
+  const joinMatch = /^\/join\/([1-9]\d*)\/?$/.exec(location.pathname);
+  const bizId = joinMatch ? Number(joinMatch[1]) : null;
+  if (!Number.isSafeInteger(bizId) || bizId <= 0) {
+    location.replace('/');
+    throw new Error('Invalid merchant QR destination');
+  }
+  function readSavedObject(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      const value = raw ? JSON.parse(raw) : null;
+      return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+    } catch (error) {
+      // Keep the existing value intact so the user may recover their wallet.
+      return null;
+    }
+  }
   let globalWalletUuid = localStorage.getItem('loial_universal_uuid');
+  // Corrupted persisted identifiers must not permanently break enrollment.
+  // Leave the old value recoverable before issuing a fresh public identifier.
+  if (globalWalletUuid && !/^[A-Za-z0-9_-]{8,120}$/.test(globalWalletUuid)) {
+    const backupKey = 'loial_invalid_universal_uuid_backup';
+    if (!localStorage.getItem(backupKey)) {
+      localStorage.setItem(backupKey, globalWalletUuid);
+    }
+    globalWalletUuid = null;
+  }
   if (!globalWalletUuid) {
-    const legacy = JSON.parse(localStorage.getItem('loial_card_' + bizId) || 'null');
-    // 122+ biți de entropie: UUID public nu este credențial, dar evităm coliziunile.
-    globalWalletUuid = (legacy && legacy.uuid) ? legacy.uuid : ('W-' + crypto.randomUUID());
+    const legacy = readSavedObject('loial_card_' + bizId);
+    // The universal UUID is a public card identifier, never a login secret.
+    globalWalletUuid = (legacy && typeof legacy.uuid === 'string' &&
+      /^[A-Za-z0-9_-]{8,120}$/.test(legacy.uuid))
+      ? legacy.uuid : ('W-' + crypto.randomUUID());
     localStorage.setItem('loial_universal_uuid', globalWalletUuid);
   }
 
-  let savedProfile = JSON.parse(localStorage.getItem('loial_universal_profile') || 'null');
+  let savedProfile = readSavedObject('loial_universal_profile');
   let knownStamps = 0;
   let targetStamps = 6;
   let currentBizName = 'Card Loial';
@@ -1004,6 +1031,7 @@
   }
 </script>
 <script src="/loial-i18n.js"></script>
+<script src="/loial-wallet-ui-i18n.js"></script>
 <div style="text-align:center;padding:18px;font-size:13px"><a href="/register.html?utm_source=card" rel="noreferrer" style="color:inherit">Ai o afacere? Încearcă LOIAL gratuit.</a></div>
 </body>
 </html>

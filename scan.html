@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="en">
 <head>
 <meta name="referrer" content="no-referrer">
 <meta charset="UTF-8">
@@ -181,6 +181,12 @@
       return id;
     }catch(error){return crypto.randomUUID();}
   }
+  function clearConfirmedScanOperation(walletUuid) {
+    // A successful grant (including a confirmed replay) completes the request.
+    // Keep the ID only when the network result is unknown, for safe retries.
+    try { sessionStorage.removeItem('loial_pending_scan_'+bizId+'_'+walletUuid); }
+    catch (error) { /* Storage can be unavailable in private browsing. */ }
+  }
   async function grantStampDirect(walletUuid) {
     const box = document.getElementById('resultBox');
     box.className = 'status-box';
@@ -214,10 +220,12 @@
       }
 
       if(data.duplicate_ignored){
+        clearConfirmedScanOperation(walletUuid);
         box.className='status-box';
         box.textContent=(window.LoialLang?.t("✓ Această scanare a fost deja procesată. Ștampilele nu s-au dublat.") ?? "✓ Această scanare a fost deja procesată. Ștampilele nu s-au dublat.");
         return;
       }
+      clearConfirmedScanOperation(walletUuid);
       playBeep();
       box.replaceChildren();
       function addLine(text, fontSize, color) {

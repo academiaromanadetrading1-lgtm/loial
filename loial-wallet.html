@@ -83,6 +83,23 @@ button.black{background:#111318;color:#ddc48b}
     <p class="notice">Pe iPhone, aplicația adăugată pe ecran poate avea un spațiu de date separat de Safari. Dacă nu îți recunoaște cardul, folosește recuperarea verificată, nu QR-ul public.</p>
   </div>
 </section>
+<section class="panel" id="devicePairPanel">
+  <h2>Conectează același card pe telefon</h2>
+  <p class="muted">Dacă ai activat deja cardul în Chrome, Safari sau alt browser, nu crea alt card. Conectează dispozitivele folosind un cod temporar, fără a pierde ștampilele.</p>
+  <div id="pairExistingWallet">
+    <button type="button" id="pairIssue" class="secondary">Generează cod pentru aplicația instalată</button>
+    <div id="pairCodeBox" hidden>
+      <label for="pairIssuedCode">Cod temporar de conectare, valabil 10 minute</label>
+      <input id="pairIssuedCode" readonly autocomplete="off" style="width:100%;padding:12px;border:1px solid #9cb4a4;border-radius:10px;font-size:13px">
+      <button type="button" id="pairCopy" class="secondary" style="margin-top:8px">Copiază codul</button>
+    </div>
+  </div>
+  <label for="pairCode">Am deja un card în alt browser. Introdu codul:</label>
+  <input id="pairCode" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Lipește codul din browserul original" style="width:100%;padding:12px;border:1px solid #9cb4a4;border-radius:10px;font-size:14px">
+  <button type="button" id="pairRedeem" style="margin-top:8px">Conectează cardul existent</button>
+  <div class="muted" id="pairFeedback" role="status" aria-live="polite"></div>
+  <p class="notice">Nu trimite codul altor persoane. Codul QR al cardului nu permite transferul accesului.</p>
+</section>
 <section class="panel" id="inboxSection">
   <h2>Mesaje primite în Loial</h2>
   <p>Mesajele firmelor și recompensele sunt vizibile aici, fără email și SMS.</p>
@@ -341,6 +358,6 @@ button.black{background:#111318;color:#ddc48b}
   };
   loadCards();loadInbox();loadFriends();loadMerchantReferral();
 })();
-</script><script src="/loial-i18n.js"></script>
+</script><script src="/loial-wallet-pair-ui.js"></script><script src="/loial-i18n.js"></script>
 <div style="text-align:center;padding:18px;font-size:13px"><a href="/register.html?utm_source=card" rel="noreferrer" style="color:inherit">Ai o afacere? Încearcă LOIAL gratuit.</a></div>
 </body></html>

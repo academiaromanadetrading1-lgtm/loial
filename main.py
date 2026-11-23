@@ -119,7 +119,7 @@ class User(Base):
     password = Column(String)
     name = Column(String)
     plan = Column(String, default="starter", index=True)
-    role = Column(String, default="owner", index=True)
+    role = Column(String, default="user", index=True)
 
 class Customer(Base):
     __tablename__ = "customers"
@@ -327,7 +327,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         if email is None:
             raise HTTPException(status_code=401, detail="Invalid token")
         user = db.query(User).filter(User.email == email).first()
-        if not user or payload.get("role") != user.role:
+        if not user or payload.get("principal_type") != "user" or payload.get("role") != user.role:
             raise HTTPException(status_code=401,detail="Sesiune de utilizator invalida")
         return user
     except JWTError:
@@ -371,7 +371,7 @@ def seed_data(db: Session):
         if len(demo_secret) < 12:
             raise RuntimeError("Set LOIAL_DEV_DEMO_PASSWORD (minim 12 caractere) for explicit dev seed")
         db.add(User(email="demo@loial.app", password=pwd_context.hash(demo_secret),
-                    name="Cont demo", plan="starter", role="owner"))
+                    name="Cont demo", plan="starter", role="user"))
     admin_email = os.getenv("LOIAL_ADMIN_BOOTSTRAP_EMAIL", "").strip().lower()
     admin_secret = os.getenv("LOIAL_ADMIN_BOOTSTRAP_PASSWORD", "")
     if admin_email:
@@ -414,7 +414,7 @@ def cleanup_old_data(db: Session):
 
 @app.post("/gdpr/cleanup")
 def trigger_cleanup(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     result = cleanup_old_data(db)
     return {"status": "completed", **result}
@@ -586,7 +586,9 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
     if role=="business" and not isinstance(authenticated,BusinessAccount):
         raise HTTPException(status_code=403,detail="Cont Business invalid")
     biz_id_val = business.id if isinstance(authenticated,BusinessAccount) else None
-    claims={"sub":email,"role":role}
+    principal_type = ("business" if isinstance(authenticated, BusinessAccount) else
+                      "agent" if isinstance(authenticated, SalesAgent) else "user")
+    claims={"sub":email,"role":role,"principal_type":principal_type}
     if biz_id_val is not None:claims["business_id"]=biz_id_val
     if role=="ambassador" and agent:claims["agent_id"]=agent.id
     token=create_access_token(claims)
@@ -668,6 +670,7 @@ def get_stats(current_user: User = Depends(get_current_user), db: Session = Depe
 @app.get("/campaign")
 @app.post("/campaign")
 def generate_campaign(lang: str = "en", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    raise HTTPException(status_code=410, detail="Campaniile legacy fara izolare pe firma au fost retrase. Foloseste campaniile din panoul firmei.")
     campaigns = {
         "en": "Hi Andrei, we noticed you love cappuccinos. Come this week and get double stamps + a free croissant.",
         "ro": "Bună Andrei, am observat că iubești cappuccino. Vino săptămâna asta și primești ștampile duble + un croissant gratis.",
@@ -858,6 +861,14 @@ def privacy_info():
 @app.post("/sales/register")
 @limiter.limit("10/minute")
 def register_agent(request: Request, name: str, email: str, password: str, phone: str = "", db: Session = Depends(get_db)):
+    # Legacy registration must not create accounts with empty or weak passwords.
+    if not 10 <= len(password.encode("utf-8")) <= 72:
+        raise HTTPException(status_code=422, detail="Parola trebuie sa aiba intre 10 si 72 de octeti")
+    email = email.strip().lower()
+    if len(email) > 254 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise HTTPException(status_code=422, detail="Adresa de email invalida")
+    if not 1 <= len(name.strip()) <= 100:
+        raise HTTPException(status_code=422, detail="Nume invalid")
     existing = db.query(SalesAgent).filter(SalesAgent.email == email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -881,7 +892,7 @@ def agent_login(request: Request, email: str, password: str, db: Session = Depen
         raise HTTPException(status_code=401, detail="Email sau parolă incorectă")
     if agent.status != "active":
         raise HTTPException(status_code=403, detail=f"Cont în așteptare. Status: {agent.status}")
-    token = create_access_token({"sub": agent.email, "role": agent.role, "agent_id": agent.id})
+    token = create_access_token({"sub": agent.email, "role": agent.role, "agent_id": agent.id, "principal_type": "agent"})
     return {
         "access_token": token,
         "agent": {"id": agent.id, "name": agent.name, "email": agent.email, "role": agent.role, "is_manager": agent.is_manager, "team_id": agent.team_id}
@@ -889,18 +900,22 @@ def agent_login(request: Request, email: str, password: str, db: Session = Depen
 
 @app.get("/sales/pending")
 def list_pending(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     pending = db.query(SalesAgent).filter(SalesAgent.status == "pending").all()
     return [{"id": a.id, "name": a.name, "email": a.email, "phone": a.phone, "created_at": a.created_at} for a in pending]
 
 @app.post("/sales/validate/{agent_id}")
 def validate_agent(agent_id: int, role: str = "agent", commission_own: float = 20.0, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
+    if role not in ("agent", "ambassador", "manager"):
+        raise HTTPException(status_code=422, detail="Rol de afiliat invalid")
+    if not 0 <= commission_own <= 100:
+        raise HTTPException(status_code=422, detail="Comision invalid")
     agent.status = "trial"
     agent.active = True
     agent.role = role
@@ -931,7 +946,7 @@ def request_team(name: str, current_user: User = Depends(get_current_user), db: 
 
 @app.get("/sales/teams/pending")
 def pending_teams(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     teams = db.query(SalesTeam).all()
     result = []
@@ -943,7 +958,7 @@ def pending_teams(current_user: User = Depends(get_current_user), db: Session = 
 
 @app.post("/sales/team/approve/{team_id}")
 def approve_team(team_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     team = db.query(SalesTeam).filter(SalesTeam.id == team_id).first()
     if not team:
@@ -973,14 +988,14 @@ def my_team(current_user: User = Depends(get_current_user), db: Session = Depend
 
 @app.get("/sales/all")
 def all_agents(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     agents = db.query(SalesAgent).all()
     return [{"id": a.id, "name": a.name, "email": a.email, "role": a.role, "status": a.status, "is_manager": a.is_manager, "commission_own": a.commission_own} for a in agents]
 
 @app.post("/sales/agent")
 def create_sales_agent(name: str, email: str, phone: str = "", commission_own: float = 20.0, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     agent = SalesAgent(name=name, email=email, phone=phone, commission_own=commission_own, commission_team=5.0, bonus_team=5.0, active=True, created_at=datetime.now().isoformat())
     db.add(agent)
@@ -1124,7 +1139,7 @@ def agent_stats(agent_id: int, month: str = None, current_user: User = Depends(g
 
 @app.post("/sales/team")
 def create_team(name: str, manager_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     team = SalesTeam(name=name, manager_id=manager_id, created_at=datetime.now().isoformat())
     db.add(team)
@@ -1149,14 +1164,14 @@ def add_to_team(team_id: int, agent_id: int, current_user: User = Depends(get_cu
 @app.post("/sales/commissions/calculate")
 def calc_commissions(month: str = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     return {"results": calculate_commissions(db, Sale, Commission, SalesAgent, month)}
 
 @app.post("/sales/commissions/pay/{agent_id}")
 def pay_commission(agent_id: int, month: str = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     if not month:
         month = datetime.now().strftime("%Y-%m")
@@ -1171,7 +1186,7 @@ def pay_commission(agent_id: int, month: str = None, current_user: User = Depend
 @app.put("/sales/agent/{agent_id}/commission")
 def set_commission(agent_id: int, own: float = 20.0, team: float = 5.0, bonus: float = 5.0, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Comisioanele sunt fixe conform planului publicat, calculate exclusiv din incasari verificate")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if agent:
@@ -1183,7 +1198,7 @@ def set_commission(agent_id: int, own: float = 20.0, team: float = 5.0, bonus: f
 
 @app.post("/admin/broadcast")
 def broadcast_message(title: str, message: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     businesses = db.query(BusinessAccount).all()
     count = 0
@@ -1206,7 +1221,7 @@ def submit_feedback(business_email: str, message: str, db: Session = Depends(get
 
 @app.get("/admin/feedback")
 def list_feedback(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     feedbacks = db.query(BusinessFeedback).order_by(BusinessFeedback.id.desc()).all()
     result = []
@@ -1217,7 +1232,7 @@ def list_feedback(current_user: User = Depends(get_current_user), db: Session = 
 
 @app.post("/admin/feedback/{feedback_id}/respond")
 def respond_feedback(feedback_id: int, response: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     feedback = db.query(BusinessFeedback).filter(BusinessFeedback.id == feedback_id).first()
     if not feedback:
@@ -1242,7 +1257,7 @@ def business_login(request: Request, email: str, password: str, db: Session = De
 
 @app.get("/analytics/admin")
 def admin_analytics(period: str = "month", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     now = datetime.now()
     periods = {"day": 1, "week": 7, "month": 30, "quarter": 90, "semester": 180, "year": 365}
@@ -1433,7 +1448,7 @@ def set_payout_method(agent_id: int, method: str, details: str, current_user: Us
 @app.get("/admin/payouts/pending")
 def pending_payouts(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     month = datetime.now().strftime("%Y-%m")
     agents = db.query(SalesAgent).filter(SalesAgent.status == "active").all()
@@ -1479,7 +1494,7 @@ def pending_payouts(current_user: User = Depends(get_current_user), db: Session 
 @app.post("/admin/payouts/pay/{agent_id}")
 def pay_agent(agent_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent:
@@ -1540,7 +1555,7 @@ def agent_payouts(agent_id: int, current_user: User = Depends(get_current_user),
 @app.post("/invoices/create")
 def create_invoice(business_id: int, amount: float, description: str = "Loial Pro Subscription", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Facturarea abonamentelor se face exclusiv prin fluxul Stripe.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     if not biz:
@@ -1560,7 +1575,7 @@ def create_invoice(business_id: int, amount: float, description: str = "Loial Pr
 
 @app.get("/invoices")
 def list_invoices(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     invoices = db.query(Invoice).order_by(Invoice.id.desc()).all()
     result = []
@@ -1572,7 +1587,7 @@ def list_invoices(current_user: User = Depends(get_current_user), db: Session = 
 @app.post("/invoices/{invoice_id}/paid")
 def mark_invoice_paid(invoice_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
@@ -1585,7 +1600,7 @@ def mark_invoice_paid(invoice_id: int, current_user: User = Depends(get_current_
 @app.post("/payouts/wise")
 def create_wise_payout(agent_id: int, amount: float, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Fluxul vechi nu verifica incasarile. Foloseste registrul /api/loial-revenue.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     agent = db.query(SalesAgent).filter(SalesAgent.id == agent_id).first()
     if not agent:
@@ -1650,7 +1665,7 @@ def get_pricing(country: str = "RO", db: Session = Depends(get_db)):
 @app.put("/pricing/{plan}")
 def update_pricing(plan: str, base_price: float, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Pretul LOIAL se schimba numai prin actualizarea verificata a configuratiei Stripe.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     pricing = db.query(Pricing).filter(Pricing.plan == plan).first()
     if not pricing:
@@ -1668,7 +1683,7 @@ def get_vat_rates(db: Session = Depends(get_db)):
 @app.put("/vat-rates/{country}")
 def update_vat_rate(country: str, rate: float, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Configurarea TVA a fluxului vechi este retrasa.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     vat = db.query(VATRate).filter(VATRate.country_code == country.upper()).first()
     if vat:
@@ -1682,7 +1697,7 @@ def update_vat_rate(country: str, rate: float, current_user: User = Depends(get_
 @app.post("/invoices/create")
 def create_invoice(business_id: int, plan: str = "pro", country: str = "RO", description: str = "", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     raise HTTPException(status_code=410,detail="Facturarea abonamentelor se face exclusiv prin fluxul Stripe.")
-    if current_user.role not in ["admin", "owner"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     biz = db.query(BusinessAccount).filter(BusinessAccount.id == business_id).first()
     if not biz:
@@ -1910,7 +1925,11 @@ def get_business_public(business_id: int, db: Session = Depends(get_db)):
     }
 
 @app.get("/join/{business_id}")
-def join_qr_page(business_id: int):
+def join_qr_page(business_id: int, db: Session = Depends(get_db)):
+    # A malformed or deleted QR must never enroll a customer into another firm.
+    if business_id <= 0 or not db.query(BusinessAccount.id).filter(
+            BusinessAccount.id == business_id).first():
+        raise HTTPException(status_code=404, detail="Business not found")
     return FileResponse("join.html")
 
 def business_can_enroll_new_customers(db, business_id):
@@ -1935,6 +1954,9 @@ class QREnrollRequest(BaseModel):
 @app.post("/api/enroll")
 @limiter.limit("10/minute")
 def qr_enroll(request: Request, req: QREnrollRequest, db: Session = Depends(get_db)):
+    # This legacy endpoint minted a card without a device-bound wallet secret.
+    # The live join page uses /api/enroll-sync with wallet possession checks.
+    raise HTTPException(status_code=410, detail="Legacy QR enrollment retired; use /api/enroll-sync.")
     # Public QR registration is subject to throttling and bounded input size.
     name = req.name.strip()
     if not 1 <= len(name) <= 120:
@@ -1997,7 +2019,8 @@ class PublicFeedbackRequest(BaseModel):
     message: str
 
 @app.post("/api/private-feedback")
-def save_public_review_feedback(req: PublicFeedbackRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def save_public_review_feedback(request: Request, req: PublicFeedbackRequest, db: Session = Depends(get_db)):
     if not 1 <= req.rating <= 5 or len(req.message) > 2000:
         raise HTTPException(422, "Feedback invalid")
     if not db.get(BusinessAccount, req.business_id):
@@ -2399,13 +2422,17 @@ def require_business_owner_or_admin(business_id: int, credentials, db: Session):
     if not email:
         raise HTTPException(status_code=403, detail="Acces interzis")
     if claims.get("role") == "business":
+        # A merchant JWT is bound to its original business ID, not just an email.
+        # This prevents stale tokens gaining access after account recreation.
+        if type(claims.get("business_id")) is not int or claims["business_id"] != business_id:
+            raise HTTPException(status_code=403, detail="Tokenul nu apartine acestei firme")
         account = db.query(BusinessAccount).filter(BusinessAccount.id == business_id,
                           BusinessAccount.email == email).first()
         if account:
             return account
-    elif claims.get("role") in ("admin", "owner"):
+    elif claims.get("role") == "admin" and claims.get("principal_type") == "user":
         operator = db.query(User).filter(User.email == email).first()
-        if operator and operator.role in ("admin", "owner"):
+        if operator and operator.role == "admin":
             return operator
     raise HTTPException(status_code=403, detail="Nu ai acces la aceasta firma")
 
@@ -2417,7 +2444,7 @@ def require_platform_admin(credentials, db: Session):
     except JWTError:
         raise HTTPException(status_code=401, detail="Sesiune invalida")
     admin = db.query(User).filter(User.email == claims.get("sub")).first()
-    if not admin or admin.role not in ("admin", "owner") or claims.get("role") not in ("admin", "owner"):
+    if not admin or admin.role != "admin" or claims.get("role") != "admin" or claims.get("principal_type") != "user":
         raise HTTPException(status_code=403, detail="Doar administratorul platformei")
     return admin
 
@@ -2882,6 +2909,10 @@ def scan_universal_card(request: Request, req: UniversalScanRequest, db: Session
     queue_service_event(db, biz, customer, kind="stamp", returning=was_away,
                         event_key=operation)
     record_award(db,biz.id,customer.id,operation,"manual",customer.stamps)
+    # Attribution is transactionally tied to a new confirmed manual stamp.
+    # Retried scan operations return early above, so they cannot be counted twice.
+    from loial_winback_campaigns import attribute_confirmed_visit
+    attribute_confirmed_visit(db,biz.id,customer.id,operation)
     from loial_friend_referrals import credit_after_valid_stamp
     credit_after_valid_stamp(db,wallet_id,biz.id,"scan:"+operation)
     from loial_wallet_sync import queue_google_refresh
@@ -3510,6 +3541,23 @@ install_stripe_billing(app,engine,SessionLocal,BusinessAccount,SalesAgent,
 
 
 
+# Asociere securizata intre browser si PWA, exclusiv cu autorizarea cardului existent.
+# Derive a separate encryption key from the deployment secret; do not store
+# the private bearer credential in plaintext in the pairing table.
+import base64 as _pair_b64
+import hashlib as _pair_hashlib
+from cryptography.fernet import Fernet as _PairFernet
+from loial_wallet_pairing import install_wallet_pairing
+_pair_key = _pair_b64.urlsafe_b64encode(_pair_hashlib.sha256(
+    (SECRET_KEY + ":loial-pwa-device-pair-v1").encode("utf-8")).digest())
+_pair_cipher = _PairFernet(_pair_key)
+install_wallet_pairing(
+    app, engine, SessionLocal,
+    encrypt=lambda token: _pair_cipher.encrypt(token.encode("utf-8")).decode("ascii"),
+    decrypt=lambda blob: _pair_cipher.decrypt(blob.encode("ascii")).decode("utf-8"),
+    limiter=limiter
+)
+
 # Recuperare izolata a cardurilor legacy, cu verificare in persoana si cod de unica folosinta.
 from loial_wallet_recovery import install_wallet_recovery
 install_wallet_recovery(app, engine, SessionLocal, BusinessAccount, Customer,
@@ -3565,6 +3613,17 @@ install_growth(app, INDUSTRIES)
 
 from loial_multilocation import install_multilocation
 install_multilocation(app,engine,SessionLocal,BusinessAccount,Customer,SECRET_KEY,ALGORITHM)
+
+# Read-only retention insights: only confirmed scans; no automatic marketing.
+from loial_winback import install_winback
+from loial_scans import StampAward
+install_winback(app,engine,get_db,BusinessAccount,Customer,StampAward,
+                require_business_account_token,security)
+
+# Merchant approval is required before marketing reaches the private wallet inbox.
+from loial_winback_campaigns import install_winback_campaigns
+install_winback_campaigns(app,engine,get_db,BusinessAccount,Customer,
+                         StampAward,Consent,require_business_account_token,security)
 
 
 from loial_acquisition import AcquisitionBase, pilot_snapshot
